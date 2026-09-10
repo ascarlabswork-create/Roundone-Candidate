@@ -1,17 +1,18 @@
 import { Search, SlidersHorizontal } from 'lucide-react'
 import { useMemo, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import { listInterviewers } from '../api/index.ts'
+import { COMPARE_MAX, ComparePanel } from '../components/interviewer/ComparePanel.tsx'
 import { FilterPanel } from '../components/interviewer/FilterPanel.tsx'
 import { InterviewerCard, InterviewerCardSkeleton } from '../components/interviewer/InterviewerCard.tsx'
 import { Button } from '../components/ui/Button.tsx'
 import { EmptyState, ErrorState, SelectInput, TextInput } from '../components/ui/primitives.tsx'
 import { SORT_OPTIONS, type SortOption } from '../data/catalogs.ts'
 import { getNextSlot } from '../data/interviewers.ts'
-import { formatINR } from '../lib/format.ts'
 import { useAsync } from '../lib/useAsync.ts'
 import { hasMeaningfulPreferences, scoreInterviewer } from '../matching/index.ts'
 import { useMatching } from '../state/matching.tsx'
+import { useToast } from '../state/toast.tsx'
 import type { Interviewer, InterviewerFilters } from '../types.ts'
 
 const defaultFilters: InterviewerFilters = {
@@ -100,32 +101,40 @@ export function SearchPage() {
   const [params, setParams] = useSearchParams()
   const filters = useMemo(() => filtersFromParams(params), [params])
   const { preferences } = useMatching()
+  const { pushToast } = useToast()
   const [drawerOpen, setDrawerOpen] = useState(false)
-  const [compareIds, setCompareIds] = useState<string[]>([])
+  const [compared, setCompared] = useState<Interviewer[]>([])
 
   const state = useAsync(() => listInterviewers(filters), [params.toString()])
 
   const matchById = useMemo(() => {
     const map = new Map<string, number>()
-    if (!hasMeaningfulPreferences(preferences) || state.status !== 'success') return map
-    for (const person of state.data) {
+    if (!hasMeaningfulPreferences(preferences)) return map
+    const people = state.status === 'success' ? state.data : []
+    const extra = compared.filter((person) => !people.some((item) => item.id === person.id))
+    for (const person of [...people, ...extra]) {
       map.set(person.id, scoreInterviewer(person, preferences!).score)
     }
     return map
-  }, [preferences, state])
+  }, [preferences, state, compared])
 
   const visible = state.status === 'success' ? sortInterviewers(state.data, filters.sort, matchById) : []
-  const compared = visible.filter((person) => compareIds.includes(person.id))
+  const compareIds = compared.map((person) => person.id)
 
   function updateFilters(next: InterviewerFilters) {
     setParams(filtersToParams(next), { replace: true })
   }
 
-  function toggleCompare(id: string) {
-    setCompareIds((current) => {
-      if (current.includes(id)) return current.filter((item) => item !== id)
-      if (current.length >= 3) return current
-      return [...current, id]
+  function toggleCompare(person: Interviewer) {
+    setCompared((current) => {
+      if (current.some((item) => item.id === person.id)) {
+        return current.filter((item) => item.id !== person.id)
+      }
+      if (current.length >= COMPARE_MAX) {
+        pushToast('You can compare up to 3 interviewers')
+        return current
+      }
+      return [...current, person]
     })
   }
 
@@ -180,7 +189,15 @@ export function SearchPage() {
           </div>
         </div>
 
-        <div className="space-y-4 pb-24">
+        <div
+          className={
+            compared.length === 0
+              ? 'space-y-4 pb-8'
+              : compared.length === 1
+                ? 'space-y-4 pb-28'
+                : 'space-y-4 pb-[min(70vh,40rem)]'
+          }
+        >
           {state.status === 'loading' ? (
             <>
               <InterviewerCardSkeleton />
@@ -206,7 +223,8 @@ export function SearchPage() {
               interviewer={person}
               matchScore={matchById.get(person.id)}
               selected={compareIds.includes(person.id)}
-              onToggleCompare={() => toggleCompare(person.id)}
+              compareFull={compared.length >= COMPARE_MAX}
+              onToggleCompare={() => toggleCompare(person)}
             />
           ))}
         </div>
@@ -233,28 +251,12 @@ export function SearchPage() {
         </div>
       ) : null}
 
-      {compared.length > 0 ? (
-        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 p-3 shadow-lg backdrop-blur">
-          <div className="mx-auto flex max-w-7xl items-center gap-4 overflow-x-auto">
-            <p className="shrink-0 text-sm font-semibold text-navy-950">Compare</p>
-            {compared.map((person) => (
-              <Link
-                key={person.id}
-                to={`/candidate/interviewers/${person.id}`}
-                className="min-w-48 rounded-lg border border-slate-200 px-3 py-2 text-sm"
-              >
-                <p className="font-medium text-navy-950">{person.name}</p>
-                <p className="text-slate-600">
-                  {formatINR(person.price)} · {person.rating}
-                </p>
-              </Link>
-            ))}
-            <Button variant="ghost" size="sm" onClick={() => setCompareIds([])}>
-              Clear
-            </Button>
-          </div>
-        </div>
-      ) : null}
+      <ComparePanel
+        interviewers={compared}
+        matchById={matchById}
+        onRemove={(id) => setCompared((current) => current.filter((person) => person.id !== id))}
+        onClear={() => setCompared([])}
+      />
     </div>
   )
 }
