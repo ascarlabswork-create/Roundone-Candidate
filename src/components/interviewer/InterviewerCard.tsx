@@ -1,4 +1,4 @@
-import { Bookmark, Clock3 } from 'lucide-react'
+import { Clock3, GitCompare } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { getNextSlot, isVerified } from '../../data/interviewers.ts'
 import { formatSlot } from '../../lib/dates.ts'
@@ -29,6 +29,7 @@ export function InterviewerCard({
   reasons,
   selected,
   onToggleCompare,
+  compareFull,
   fromMatches,
 }: {
   interviewer: Interviewer
@@ -36,6 +37,7 @@ export function InterviewerCard({
   reasons?: MatchReason[]
   selected?: boolean
   onToggleCompare?: () => void
+  compareFull?: boolean
   fromMatches?: boolean
 }) {
   const next = getNextSlot(interviewer)
@@ -44,7 +46,13 @@ export function InterviewerCard({
     : `/candidate/interviewers/${interviewer.id}`
 
   return (
-    <article className="flex flex-col rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+    <article
+      className={
+        selected
+          ? 'flex flex-col rounded-xl border border-blue-600 bg-white p-5 shadow-sm ring-2 ring-blue-100'
+          : 'flex flex-col rounded-xl border border-slate-200 bg-white p-5 shadow-sm'
+      }
+    >
       <div className="flex gap-4">
         <Avatar src={interviewer.photo} name={interviewer.name} size="lg" />
         <div className="min-w-0 flex-1">
@@ -113,8 +121,16 @@ export function InterviewerCard({
         </div>
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
           {onToggleCompare ? (
-            <Button variant={selected ? 'secondary' : 'ghost'} size="sm" onClick={onToggleCompare}>
-              <Bookmark className="h-4 w-4" />
+            <Button
+              variant={selected ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={onToggleCompare}
+              disabled={!selected && compareFull}
+              aria-pressed={selected}
+              aria-label={selected ? 'Remove from comparison' : 'Add to comparison'}
+              title={!selected && compareFull ? 'You can compare up to 3 interviewers' : undefined}
+            >
+              <GitCompare className="h-4 w-4" />
               {selected ? 'Selected' : 'Compare'}
             </Button>
           ) : null}
