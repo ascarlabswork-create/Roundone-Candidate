@@ -38,16 +38,16 @@ export function Footer() {
           </ul>
         </div>
         <div>
-          <p className="text-sm font-semibold text-navy-950">Company</p>
+          <p className="text-sm font-semibold text-navy-950">Prepare</p>
           <ul className="mt-3 space-y-2 text-sm text-slate-600">
-            <li>
-              <a href="#interviewer-platform" className="hover:text-navy-900">
-                Are you an interviewer?
-              </a>
-            </li>
             <li>
               <Link to="/candidate/interview-types" className="hover:text-navy-900">
                 Interview types
+              </Link>
+            </li>
+            <li>
+              <Link to="/candidate/practice" className="hover:text-navy-900">
+                AI Practice
               </Link>
             </li>
           </ul>
