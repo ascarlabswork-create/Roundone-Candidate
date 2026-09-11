@@ -1,38 +1,21 @@
-import { addDays, startOfDay } from '../lib/dates.ts'
-import type { AvailabilitySlot, Interviewer, Service } from '../types.ts'
+import { generateBookableSlots } from '../availability/generateSlots.ts'
+import { shiftCivilDateFromNow } from '../availability/timezone.ts'
+import type { InterviewerAvailability, RecurringAvailability } from '../availability/types.ts'
+import type { Interviewer, Service } from '../types.ts'
+import { loadAllBookings } from './bookings.ts'
 
-let slotSeq = 0
-
-function slot(date: Date, durationMin: number): AvailabilitySlot {
-  slotSeq += 1
+function hours(
+  timezone: string,
+  recurring: RecurringAvailability[],
+  extra?: Partial<Pick<InterviewerAvailability, 'custom' | 'blocked' | 'bookingBufferMin'>>,
+): InterviewerAvailability {
   return {
-    id: `slot-${slotSeq}`,
-    start: date.toISOString(),
-    durationMin,
+    timezone,
+    bookingBufferMin: extra?.bookingBufferMin ?? 0,
+    recurring,
+    custom: extra?.custom ?? [],
+    blocked: extra?.blocked ?? [],
   }
-}
-
-function upcomingSlots(
-  weekdayHours: Array<{ weekday: number; hour: number; minute?: number }>,
-  durationMin = 60,
-  count = 8,
-) {
-  const slots: AvailabilitySlot[] = []
-  const start = startOfDay(new Date())
-  const now = new Date()
-
-  for (let d = 0; d < 28 && slots.length < count; d += 1) {
-    const day = addDays(start, d)
-    for (const rule of weekdayHours) {
-      if (day.getDay() !== rule.weekday) continue
-      const date = new Date(day)
-      date.setHours(rule.hour, rule.minute ?? 0, 0, 0)
-      if (date <= now) continue
-      slots.push(slot(date, durationMin))
-    }
-  }
-
-  return slots
 }
 
 function service(
@@ -70,11 +53,31 @@ export const interviewers: Interviewer[] = [
       service('rahul-behavioral', 'Behavioral Mock', 'Behavioral', 45, 800, 'Leadership, conflict, and Google-style behavioral stories.'),
       service('rahul-full', 'Full Interview', 'System Design', 90, 2000, 'Coding plus system design with a written scorecard.'),
     ],
-    availability: upcomingSlots([
-      { weekday: 3, hour: 20 },
-      { weekday: 6, hour: 19 },
-      { weekday: 0, hour: 10 },
-    ]),
+    availability: hours(
+      'Asia/Kolkata',
+      [
+        { day: 'Monday', startTime: '18:00', endTime: '21:00' },
+        { day: 'Tuesday', startTime: '18:00', endTime: '21:00' },
+        { day: 'Thursday', startTime: '18:00', endTime: '21:00' },
+        { day: 'Saturday', startTime: '10:00', endTime: '14:00' },
+      ],
+      {
+        custom: [
+          {
+            date: shiftCivilDateFromNow(9, 'Asia/Kolkata'),
+            startTime: '14:00',
+            endTime: '18:00',
+          },
+        ],
+        blocked: [
+          {
+            date: shiftCivilDateFromNow(14, 'Asia/Kolkata'),
+            allDay: true,
+            reason: 'Travel',
+          },
+        ],
+      },
+    ),
     isOnline: true,
     verification: { identity: true, employment: true, linkedin: true },
     bio: 'Staff engineer on Google Cloud storage. Rahul has run 400+ mock interviews for SDE 2 through Staff candidates, with a focus on realistic system design loops used at Google, Amazon, and Uber. Sessions end with a written scorecard and a recommended practice plan.',
@@ -104,11 +107,15 @@ export const interviewers: Interviewer[] = [
       service('marcus-sysdesign', 'System Design Mock', 'System Design', 60, 1800, 'High-scale retail and streaming system design.'),
       service('marcus-full', 'Full Interview', 'System Design', 90, 2400, 'Bar-raiser style loop with written feedback.'),
     ],
-    availability: upcomingSlots([
-      { weekday: 2, hour: 18, minute: 30 },
-      { weekday: 4, hour: 19 },
-      { weekday: 6, hour: 11 },
-    ]),
+    availability: hours(
+      'America/Los_Angeles',
+      [
+        { day: 'Tuesday', startTime: '18:30', endTime: '21:30' },
+        { day: 'Thursday', startTime: '19:00', endTime: '22:00' },
+        { day: 'Saturday', startTime: '11:00', endTime: '15:00' },
+      ],
+      { bookingBufferMin: 15 },
+    ),
     isOnline: true,
     verification: { identity: true, employment: true, linkedin: true },
     bio: 'Principal engineer on Amazon retail platform. Marcus previously bar-raised for SDE and Senior loops. He is direct, structured, and known for turning vague design answers into clear architecture decisions.',
@@ -138,10 +145,10 @@ export const interviewers: Interviewer[] = [
       service('ananya-sysdesign', 'System Design Mock', 'System Design', 60, 1600, 'Design interviews with a hiring-manager lens.'),
       service('ananya-full', 'Full Interview', 'Behavioral', 90, 2200, 'Mixed loop covering design, coding, and leadership.'),
     ],
-    availability: upcomingSlots([
-      { weekday: 1, hour: 20 },
-      { weekday: 5, hour: 18 },
-      { weekday: 6, hour: 16 },
+    availability: hours('Asia/Kolkata', [
+      { day: 'Monday', startTime: '20:00', endTime: '22:00' },
+      { day: 'Friday', startTime: '18:00', endTime: '21:00' },
+      { day: 'Saturday', startTime: '16:00', endTime: '19:00' },
     ]),
     isOnline: false,
     verification: { identity: true, employment: true, linkedin: true },
@@ -171,10 +178,10 @@ export const interviewers: Interviewer[] = [
       service('priya-product', 'Product Sense Mock', 'Product', 45, 1700, 'Product sense, execution, and metric design.'),
       service('priya-behavioral', 'Leadership Mock', 'Behavioral', 45, 1400, 'PM behavioral stories with Meta-style follow-ups.'),
     ],
-    availability: upcomingSlots([
-      { weekday: 2, hour: 19 },
-      { weekday: 4, hour: 8 },
-      { weekday: 0, hour: 17 },
+    availability: hours('America/Los_Angeles', [
+      { day: 'Tuesday', startTime: '19:00', endTime: '21:00' },
+      { day: 'Thursday', startTime: '08:00', endTime: '10:00' },
+      { day: 'Sunday', startTime: '17:00', endTime: '19:00' },
     ]),
     isOnline: true,
     verification: { identity: true, employment: true, linkedin: true },
@@ -204,11 +211,23 @@ export const interviewers: Interviewer[] = [
       service('arjun-ml', 'ML Interview Mock', 'Machine Learning', 60, 2200, 'ML fundamentals, applied modeling, and ML system design.'),
       service('arjun-coding', 'Coding Mock', 'Coding', 60, 1600, 'Python coding with ML-flavored follow-ups.'),
     ],
-    availability: upcomingSlots([
-      { weekday: 3, hour: 21 },
-      { weekday: 6, hour: 9 },
-      { weekday: 0, hour: 18 },
-    ]),
+    availability: hours(
+      'America/Los_Angeles',
+      [
+        { day: 'Wednesday', startTime: '21:00', endTime: '23:00' },
+        { day: 'Saturday', startTime: '09:00', endTime: '12:00' },
+        { day: 'Sunday', startTime: '18:00', endTime: '20:00' },
+      ],
+      {
+        custom: [
+          {
+            date: shiftCivilDateFromNow(6, 'America/Los_Angeles'),
+            startTime: '14:00',
+            endTime: '17:00',
+          },
+        ],
+      },
+    ),
     isOnline: true,
     verification: { identity: true, employment: true, linkedin: false },
     bio: 'Staff ML engineer working on evaluation and ranking. Arjun covers classical ML, deep learning, and production ML systems. Best for candidates targeting applied scientist or ML engineer loops.',
@@ -237,10 +256,10 @@ export const interviewers: Interviewer[] = [
       service('sneha-ds', 'Data Science Mock', 'Data Science', 60, 1400, 'Case, metrics, SQL, and take-home style walkthroughs.'),
       service('sneha-behavioral', 'Behavioral Mock', 'Behavioral', 45, 900, 'Cross-functional storytelling for DS loops.'),
     ],
-    availability: upcomingSlots([
-      { weekday: 1, hour: 19 },
-      { weekday: 5, hour: 12 },
-      { weekday: 6, hour: 15 },
+    availability: hours('Asia/Kolkata', [
+      { day: 'Monday', startTime: '19:00', endTime: '21:00' },
+      { day: 'Friday', startTime: '12:00', endTime: '15:00' },
+      { day: 'Saturday', startTime: '15:00', endTime: '18:00' },
     ]),
     isOnline: false,
     verification: { identity: true, employment: true, linkedin: true },
@@ -270,11 +289,23 @@ export const interviewers: Interviewer[] = [
       service('fatima-coding', 'Frontend Coding Mock', 'Coding', 60, 1300, 'UI coding, JavaScript internals, and accessibility.'),
       service('fatima-sysdesign', 'Frontend System Design', 'System Design', 60, 1500, 'Design a web app: performance, state, and rendering.'),
     ],
-    availability: upcomingSlots([
-      { weekday: 2, hour: 20 },
-      { weekday: 4, hour: 20 },
-      { weekday: 0, hour: 11 },
-    ]),
+    availability: hours(
+      'America/Los_Angeles',
+      [
+        { day: 'Tuesday', startTime: '20:00', endTime: '22:00' },
+        { day: 'Thursday', startTime: '20:00', endTime: '22:00' },
+        { day: 'Sunday', startTime: '11:00', endTime: '14:00' },
+      ],
+      {
+        blocked: [
+          {
+            date: shiftCivilDateFromNow(11, 'America/Los_Angeles'),
+            allDay: true,
+            reason: 'Oncall',
+          },
+        ],
+      },
+    ),
     isOnline: true,
     verification: { identity: true, employment: true, linkedin: true },
     bio: 'Staff frontend engineer on Netflix web playback. Fatima runs realistic UI and frontend architecture interviews, including performance budgets, design systems, and component API decisions.',
@@ -303,10 +334,10 @@ export const interviewers: Interviewer[] = [
       service('david-coding', 'Coding Mock', 'Coding', 60, 1100, 'Medium-hard DSA with production follow-ups.'),
       service('david-sysdesign', 'System Design Mock', 'System Design', 60, 1300, 'Marketplace and geo-system design at SDE 2 depth.'),
     ],
-    availability: upcomingSlots([
-      { weekday: 3, hour: 21 },
-      { weekday: 5, hour: 19 },
-      { weekday: 6, hour: 13 },
+    availability: hours('America/New_York', [
+      { day: 'Wednesday', startTime: '21:00', endTime: '23:00' },
+      { day: 'Friday', startTime: '19:00', endTime: '21:00' },
+      { day: 'Saturday', startTime: '13:00', endTime: '16:00' },
     ]),
     isOnline: true,
     verification: { identity: true, employment: false, linkedin: true },
@@ -322,9 +353,20 @@ export function getInterviewerById(id: string) {
 }
 
 export function getNextSlot(interviewer: Interviewer, from = new Date()) {
-  return [...interviewer.availability]
-    .filter((item) => new Date(item.start) >= from)
-    .sort((a, b) => +new Date(a.start) - +new Date(b.start))[0]
+  const durationMin = Math.min(...interviewer.services.map((item) => item.durationMin))
+  const occupied = loadAllBookings()
+    .filter((item) => item.interviewerId === interviewer.id && item.status !== 'cancelled')
+    .map((item) => ({
+      start: item.start,
+      end: new Date(new Date(item.start).getTime() + item.durationMin * 60_000).toISOString(),
+    }))
+  return generateBookableSlots({
+    interviewerId: interviewer.id,
+    availability: interviewer.availability,
+    durationMin,
+    occupied,
+    from,
+  })[0]
 }
 
 export function isVerified(interviewer: Interviewer) {

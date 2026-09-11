@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { createBooking, getInterviewer, platformFeeFor } from '../api/index.ts'
+import { createBooking, getAvailability, getInterviewer, platformFeeFor } from '../api/index.ts'
+import { formatCivilDateLong, formatTimeInZone, isoDateInZone } from '../availability/index.ts'
+import type { BookableSlot } from '../availability/types.ts'
 import { Button } from '../components/ui/Button.tsx'
-import { Card, ErrorState, FieldLabel, SelectInput, Skeleton } from '../components/ui/primitives.tsx'
+import { Card, EmptyState, ErrorState, FieldLabel, SelectInput, Skeleton } from '../components/ui/primitives.tsx'
 import { Avatar, VerifiedBadge } from '../components/ui/identity.tsx'
 import { TIMEZONES } from '../data/catalogs.ts'
-import { formatDateLong, formatTime, toISODate } from '../lib/dates.ts'
 import { formatINR } from '../lib/format.ts'
 import { useAsync } from '../lib/useAsync.ts'
 import { isVerified } from '../data/interviewers.ts'
@@ -22,6 +23,8 @@ export function BookPage() {
   const { draft, updateDraft, resetDraft } = useBookingDraft()
   const [paying, setPaying] = useState(false)
   const [error, setError] = useState('')
+  const [selectedDay, setSelectedDay] = useState('')
+  const [selectedSlot, setSelectedSlot] = useState<BookableSlot | null>(null)
 
   const step = Number(params.get('step') ?? '1') as 1 | 2 | 3
   const preselectedService = params.get('service')
@@ -38,25 +41,33 @@ export function BookPage() {
 
   const interviewer = interviewerState.status === 'success' ? interviewerState.data : null
   const service = interviewer?.services.find((item) => item.id === draft.serviceId)
-  const slot = interviewer?.availability.find((item) => item.id === draft.slotId)
+  const displayTimeZone = draft.timezone || interviewer?.availability.timezone || 'Asia/Kolkata'
+
+  const availabilityState = useAsync(
+    () =>
+      interviewer && draft.serviceId
+        ? getAvailability(interviewer.id, draft.serviceId, displayTimeZone)
+        : Promise.resolve(null),
+    [interviewer?.id, draft.serviceId, displayTimeZone],
+  )
+
+  const days = availabilityState.status === 'success' ? availabilityState.data?.days ?? [] : []
+  const activeDay = days.some((day) => day.date === selectedDay) ? selectedDay : days[0]?.date ?? ''
+  const visibleSlots = days.find((day) => day.date === activeDay)?.slots ?? []
+
+  useEffect(() => {
+    if (!activeDay) return
+    if (selectedDay !== activeDay) setSelectedDay(activeDay)
+  }, [activeDay, selectedDay])
+
+  useEffect(() => {
+    if (!draft.slotId || selectedSlot) return
+    const found = days.flatMap((day) => day.slots).find((item) => item.id === draft.slotId)
+    if (found) setSelectedSlot(found)
+  }, [days, draft.slotId, selectedSlot])
+
   const sessionFee = service?.price ?? 0
   const platformFee = sessionFee ? platformFeeFor(sessionFee) : 0
-
-  const days = useMemo(() => {
-    if (!interviewer) return []
-    const map = new Map<string, typeof interviewer.availability>()
-    for (const item of interviewer.availability) {
-      const key = toISODate(new Date(item.start))
-      const list = map.get(key) ?? []
-      list.push(item)
-      map.set(key, list)
-    }
-    return [...map.entries()]
-  }, [interviewer])
-
-  const [selectedDay, setSelectedDay] = useState('')
-  const activeDay = selectedDay || days[0]?.[0] || ''
-  const visibleSlots = days.find(([key]) => key === activeDay)?.[1] ?? []
 
   function go(next: number) {
     const copy = new URLSearchParams(params)
@@ -64,8 +75,13 @@ export function BookPage() {
     setParams(copy)
   }
 
+  function chooseSlot(slot: BookableSlot) {
+    setSelectedSlot(slot)
+    updateDraft({ slotId: slot.id, timezone: displayTimeZone })
+  }
+
   async function pay() {
-    if (!service || !slot) return
+    if (!service || !selectedSlot) return
     setPaying(true)
     setError('')
     try {
@@ -73,6 +89,8 @@ export function BookPage() {
       navigate(`/candidate/booking/confirmation?bookingId=${booking.id}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Payment failed')
+      setSelectedSlot(null)
+      updateDraft({ slotId: '' })
     } finally {
       setPaying(false)
     }
@@ -132,7 +150,10 @@ export function BookPage() {
                 <button
                   key={item.id}
                   type="button"
-                  onClick={() => updateDraft({ serviceId: item.id })}
+                  onClick={() => {
+                    updateDraft({ serviceId: item.id, slotId: '' })
+                    setSelectedSlot(null)
+                  }}
                   className={`w-full rounded-xl border p-4 text-left ${
                     draft.serviceId === item.id ? 'border-navy-950 bg-slate-50' : 'border-slate-200'
                   }`}
@@ -158,12 +179,19 @@ export function BookPage() {
           {step === 2 ? (
             <div>
               <h2 className="text-lg font-semibold text-navy-950">Choose date & time</h2>
+              <p className="mt-1 text-sm text-slate-600">
+                Only dates and times from this interviewer&apos;s availability are shown. You cannot enter a
+                custom time.
+              </p>
               <div className="mt-4">
                 <FieldLabel htmlFor="timezone">Timezone</FieldLabel>
                 <SelectInput
                   id="timezone"
-                  value={draft.timezone}
-                  onChange={(event) => updateDraft({ timezone: event.target.value })}
+                  value={displayTimeZone}
+                  onChange={(event) => {
+                    updateDraft({ timezone: event.target.value, slotId: '' })
+                    setSelectedSlot(null)
+                  }}
                 >
                   {TIMEZONES.map((zone) => (
                     <option key={zone} value={zone}>
@@ -171,38 +199,80 @@ export function BookPage() {
                     </option>
                   ))}
                 </SelectInput>
-              </div>
-              <div className="mt-4 flex gap-2 overflow-x-auto pb-2">
-                {days.map(([day]) => (
-                  <button
-                    key={day}
-                    type="button"
-                    onClick={() => setSelectedDay(day)}
-                    className={`min-w-24 rounded-lg border px-3 py-2 text-sm ${
-                      activeDay === day ? 'border-navy-950 bg-navy-950 text-white' : 'border-slate-200'
-                    }`}
-                  >
-                    {formatDateLong(`${day}T12:00:00`)}
-                  </button>
-                ))}
-              </div>
-              <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
-                {visibleSlots.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => updateDraft({ slotId: item.id })}
-                    className={`rounded-lg border px-3 py-2 text-sm ${
-                      draft.slotId === item.id ? 'border-navy-950 bg-navy-950 text-white' : 'border-slate-200'
-                    }`}
-                  >
-                    {formatTime(item.start)}
-                  </button>
-                ))}
+                <p className="mt-2 text-xs text-slate-500">
+                  Interviewer timezone: {interviewer.availability.timezone}
+                </p>
               </div>
               <p className="mt-4 text-sm text-slate-600">
                 Duration: {service?.durationMin ?? '—'} min · Price: {service ? formatINR(service.price) : '—'}
               </p>
+
+              {availabilityState.status === 'loading' ? <Skeleton className="mt-4 h-40" /> : null}
+              {availabilityState.status === 'error' ? (
+                <div className="mt-4">
+                  <ErrorState body={availabilityState.error} />
+                </div>
+              ) : null}
+
+              {availabilityState.status === 'success' ? (
+                days.length ? (
+                  <>
+                    <h3 className="mt-6 text-sm font-semibold text-navy-950">Available dates</h3>
+                    <div className="mt-3 flex gap-2 overflow-x-auto pb-2">
+                      {days.map((day) => (
+                        <button
+                          key={day.date}
+                          type="button"
+                          onClick={() => {
+                            setSelectedDay(day.date)
+                            setSelectedSlot(null)
+                            updateDraft({ slotId: '' })
+                          }}
+                          className={`min-w-36 shrink-0 rounded-lg border px-3 py-2 text-left text-sm ${
+                            activeDay === day.date
+                              ? 'border-navy-950 bg-navy-950 text-white'
+                              : 'border-slate-200'
+                          }`}
+                        >
+                          {formatCivilDateLong(day.date)}
+                        </button>
+                      ))}
+                    </div>
+                    <h3 className="mt-6 text-sm font-semibold text-navy-950">Available time slots</h3>
+                    {visibleSlots.length ? (
+                      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                        {visibleSlots.map((item) => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => chooseSlot(item)}
+                            className={`rounded-lg border px-3 py-2 text-sm ${
+                              draft.slotId === item.id
+                                ? 'border-navy-950 bg-navy-950 text-white'
+                                : 'border-slate-200'
+                            }`}
+                          >
+                            {formatTimeInZone(item.start, displayTimeZone)}
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <EmptyState
+                        title="No available slots on this date."
+                        body="Pick another date from this interviewer’s open availability."
+                      />
+                    )}
+                  </>
+                ) : (
+                  <div className="mt-6">
+                    <EmptyState
+                      title="No available slots"
+                      body="This interviewer has no valid bookable times for the selected service in the next four weeks."
+                    />
+                  </div>
+                )
+              ) : null}
+
               <div className="mt-6 flex gap-3">
                 <Button variant="outline" onClick={() => go(1)}>
                   Back
@@ -232,15 +302,21 @@ export function BookPage() {
                 </div>
                 <div>
                   <dt className="text-slate-500">Date</dt>
-                  <dd className="font-medium text-navy-950">{slot ? formatDateLong(slot.start) : '—'}</dd>
+                  <dd className="font-medium text-navy-950">
+                    {selectedSlot
+                      ? formatCivilDateLong(isoDateInZone(new Date(selectedSlot.start), displayTimeZone))
+                      : '—'}
+                  </dd>
                 </div>
                 <div>
                   <dt className="text-slate-500">Time</dt>
-                  <dd className="font-medium text-navy-950">{slot ? formatTime(slot.start) : '—'}</dd>
+                  <dd className="font-medium text-navy-950">
+                    {selectedSlot ? formatTimeInZone(selectedSlot.start, displayTimeZone) : '—'}
+                  </dd>
                 </div>
                 <div>
                   <dt className="text-slate-500">Timezone</dt>
-                  <dd className="font-medium text-navy-950">{draft.timezone}</dd>
+                  <dd className="font-medium text-navy-950">{displayTimeZone}</dd>
                 </div>
                 <div>
                   <dt className="text-slate-500">Mode</dt>
@@ -257,13 +333,13 @@ export function BookPage() {
                     ['netbanking', 'Net Banking'],
                     ['wallet', 'Wallet'],
                   ] as Array<[PaymentMethod, string]>
-                ).map(([id, label]) => (
+                ).map(([methodId, label]) => (
                   <button
-                    key={id}
+                    key={methodId}
                     type="button"
-                    onClick={() => updateDraft({ paymentMethod: id })}
+                    onClick={() => updateDraft({ paymentMethod: methodId })}
                     className={`rounded-lg border px-3 py-2 text-sm ${
-                      draft.paymentMethod === id ? 'border-navy-950 bg-navy-950 text-white' : 'border-slate-200'
+                      draft.paymentMethod === methodId ? 'border-navy-950 bg-navy-950 text-white' : 'border-slate-200'
                     }`}
                   >
                     {label}
@@ -289,14 +365,15 @@ export function BookPage() {
               <p className="mt-4 text-xs leading-5 text-slate-500">
                 Cancellation policy: Cancel at least 24 hours before the session for a full refund.
                 Cancellations within 24 hours receive 50% credit toward a future interview. Payment is
-                simulated in this prototype — no real charge is made.
+                simulated in this prototype — no real charge is made. The selected slot is rechecked before
+                the booking is created.
               </p>
               {error ? <p className="mt-3 text-sm text-red-700">{error}</p> : null}
               <div className="mt-6 flex gap-3">
                 <Button variant="outline" onClick={() => go(2)}>
                   Back
                 </Button>
-                <Button className="flex-1" disabled={!service || !slot || paying} onClick={() => void pay()}>
+                <Button className="flex-1" disabled={!service || !selectedSlot || paying} onClick={() => void pay()}>
                   {paying ? 'Processing…' : 'Pay and Book'}
                 </Button>
               </div>
@@ -322,7 +399,9 @@ export function BookPage() {
             </div>
             <div className="flex justify-between">
               <dt>When</dt>
-              <dd className="font-medium text-navy-950">{slot ? formatTime(slot.start) : '—'}</dd>
+              <dd className="font-medium text-navy-950">
+                {selectedSlot ? formatTimeInZone(selectedSlot.start, displayTimeZone) : '—'}
+              </dd>
             </div>
             <div className="flex justify-between">
               <dt>Total</dt>

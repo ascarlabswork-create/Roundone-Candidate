@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
-import { listBookings } from '../api/index.ts'
+import { listBookings, listMyReviews } from '../api/index.ts'
+import { CompletedSessionCtas } from '../components/interviews/CompletedSessionCtas.tsx'
 import { Button } from '../components/ui/Button.tsx'
 import { Card, ErrorState, PageHeader, Skeleton } from '../components/ui/primitives.tsx'
 import { progressSnapshot } from '../data/feedback.ts'
@@ -16,7 +17,11 @@ const metrics = [
 
 export function ProgressPage() {
   const bookings = useAsync(() => listBookings(), [])
+  const myReviews = useAsync(() => listMyReviews(), [])
   const recent = bookings.status === 'success' ? bookings.data.filter((item) => item.status === 'completed') : []
+  const reviewedIds = new Set(
+    myReviews.status === 'success' ? myReviews.data.map((item) => item.bookingId) : [],
+  )
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
@@ -71,15 +76,22 @@ export function ProgressPage() {
           <h2 className="text-base font-semibold text-navy-950">Recent Interviews</h2>
           {bookings.status === 'loading' ? <Skeleton className="mt-4 h-24" /> : null}
           {bookings.status === 'error' ? <ErrorState body={bookings.error} /> : null}
-          <ul className="mt-4 space-y-3 text-sm">
+          <ul className="mt-4 space-y-4 text-sm">
             {recent.map((item) => (
-              <li key={item.id} className="flex items-center justify-between gap-3">
-                <span>
-                  {item.interviewType} · {formatDateShort(item.start)}
-                </span>
-                <Link to={`/candidate/feedback/${item.id}`} className="font-medium text-blue-700">
-                  View Feedback
-                </Link>
+              <li key={item.id} className="rounded-lg border border-slate-100 p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <span>
+                    {item.serviceName}
+                    <span className="mt-1 block text-slate-500">{formatDateShort(item.start)}</span>
+                  </span>
+                </div>
+                <div className="mt-3">
+                  <CompletedSessionCtas
+                    bookingId={item.id}
+                    completed
+                    hasReview={reviewedIds.has(item.id)}
+                  />
+                </div>
               </li>
             ))}
           </ul>
