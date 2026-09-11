@@ -1,32 +1,44 @@
-# React + TypeScript + Vite
+# RoundOne — candidate website
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Candidate-facing prototype for finding verified interviewers, booking mock interviews, and tracking feedback. This is **not** the interviewer product: there is no interviewer dashboard, earnings, host calendar, or interviewer registration.
 
-Currently, two official plugins are available:
+**Repo:** https://github.com/ascarlabs/roundone-candidate
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Stack
 
-## React Compiler
+React, TypeScript, Vite, Tailwind CSS, React Router, Lucide. Data is mocked in the client — no backend.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Candidate journey
 
-## Expanding the Oxlint configuration
+Home → goal → matching → search/compare → interviewer profile → service → availability → book/pay → confirmation → My Interviews → interview room → feedback → rating → progress → next recommendation.
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+## Routes
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+- `/` — home and goal form
+- `/candidate/find` — matching inputs
+- `/candidate/matches` — ranked matches
+- `/candidate/interviewers` — search, filters, compare
+- `/candidate/interviewers/:id` — interviewer profile (browse/book)
+- `/candidate/interviewers/:id/book` — service, slot, pay
+- `/candidate/booking/confirmation`
+- `/candidate/interviews` — My Interviews
+- `/candidate/interview/:id` — interview room
+- `/candidate/feedback/:id`
+- `/candidate/progress`
+- `/candidate/practice`, `/candidate/interview-types`, `/candidate/resources`, `/candidate/notifications`, `/candidate/profile`
+
+## Local development
+
+```bash
+npm install
+npm run dev -- --host localhost --port 5173
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+Open http://localhost:5173/
+
+## Scripts
+
+- `npm run dev` — Vite dev server
+- `npm run build` — typecheck and production build
+- `npm run preview` — serve the production build
+- `npm run lint` — Oxlint
