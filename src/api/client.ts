@@ -2,6 +2,7 @@ export const API_ENDPOINTS = {
   register: '/api/auth/register',
   interviewers: '/api/interviewers',
   interviewer: (id: string) => `/api/interviewers/${id}`,
+  interviewerReviews: (id: string) => `/api/interviewers/${id}/reviews`,
   recommendations: '/api/matching/recommendations',
   availability: (id: string) => `/api/interviewers/${id}/availability`,
   bookings: '/api/bookings',

@@ -1,7 +1,7 @@
 import { Clock3, GitCompare } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { formatDateTimeInZone } from '../../availability/index.ts'
 import { getNextSlot, isVerified } from '../../data/interviewers.ts'
-import { formatSlot } from '../../lib/dates.ts'
 import { formatCount, formatINR } from '../../lib/format.ts'
 import type { Interviewer, MatchReason } from '../../types.ts'
 import { Button } from '../ui/Button.tsx'
@@ -116,7 +116,7 @@ export function InterviewerCard({
           <p className="text-lg font-semibold text-navy-950">{formatINR(interviewer.price)} / session</p>
           <p className="mt-1 inline-flex items-center gap-1.5 text-sm text-slate-600">
             <Clock3 className="h-4 w-4" />
-            Next available: {next ? formatSlot(next.start) : 'No upcoming slots'}
+            Next available: {next ? formatDateTimeInZone(next.start, interviewer.availability.timezone) : 'No upcoming slots'}
           </p>
         </div>
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">

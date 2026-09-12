@@ -2,9 +2,6 @@ import { Link } from 'react-router-dom'
 import { Button } from '../components/ui/Button.tsx'
 import { Card, PageHeader } from '../components/ui/primitives.tsx'
 import { INTERVIEW_TYPES } from '../data/catalogs.ts'
-import { getInterviewerById } from '../data/interviewers.ts'
-import { useSavedInterviewers } from '../state/saved.tsx'
-import { useSession } from '../state/session.tsx'
 
 export function PracticePage() {
   return (
@@ -104,55 +101,6 @@ export function NotificationsPage() {
             <p className="mt-1 text-sm text-slate-600">{note.body}</p>
           </Card>
         ))}
-      </div>
-    </div>
-  )
-}
-
-export function CandidateProfilePage() {
-  const candidate = useSession()
-  const { savedIds } = useSavedInterviewers()
-  const saved = savedIds.map((id) => getInterviewerById(id)).filter((person) => person !== undefined)
-
-  return (
-    <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
-      <PageHeader
-        title="Profile"
-        subtitle="You are signed in as the sample candidate for this prototype. Real authentication will replace this later."
-      />
-      <div className="mt-8 space-y-6">
-        <Card className="p-6">
-          <h2 className="font-semibold text-navy-950">{candidate.name}</h2>
-          <p className="mt-1 text-sm text-slate-600">{candidate.email}</p>
-          <p className="mt-3 text-sm text-slate-700">
-            Target: {candidate.level} {candidate.targetRole} · {candidate.targetCompany}
-          </p>
-          <p className="mt-1 text-sm text-slate-700">Skills: {candidate.skills.join(', ')}</p>
-          <div className="mt-4 flex gap-3">
-            <Link to="/candidate/interviews">
-              <Button variant="outline">My Interviews</Button>
-            </Link>
-            <Link to="/candidate/progress">
-              <Button>View progress</Button>
-            </Link>
-          </div>
-        </Card>
-        <Card className="p-6">
-          <h2 className="font-semibold text-navy-950">Saved interviewers</h2>
-          {saved.length === 0 ? (
-            <p className="mt-2 text-sm text-slate-600">Save interviewers from a profile to see them here.</p>
-          ) : (
-            <ul className="mt-3 space-y-2 text-sm">
-              {saved.map((person) => (
-                <li key={person.id}>
-                  <Link className="font-medium text-blue-700" to={`/candidate/interviewers/${person.id}`}>
-                    {person.name}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
       </div>
     </div>
   )

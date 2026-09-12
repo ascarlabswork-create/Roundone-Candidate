@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { getInterviewer, listBookings } from '../api/index.ts'
+import { getInterviewer, listBookings, listMyReviews } from '../api/index.ts'
+import { CompletedSessionCtas } from '../components/interviews/CompletedSessionCtas.tsx'
 import { Button } from '../components/ui/Button.tsx'
 import { Badge, Card, EmptyState, ErrorState, Skeleton } from '../components/ui/primitives.tsx'
 import { formatDateShort, formatTime } from '../lib/dates.ts'
@@ -16,6 +17,10 @@ const tabs: Array<{ id: BookingStatus; label: string }> = [
 export function InterviewsPage() {
   const [tab, setTab] = useState<BookingStatus>('upcoming')
   const state = useAsync(() => listBookings(), [])
+  const reviewsState = useAsync(() => listMyReviews(), [])
+  const reviewedIds = new Set(
+    reviewsState.status === 'success' ? reviewsState.data.map((item) => item.bookingId) : [],
+  )
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
@@ -46,14 +51,26 @@ export function InterviewsPage() {
         ) : null}
         {state.status === 'error' ? <ErrorState body={state.error} /> : null}
         {state.status === 'success' ? (
-          <BookingList bookings={state.data.filter((item) => item.status === tab)} tab={tab} />
+          <BookingList
+            bookings={state.data.filter((item) => item.status === tab)}
+            tab={tab}
+            reviewedIds={reviewedIds}
+          />
         ) : null}
       </div>
     </div>
   )
 }
 
-function BookingList({ bookings, tab }: { bookings: Booking[]; tab: BookingStatus }) {
+function BookingList({
+  bookings,
+  tab,
+  reviewedIds,
+}: {
+  bookings: Booking[]
+  tab: BookingStatus
+  reviewedIds: Set<string>
+}) {
   if (!bookings.length) {
     return (
       <EmptyState
@@ -71,35 +88,40 @@ function BookingList({ bookings, tab }: { bookings: Booking[]; tab: BookingStatu
   return (
     <>
       {bookings.map((booking) => (
-        <BookingCard key={booking.id} booking={booking} />
+        <BookingCard key={booking.id} booking={booking} hasReview={reviewedIds.has(booking.id)} />
       ))}
     </>
   )
 }
 
-function BookingCard({ booking }: { booking: Booking }) {
+function BookingCard({ booking, hasReview }: { booking: Booking; hasReview: boolean }) {
   const interviewerState = useAsync(() => getInterviewer(booking.interviewerId), [booking.interviewerId])
   const name = interviewerState.status === 'success' ? interviewerState.data.name : 'Interviewer'
+  const completed = booking.status === 'completed'
 
   return (
     <Card className="p-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="font-semibold text-navy-950">{booking.interviewType}</h2>
-            <Badge tone={booking.status === 'upcoming' ? 'blue' : booking.status === 'completed' ? 'green' : 'slate'}>
-              {booking.status}
+            <h2 className="font-semibold text-navy-950">{booking.serviceName}</h2>
+            <Badge tone={booking.status === 'upcoming' ? 'blue' : completed ? 'green' : 'slate'}>
+              {completed ? 'Interview Completed' : booking.status}
             </Badge>
           </div>
-          <p className="mt-1 text-sm text-slate-600">with {name}</p>
+          <p className="mt-1 text-sm text-slate-600">{name}</p>
           <p className="mt-2 text-sm text-slate-600">
             {formatDateShort(booking.start)} · {formatTime(booking.start)} · {booking.durationMin} min
           </p>
-          {booking.status === 'completed' ? (
-            <p className="mt-2 text-sm text-slate-600">
-              Feedback: {booking.feedbackStatus === 'ready' ? 'Ready' : 'Pending'} · Result available on the
-              feedback page
-            </p>
+          {completed ? (
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Badge tone="violet">
+                {booking.feedbackStatus === 'ready' ? 'Feedback Available' : 'Feedback Pending'}
+              </Badge>
+              <Badge tone={hasReview ? 'green' : 'blue'}>
+                {hasReview ? 'Reviewed' : 'Review Pending'}
+              </Badge>
+            </div>
           ) : null}
         </div>
         {booking.status === 'upcoming' ? (
@@ -107,10 +129,8 @@ function BookingCard({ booking }: { booking: Booking }) {
             <Button>Join Interview</Button>
           </Link>
         ) : null}
-        {booking.status === 'completed' ? (
-          <Link to={`/candidate/feedback/${booking.id}`}>
-            <Button variant={booking.feedbackStatus === 'ready' ? 'primary' : 'outline'}>View Feedback</Button>
-          </Link>
+        {completed ? (
+          <CompletedSessionCtas bookingId={booking.id} completed hasReview={hasReview} />
         ) : null}
       </div>
     </Card>

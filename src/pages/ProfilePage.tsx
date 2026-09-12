@@ -1,21 +1,21 @@
 import { Bookmark, MessageSquare } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
-import { getInterviewer, listReviews } from '../api/index.ts'
+import { getAvailability, getInterviewer, getInterviewerReviewSummary, listReviews } from '../api/index.ts'
 import { MatchReasonList } from '../components/interviewer/InterviewerCard.tsx'
 import { Button } from '../components/ui/Button.tsx'
 import { Badge, Card, EmptyState, ErrorState, Skeleton } from '../components/ui/primitives.tsx'
 import { Avatar, MatchScore, StarRating, VerifiedBadge } from '../components/ui/identity.tsx'
 import { getNextSlot, isVerified } from '../data/interviewers.ts'
+import { formatDateTimeInZone } from '../availability/index.ts'
 import { formatCount, formatINR } from '../lib/format.ts'
-import { formatSlot } from '../lib/dates.ts'
-import { useAsync } from '../lib/useAsync.ts'
+import { useAsync, type AsyncState } from '../lib/useAsync.ts'
 import { scoreInterviewer } from '../matching/index.ts'
 import { useBookingDraft } from '../state/booking.tsx'
 import { useMatching } from '../state/matching.tsx'
 import { useSavedInterviewers } from '../state/saved.tsx'
 import { useToast } from '../state/toast.tsx'
-import type { Interviewer } from '../types.ts'
+import type { Interviewer, PublicCandidateReview, PublicReviewSummary, ReviewDimensions } from '../types.ts'
 
 const tabs = ['About', 'Expertise', 'Services', 'Availability', 'Reviews'] as const
 
@@ -25,6 +25,7 @@ export function ProfilePage() {
   const fromMatches = params.get('from') === 'matches'
   const interviewerState = useAsync(() => getInterviewer(id), [id])
   const reviewsState = useAsync(() => listReviews(id), [id])
+  const summaryState = useAsync(() => getInterviewerReviewSummary(id), [id])
   const { preferences } = useMatching()
   const { isSaved, toggleSaved } = useSavedInterviewers()
   const { pushToast } = useToast()
@@ -136,30 +137,11 @@ export function ProfilePage() {
         {tab === 'Services' ? <ServicesTab interviewer={interviewer} /> : null}
         {tab === 'Availability' ? <AvailabilityTab interviewer={interviewer} /> : null}
         {tab === 'Reviews' ? (
-          reviewsState.status === 'success' ? (
-            reviewsState.data.length ? (
-              <div className="space-y-4">
-                {reviewsState.data.map((review) => (
-                  <Card key={review.id} className="p-5">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="font-medium text-navy-950">{review.candidateName}</p>
-                      <StarRating value={review.rating} />
-                    </div>
-                    <p className="mt-1 text-xs text-slate-500">
-                      {review.interviewType} · {review.date}
-                    </p>
-                    <p className="mt-3 text-sm leading-6 text-slate-700">{review.text}</p>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <EmptyState title="No reviews yet" body="Be the first candidate to leave a review after your session." />
-            )
-          ) : reviewsState.status === 'error' ? (
-            <ErrorState body={reviewsState.error} />
-          ) : (
-            <Skeleton className="h-40" />
-          )
+          <ReviewsRatings
+            interviewer={interviewer}
+            reviewsState={reviewsState}
+            summaryState={summaryState}
+          />
         ) : null}
       </div>
 
@@ -168,6 +150,87 @@ export function ProfilePage() {
           <Button fullWidth>Book Interview</Button>
         </Link>
       </div>
+    </div>
+  )
+}
+
+const breakdownLabels: Array<[keyof ReviewDimensions, string]> = [
+  ['technicalExpertise', 'Technical Expertise'],
+  ['communication', 'Communication'],
+  ['interviewRealism', 'Interview Realism'],
+  ['feedbackQuality', 'Feedback Quality'],
+  ['professionalism', 'Professionalism'],
+]
+
+function ReviewsRatings({
+  interviewer,
+  reviewsState,
+  summaryState,
+}: {
+  interviewer: Interviewer
+  reviewsState: AsyncState<PublicCandidateReview[]>
+  summaryState: AsyncState<PublicReviewSummary | null>
+}) {
+  const summary = summaryState.status === 'success' ? summaryState.data : null
+  const rating = summary?.rating ?? interviewer.rating
+  const reviewCount = summary?.reviewCount ?? interviewer.reviewCount
+  const breakdown = summary?.breakdown
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-lg font-semibold text-navy-950">Reviews & Ratings</h2>
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <p className="text-3xl font-semibold text-navy-950">{rating}</p>
+          <StarRating value={rating} size="md" />
+          <p className="text-sm text-slate-600">{formatCount(reviewCount)} Reviews</p>
+        </div>
+      </div>
+
+      {breakdown ? (
+        <Card className="p-5">
+          <h3 className="text-sm font-semibold text-navy-950">Rating breakdown</h3>
+          <div className="mt-4 space-y-3">
+            {breakdownLabels.map(([key, label]) => (
+              <div key={key}>
+                <div className="mb-1 flex justify-between text-sm">
+                  <span className="text-slate-700">{label}</span>
+                  <span className="font-semibold text-navy-950">{breakdown[key]}</span>
+                </div>
+                <div className="h-2 rounded-full bg-slate-100">
+                  <div
+                    className="h-2 rounded-full bg-amber-400"
+                    style={{ width: `${(breakdown[key] / 5) * 100}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      ) : null}
+
+      {reviewsState.status === 'loading' || summaryState.status === 'loading' ? (
+        <Skeleton className="h-40" />
+      ) : null}
+      {reviewsState.status === 'error' ? <ErrorState body={reviewsState.error} /> : null}
+      {reviewsState.status === 'success' && reviewsState.data ? (
+        reviewsState.data.length ? (
+          <div className="space-y-4">
+            {reviewsState.data.map((review) => (
+              <Card key={review.id} className="p-5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="font-medium text-navy-950">{review.displayName}</p>
+                  <StarRating value={review.overallRating} />
+                </div>
+                <p className="mt-1 text-xs text-slate-500">{review.date}</p>
+                <p className="mt-3 text-sm leading-6 text-slate-700">{review.writtenReview}</p>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <EmptyState title="No reviews yet" body="Be the first candidate to leave a review after your session." />
+        )
+      ) : null}
     </div>
   )
 }
@@ -262,20 +325,45 @@ function ServicesTab({ interviewer }: { interviewer: Interviewer }) {
 }
 
 function AvailabilityTab({ interviewer }: { interviewer: Interviewer }) {
-  const upcoming = interviewer.availability.filter((slot) => new Date(slot.start) > new Date())
   const next = getNextSlot(interviewer)
+  const calendar = useAsync(
+    () => getAvailability(interviewer.id, interviewer.services[0]?.id, interviewer.availability.timezone),
+    [interviewer.id],
+  )
+  const tz = interviewer.availability.timezone
+
   return (
-    <div>
+    <div className="space-y-6">
       <p className="text-sm text-slate-600">
-        Timezone {interviewer.timezone}. Next available: {next ? formatSlot(next.start) : 'None listed'}.
+        Timezone {tz}. Next available:{' '}
+        {next ? formatDateTimeInZone(next.start, tz) : 'None in the next four weeks'}.
       </p>
-      <div className="mt-4 grid gap-2 sm:grid-cols-2">
-        {upcoming.map((slot) => (
-          <div key={slot.id} className="rounded-lg border border-slate-200 px-4 py-3 text-sm">
-            {formatSlot(slot.start)} · {slot.durationMin} min
-          </div>
-        ))}
+      <div>
+        <h3 className="text-sm font-semibold text-navy-950">Typical hours</h3>
+        <ul className="mt-2 space-y-1 text-sm text-slate-700">
+          {interviewer.availability.recurring.map((rule) => (
+            <li key={`${rule.day}-${rule.startTime}`}>
+              {rule.day}: {rule.startTime} – {rule.endTime}
+            </li>
+          ))}
+        </ul>
       </div>
+      {calendar.status === 'loading' ? <Skeleton className="h-24" /> : null}
+      {calendar.status === 'success' && calendar.data ? (
+        <div>
+          <h3 className="text-sm font-semibold text-navy-950">Upcoming bookable times</h3>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {calendar.data.days
+              .flatMap((day) => day.slots)
+              .slice(0, 8)
+              .map((slot) => (
+                <div key={slot.id} className="rounded-lg border border-slate-200 px-4 py-3 text-sm">
+                  {formatDateTimeInZone(slot.start, tz)} · {slot.durationMin} min
+                </div>
+              ))}
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }

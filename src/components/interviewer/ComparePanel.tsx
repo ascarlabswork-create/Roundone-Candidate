@@ -1,8 +1,8 @@
 import { GitCompare, X } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
+import { formatDateTimeInZone } from '../../availability/index.ts'
 import { getNextSlot, isVerified } from '../../data/interviewers.ts'
-import { formatSlot } from '../../lib/dates.ts'
 import { formatCount, formatINR } from '../../lib/format.ts'
 import type { Interviewer } from '../../types.ts'
 import { Button } from '../ui/Button.tsx'
@@ -39,7 +39,7 @@ function CompanyCell({ person }: { person: Interviewer }) {
 
 function AvailabilityCell({ person }: { person: Interviewer }) {
   const next = getNextSlot(person)
-  return <span>{next ? formatSlot(next.start) : 'No upcoming slots'}</span>
+  return <span>{next ? formatDateTimeInZone(next.start, person.availability.timezone) : 'No upcoming slots'}</span>
 }
 
 function TypeBadges({ person }: { person: Interviewer }) {

@@ -1,6 +1,10 @@
+import { addCivilDays, isoDateInZone, wallTimeInZoneToUtc, weekdayOfCivilDate } from '../availability/timezone.ts'
 import { addDays } from '../lib/dates.ts'
+import { readJson } from '../lib/storage.ts'
 import type { Booking } from '../types.ts'
 import { currentCandidate } from './candidate.ts'
+
+export const BOOKINGS_STORAGE_KEY = 'roundone.bookings'
 
 function atHour(daysFromToday: number, hour: number, minute = 0) {
   const date = addDays(new Date(), daysFromToday)
@@ -8,7 +12,43 @@ function atHour(daysFromToday: number, hour: number, minute = 0) {
   return date.toISOString()
 }
 
+function nextWeekdayWallTime(day: ReturnType<typeof weekdayOfCivilDate>, timeHHMM: string, timeZone: string) {
+  const today = isoDateInZone(new Date(), timeZone)
+  for (let offset = 0; offset < 14; offset += 1) {
+    const date = addCivilDays(today, offset)
+    if (weekdayOfCivilDate(date) !== day) continue
+    const start = wallTimeInZoneToUtc(date, timeHHMM, timeZone)
+    if (start.getTime() > Date.now() + 60 * 60_000) return start.toISOString()
+  }
+  return wallTimeInZoneToUtc(addCivilDays(today, 7), timeHHMM, timeZone).toISOString()
+}
+
+export function loadAllBookings() {
+  const extras = readJson<Booking[]>(BOOKINGS_STORAGE_KEY, [])
+  const extraIds = new Set(extras.map((item) => item.id))
+  return [...extras, ...seedBookings.filter((item) => !extraIds.has(item.id))]
+}
+
 export const seedBookings: Booking[] = [
+  {
+    id: 'bk-completed-rahul',
+    interviewerId: 'rahul-sharma',
+    candidateId: currentCandidate.id,
+    serviceId: 'rahul-sysdesign',
+    serviceName: 'System Design Mock',
+    interviewType: 'System Design',
+    durationMin: 60,
+    sessionFee: 1500,
+    platformFee: 75,
+    total: 1575,
+    start: atHour(-5, 18),
+    timezone: 'Asia/Kolkata',
+    mode: 'Video',
+    status: 'completed',
+    paymentMethod: 'upi',
+    feedbackStatus: 'ready',
+    createdAt: atHour(-8, 11),
+  },
   {
     id: 'bk-upcoming-rahul',
     interviewerId: 'rahul-sharma',
@@ -20,7 +60,7 @@ export const seedBookings: Booking[] = [
     sessionFee: 1500,
     platformFee: 75,
     total: 1575,
-    start: atHour(3, 19),
+    start: nextWeekdayWallTime('Saturday', '11:00', 'Asia/Kolkata'),
     timezone: 'Asia/Kolkata',
     mode: 'Video',
     status: 'upcoming',

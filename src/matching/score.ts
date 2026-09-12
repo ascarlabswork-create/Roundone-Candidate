@@ -1,4 +1,7 @@
-import { hoursForWindow, sameDay } from '../lib/dates.ts'
+import { generateBookableSlots } from '../availability/generateSlots.ts'
+import { isoDateInZone } from '../availability/timezone.ts'
+import { loadAllBookings } from '../data/bookings.ts'
+import { hoursForWindow } from '../lib/dates.ts'
 import { getNextSlot, isVerified, lowestServicePrice } from '../data/interviewers.ts'
 import type {
   Interviewer,
@@ -64,27 +67,46 @@ function levelScore(interviewer: Interviewer, level: string) {
 }
 
 function availabilityScore(interviewer: Interviewer, prefs: MatchingPreferences) {
-  const slots = interviewer.availability.map((item) => new Date(item.start))
+  const durationMin = Math.min(...interviewer.services.map((item) => item.durationMin))
+  const occupied = loadAllBookings()
+    .filter((item) => item.interviewerId === interviewer.id && item.status !== 'cancelled')
+    .map((item) => ({
+      start: item.start,
+      end: new Date(new Date(item.start).getTime() + item.durationMin * 60_000).toISOString(),
+    }))
+  const slots = generateBookableSlots({
+    interviewerId: interviewer.id,
+    availability: interviewer.availability,
+    durationMin,
+    occupied,
+  })
   if (!slots.length) return 0
   if (!prefs.preferredDate) return getNextSlot(interviewer) ? 0.6 : 0.15
 
-  const [year, month, day] = prefs.preferredDate.split('-').map(Number)
-  const preferred = new Date(year, (month ?? 1) - 1, day ?? 1)
+  const tz = interviewer.availability.timezone
   const window = hoursForWindow(prefs.preferredTime)
 
   const exact = slots.some((slot) => {
-    if (!sameDay(slot, preferred)) return false
+    const date = isoDateInZone(new Date(slot.start), tz)
+    if (date !== prefs.preferredDate) return false
     if (!window) return true
-    const hour = slot.getHours() + slot.getMinutes() / 60
+    const hour = Number(
+      new Intl.DateTimeFormat('en-GB', {
+        timeZone: tz,
+        hour: 'numeric',
+        hourCycle: 'h23',
+      }).format(new Date(slot.start)),
+    )
     return hour >= window.start && hour < window.end
   })
   if (exact) return 1
 
-  const same = slots.some((slot) => sameDay(slot, preferred))
+  const same = slots.some((slot) => isoDateInZone(new Date(slot.start), tz) === prefs.preferredDate)
   if (same) return 0.7
 
   const nearby = slots.some((slot) => {
-    const diff = Math.abs(slot.getTime() - preferred.getTime())
+    const preferred = new Date(`${prefs.preferredDate}T12:00:00Z`)
+    const diff = Math.abs(new Date(slot.start).getTime() - preferred.getTime())
     return diff <= 2 * 24 * 60 * 60 * 1000
   })
   if (nearby) return 0.4

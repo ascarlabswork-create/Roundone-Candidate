@@ -6,24 +6,32 @@ const STORAGE_KEY = 'roundone.bookingDraft'
 
 const emptyDraft: BookingDraft = {
   interviewerId: '',
+  interviewerProfileId: '',
   serviceId: '',
   slotId: '',
   timezone: 'Asia/Kolkata',
   paymentMethod: 'upi',
+  selectedDate: '',
+  selectedSlot: '',
+  startsAtUtc: '',
+  endsAtUtc: '',
+  displayTimezone: 'Asia/Kolkata',
+  createdBookingId: '',
 }
 
 type BookingContextValue = {
   draft: BookingDraft
   updateDraft: (patch: Partial<BookingDraft>) => void
-  resetDraft: (interviewerId?: string) => void
+  resetDraft: (interviewerId?: string, timezone?: string) => void
 }
 
 const BookingContext = createContext<BookingContextValue | null>(null)
 
 export function BookingProvider({ children }: { children: ReactNode }) {
-  const [draft, setDraft] = useState<BookingDraft>(() =>
-    readSessionJson<BookingDraft>(STORAGE_KEY, emptyDraft),
-  )
+  const [draft, setDraft] = useState<BookingDraft>(() => ({
+    ...emptyDraft,
+    ...readSessionJson<BookingDraft>(STORAGE_KEY, emptyDraft),
+  }))
 
   const value = useMemo<BookingContextValue>(
     () => ({
@@ -35,11 +43,14 @@ export function BookingProvider({ children }: { children: ReactNode }) {
           return next
         })
       },
-      resetDraft: (interviewerId) => {
+      resetDraft: (interviewerId, timezone) => {
+        const zone = timezone?.trim() || 'Asia/Kolkata'
         const next = {
           ...emptyDraft,
           interviewerId: interviewerId ?? '',
-          timezone: 'Asia/Kolkata',
+          interviewerProfileId: interviewerId ?? '',
+          timezone: zone,
+          displayTimezone: zone,
         }
         setDraft(next)
         writeSessionJson(STORAGE_KEY, next)

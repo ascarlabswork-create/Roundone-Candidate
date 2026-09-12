@@ -1,4 +1,5 @@
 import type { CandidateLevel, InterviewType, SortOption, TimeWindow } from './data/catalogs.ts'
+import type { InterviewerAvailability } from './availability/types.ts'
 
 export type Verification = {
   identity: boolean
@@ -6,11 +7,7 @@ export type Verification = {
   linkedin: boolean
 }
 
-export type AvailabilitySlot = {
-  id: string
-  start: string
-  durationMin: number
-}
+export type { InterviewerAvailability, BookableSlot as AvailabilitySlot } from './availability/types.ts'
 
 export type Service = {
   id: string
@@ -39,7 +36,7 @@ export type Interviewer = {
   price: number
   currency: 'INR'
   services: Service[]
-  availability: AvailabilitySlot[]
+  availability: InterviewerAvailability
   isOnline: boolean
   verification: Verification
   bio: string
@@ -83,42 +80,87 @@ export type Booking = {
   createdAt: string
 }
 
-export type Review = {
+export type ReviewRecommend = 'yes' | 'maybe' | 'no'
+export type ReviewModerationStatus = 'pending' | 'approved' | 'rejected'
+
+export type ReviewDimensions = {
+  technicalExpertise: number
+  communication: number
+  interviewRealism: number
+  feedbackQuality: number
+  professionalism: number
+}
+
+/** Public candidate → interviewer review. Never mixed with private scorecards. */
+export type CandidateReview = {
+  id: string
+  bookingId: string
+  interviewerId: string
+  candidateId: string
+  overallRating: number
+  date: string
+  writtenReview: string
+  recommend: ReviewRecommend
+  showNamePublicly: boolean
+  displayName: string
+  moderationStatus: ReviewModerationStatus
+  dimensions: ReviewDimensions
+}
+
+/** Approved review payload for interviewer profiles and marketplace cards. */
+export type PublicCandidateReview = {
   id: string
   interviewerId: string
-  candidateName: string
-  rating: number
+  displayName: string
+  overallRating: number
   date: string
-  interviewType: InterviewType
-  text: string
-  recommend: 'yes' | 'maybe' | 'no'
-  dimensions: {
-    technicalExpertise: number
-    communication: number
-    interviewRealism: number
-    feedbackQuality: number
-    professionalism: number
-  }
+  writtenReview: string
+  dimensions: ReviewDimensions
+}
+
+export type PublicReviewSummary = {
+  rating: number
+  reviewCount: number
+  breakdown: ReviewDimensions
+}
+
+export type Review = CandidateReview
+
+export type ReviewDraft = {
+  overallRating: number
+  dimensions: ReviewDimensions
+  writtenReview: string
+  recommend: ReviewRecommend
+  showNamePublicly: boolean
 }
 
 export type Readiness = 'Ready' | 'Almost Ready' | 'Needs More Practice'
 
-export type FeedbackReport = {
+export type InterviewerFeedbackScores = {
+  technicalSkills: number
+  problemSolving: number
+  communication: number
+  systemDesign: number
+  coding: number
+  behavioral: number
+  overall: number
+}
+
+/** Private interviewer → candidate feedback. Never shown on public profiles. */
+export type InterviewerFeedback = {
   id: string
   bookingId: string
   interviewerId: string
-  scores: {
-    technicalSkills: number
-    problemSolving: number
-    communication: number
-    systemDesign: number
-    overall: number
-  }
+  candidateId: string
+  scores: InterviewerFeedbackScores
   strengths: string[]
   improvements: string[]
-  overallFeedback: string
+  detailedFeedback: string
   readiness: Readiness
+  internalNotes?: string
 }
+
+export type FeedbackReport = InterviewerFeedback
 
 export type MatchingPreferences = {
   targetRole: string
@@ -176,10 +218,17 @@ export type InterviewerFilters = {
 
 export type BookingDraft = {
   interviewerId: string
+  interviewerProfileId: string
   serviceId: string
   slotId: string
   timezone: string
   paymentMethod: PaymentMethod
+  selectedDate: string
+  selectedSlot: string
+  startsAtUtc: string
+  endsAtUtc: string
+  displayTimezone: string
+  createdBookingId: string
 }
 
 export type ProgressSnapshot = {
