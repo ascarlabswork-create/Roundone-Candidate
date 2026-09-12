@@ -1,6 +1,7 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { RequireCandidateAuth } from '../components/auth/RequireCandidateAuth.tsx'
 import { CandidateLayout } from '../components/layout/CandidateLayout.tsx'
+import { AuthCallbackPage } from '../pages/AuthCallbackPage.tsx'
 import { AuthPage } from '../pages/AuthPage.tsx'
 import { BookPage } from '../pages/BookPage.tsx'
 import { CandidateProfilePage } from '../pages/CandidateProfilePage.tsx'
@@ -30,6 +31,7 @@ export function AppRouter() {
           <Route path="/" element={<HomePage />} />
           <Route path="/candidate/login" element={<AuthPage mode="login" />} />
           <Route path="/candidate/register" element={<AuthPage mode="register" />} />
+          <Route path="/candidate/auth/callback" element={<AuthCallbackPage />} />
           <Route path="/candidate/find" element={<FindPage />} />
           <Route path="/candidate/matches" element={<MatchesPage />} />
           <Route path="/candidate/interviewers" element={<SearchPage />} />
