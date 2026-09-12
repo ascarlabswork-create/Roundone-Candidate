@@ -15,7 +15,12 @@ const navItems = [
 ]
 
 /** Routes that should show only the logo (no app navigation). */
-const AUTH_ROUTES = ['/candidate/login', '/candidate/register', '/candidate/auth/callback']
+const AUTH_ROUTES = [
+  '/candidate/login',
+  '/candidate/register',
+  '/candidate/auth/callback',
+  '/candidate/update-password',
+]
 
 function initials(name: string) {
   return name
