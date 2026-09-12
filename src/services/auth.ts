@@ -82,6 +82,8 @@ export async function signUpCandidate(input: SignUpInput): Promise<SignUpResult>
     email: input.email.trim(),
     password: input.password,
     options: {
+      // Where the email-confirmation link returns to. Dynamic origin, never hardcoded.
+      emailRedirectTo: new URL(OAUTH_CALLBACK_PATH, window.location.origin).toString(),
       data: {
         full_name: input.fullName.trim(),
         role: 'candidate',
@@ -125,12 +127,22 @@ export async function signInWithGoogle(nextPath?: string) {
   return data
 }
 
+/** Path where the password-recovery email link lands (public route). */
+export const UPDATE_PASSWORD_PATH = '/candidate/update-password'
+
 export async function sendPasswordReset(email: string) {
   const trimmed = email.trim()
   if (!trimmed) throw new Error('Enter your email above first, then choose “Forgot password?”.')
   const { error } = await supabase.auth.resetPasswordForEmail(trimmed, {
-    redirectTo: new URL('/candidate/login', window.location.origin).toString(),
+    redirectTo: new URL(UPDATE_PASSWORD_PATH, window.location.origin).toString(),
   })
+  if (error) throw new Error(authErrorMessage(error))
+}
+
+/** Set a new password for the currently-recovered/authenticated user. */
+export async function updatePassword(newPassword: string) {
+  if (newPassword.length < 6) throw new Error('Your password must be at least 6 characters.')
+  const { error } = await supabase.auth.updateUser({ password: newPassword })
   if (error) throw new Error(authErrorMessage(error))
 }
 

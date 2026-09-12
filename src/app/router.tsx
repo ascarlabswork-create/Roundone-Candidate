@@ -3,6 +3,7 @@ import { RequireCandidateAuth } from '../components/auth/RequireCandidateAuth.ts
 import { CandidateLayout } from '../components/layout/CandidateLayout.tsx'
 import { AuthCallbackPage } from '../pages/AuthCallbackPage.tsx'
 import { AuthPage } from '../pages/AuthPage.tsx'
+import { UpdatePasswordPage } from '../pages/UpdatePasswordPage.tsx'
 import { BookPage } from '../pages/BookPage.tsx'
 import { CandidateProfilePage } from '../pages/CandidateProfilePage.tsx'
 import { ConfirmationPage } from '../pages/ConfirmationPage.tsx'
@@ -31,6 +32,7 @@ export function AppRouter() {
           <Route path="/candidate/login" element={<AuthPage mode="login" />} />
           <Route path="/candidate/register" element={<AuthPage mode="register" />} />
           <Route path="/candidate/auth/callback" element={<AuthCallbackPage />} />
+          <Route path="/candidate/update-password" element={<UpdatePasswordPage />} />
           <Route element={<RequireCandidateAuth />}>
             <Route path="/" element={<HomePage />} />
             <Route path="/candidate/find" element={<FindPage />} />
