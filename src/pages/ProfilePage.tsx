@@ -9,7 +9,7 @@ import { Avatar, MatchScore, StarRating, VerifiedBadge } from '../components/ui/
 import { getNextSlot, isVerified } from '../data/interviewers.ts'
 import { formatDateTimeInZone } from '../availability/index.ts'
 import { formatCount, formatINR } from '../lib/format.ts'
-import { useAsync } from '../lib/useAsync.ts'
+import { useAsync, type AsyncState } from '../lib/useAsync.ts'
 import { scoreInterviewer } from '../matching/index.ts'
 import { useBookingDraft } from '../state/booking.tsx'
 import { useMatching } from '../state/matching.tsx'
@@ -168,8 +168,8 @@ function ReviewsRatings({
   summaryState,
 }: {
   interviewer: Interviewer
-  reviewsState: { status: string; data: PublicCandidateReview[] | null; error: string | null }
-  summaryState: { status: string; data: PublicReviewSummary | null; error: string | null }
+  reviewsState: AsyncState<PublicCandidateReview[]>
+  summaryState: AsyncState<PublicReviewSummary | null>
 }) {
   const summary = summaryState.status === 'success' ? summaryState.data : null
   const rating = summary?.rating ?? interviewer.rating
