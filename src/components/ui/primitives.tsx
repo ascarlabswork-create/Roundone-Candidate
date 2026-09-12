@@ -122,22 +122,24 @@ export function ErrorState({
   title = 'Something went wrong',
   body,
   onRetry,
+  retryLabel = 'Try again',
 }: {
   title?: string
   body: string
   onRetry?: () => void
+  retryLabel?: string
 }) {
   return (
     <div className="rounded-xl border border-red-200 bg-red-50 px-6 py-10 text-center">
       <h3 className="text-lg font-semibold text-red-800">{title}</h3>
-      <p className="mt-2 text-sm text-red-700">{body}</p>
+      {body ? <p className="mt-2 text-sm text-red-700">{body}</p> : null}
       {onRetry ? (
         <button
           type="button"
           onClick={onRetry}
           className="mt-4 text-sm font-semibold text-red-800 underline"
         >
-          Try again
+          {retryLabel}
         </button>
       ) : null}
     </div>

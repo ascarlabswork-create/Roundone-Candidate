@@ -218,10 +218,17 @@ export type InterviewerFilters = {
 
 export type BookingDraft = {
   interviewerId: string
+  interviewerProfileId: string
   serviceId: string
   slotId: string
   timezone: string
   paymentMethod: PaymentMethod
+  selectedDate: string
+  selectedSlot: string
+  startsAtUtc: string
+  endsAtUtc: string
+  displayTimezone: string
+  createdBookingId: string
 }
 
 export type ProgressSnapshot = {

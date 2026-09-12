@@ -14,9 +14,20 @@ const navItems = [
   { to: '/candidate/resources', label: 'Resources' },
 ]
 
+function initials(name: string) {
+  return name
+    .split(' ')
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase()
+}
+
 export function Navbar() {
   const [open, setOpen] = useState(false)
-  const candidate = useSession()
+  const { status, account, user, signOut } = useSession()
+  const displayName = account?.profile.full_name || user?.email || ''
 
   return (
     <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
@@ -58,19 +69,41 @@ export function Navbar() {
             <Bell className="h-5 w-5" />
             <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-blue-600" />
           </Link>
-          <Link
-            to="/candidate/profile"
-            className="hidden items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 sm:inline-flex"
-            aria-label="Profile"
-          >
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-navy-900 text-xs font-semibold text-white">
-              {candidate.name
-                .split(' ')
-                .map((part) => part[0])
-                .join('')}
-            </span>
-            <UserRound className="hidden h-4 w-4 lg:block" />
-          </Link>
+          {status === 'authenticated' ? (
+            <>
+              <Link
+                to="/candidate/profile"
+                className="hidden items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 sm:inline-flex"
+                aria-label="Profile"
+              >
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-navy-900 text-xs font-semibold text-white">
+                  {initials(displayName) || 'C'}
+                </span>
+                <UserRound className="hidden h-4 w-4 lg:block" />
+              </Link>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="hidden sm:inline-flex"
+                onClick={() => void signOut()}
+              >
+                Sign out
+              </Button>
+            </>
+          ) : (
+            <div className="hidden items-center gap-2 sm:flex">
+              <Link to="/candidate/login">
+                <Button variant="ghost" size="sm">
+                  Sign in
+                </Button>
+              </Link>
+              <Link to="/candidate/register">
+                <Button variant="outline" size="sm">
+                  Create account
+                </Button>
+              </Link>
+            </div>
+          )}
           <Link to="/candidate/find" className="hidden sm:block">
             <Button size="sm">Find My Interviewer</Button>
           </Link>
@@ -107,9 +140,32 @@ export function Navbar() {
             <NavLink to="/candidate/interviews" onClick={() => setOpen(false)} className="rounded-lg px-3 py-2 text-sm font-medium text-slate-700">
               My Interviews
             </NavLink>
-            <NavLink to="/candidate/profile" onClick={() => setOpen(false)} className="rounded-lg px-3 py-2 text-sm font-medium text-slate-700">
-              Profile
-            </NavLink>
+            {status === 'authenticated' ? (
+              <>
+                <NavLink to="/candidate/profile" onClick={() => setOpen(false)} className="rounded-lg px-3 py-2 text-sm font-medium text-slate-700">
+                  Profile
+                </NavLink>
+                <button
+                  type="button"
+                  className="rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-700"
+                  onClick={() => {
+                    setOpen(false)
+                    void signOut()
+                  }}
+                >
+                  Sign out
+                </button>
+              </>
+            ) : (
+              <>
+                <NavLink to="/candidate/login" onClick={() => setOpen(false)} className="rounded-lg px-3 py-2 text-sm font-medium text-slate-700">
+                  Sign in
+                </NavLink>
+                <NavLink to="/candidate/register" onClick={() => setOpen(false)} className="rounded-lg px-3 py-2 text-sm font-medium text-slate-700">
+                  Create account
+                </NavLink>
+              </>
+            )}
             <Link to="/candidate/find" onClick={() => setOpen(false)} className="pt-2">
               <Button fullWidth>Find My Interviewer</Button>
             </Link>

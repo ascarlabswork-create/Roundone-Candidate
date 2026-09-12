@@ -25,7 +25,10 @@ export type {
 export { findBookableSlot, generateBookableSlots, groupSlotsByDate } from './generateSlots.ts'
 export {
   addCivilDays,
+  formatBookingTime,
+  formatCivilDateCard,
   formatCivilDateLong,
+  formatCivilDateWithYear,
   formatDateTimeInZone,
   formatTimeInZone,
   isoDateInZone,

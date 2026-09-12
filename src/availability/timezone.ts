@@ -87,6 +87,16 @@ export function formatTimeInZone(iso: string, timeZone: string) {
   })
 }
 
+/** Candidate booking chips, e.g. "10:00 AM". */
+export function formatBookingTime(iso: string, timeZone: string) {
+  return new Date(iso).toLocaleTimeString('en-US', {
+    timeZone,
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  })
+}
+
 export function formatDateTimeInZone(iso: string, timeZone: string) {
   return new Date(iso).toLocaleString('en-IN', {
     timeZone,
@@ -105,6 +115,31 @@ export function formatCivilDateLong(dateISO: string) {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
+    timeZone: 'UTC',
+  })
+}
+
+/** Date cards, e.g. "Saturday, 12 Sep". */
+export function formatCivilDateCard(dateISO: string) {
+  const [year, month, day] = dateISO.split('-').map(Number)
+  const date = new Date(Date.UTC(year, month - 1, day, 12, 0, 0))
+  return date.toLocaleDateString('en-GB', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'short',
+    timeZone: 'UTC',
+  })
+}
+
+/** Full booking date, e.g. "Saturday, 12 September 2026". */
+export function formatCivilDateWithYear(dateISO: string) {
+  const [year, month, day] = dateISO.split('-').map(Number)
+  const date = new Date(Date.UTC(year, month - 1, day, 12, 0, 0))
+  return date.toLocaleDateString('en-GB', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
     timeZone: 'UTC',
   })
 }
