@@ -1,6 +1,6 @@
 import { Bell, CalendarCheck, Menu, UserRound, X } from 'lucide-react'
 import { useState } from 'react'
-import { Link, NavLink } from 'react-router-dom'
+import { Link, NavLink, useLocation } from 'react-router-dom'
 import { cn } from '../../lib/cn.ts'
 import { useSession } from '../../state/session.tsx'
 import { Button } from '../ui/Button.tsx'
@@ -13,6 +13,9 @@ const navItems = [
   { to: '/candidate/interview-types', label: 'Interview Types' },
   { to: '/candidate/resources', label: 'Resources' },
 ]
+
+/** Routes that should show only the logo (no app navigation). */
+const AUTH_ROUTES = ['/candidate/login', '/candidate/register', '/candidate/auth/callback']
 
 function initials(name: string) {
   return name
@@ -27,7 +30,19 @@ function initials(name: string) {
 export function Navbar() {
   const [open, setOpen] = useState(false)
   const { status, account, user, signOut } = useSession()
+  const location = useLocation()
   const displayName = account?.profile.full_name || user?.email || ''
+  const isAuthRoute = AUTH_ROUTES.includes(location.pathname)
+
+  if (isAuthRoute) {
+    return (
+      <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
+        <div className="mx-auto flex h-16 max-w-7xl items-center px-4 sm:px-6">
+          <Logo />
+        </div>
+      </header>
+    )
+  }
 
   return (
     <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">

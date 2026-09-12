@@ -15,7 +15,7 @@ import { useSession } from '../state/session.tsx'
 
 function safeNextPath(value: string | null) {
   if (!value || !value.startsWith('/') || value.startsWith('//') || value.includes('\\')) {
-    return '/candidate/profile'
+    return '/'
   }
   return value
 }
