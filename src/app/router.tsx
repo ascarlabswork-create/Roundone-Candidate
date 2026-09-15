@@ -14,13 +14,13 @@ import { InterviewRoomPage } from '../pages/InterviewRoomPage.tsx'
 import { InterviewsPage } from '../pages/InterviewsPage.tsx'
 import { MatchesPage } from '../pages/MatchesPage.tsx'
 import { ProfilePage } from '../pages/ProfilePage.tsx'
+import { PracticePage } from '../pages/PracticePage.tsx'
 import { ProgressPage } from '../pages/ProgressPage.tsx'
 import { SearchPage } from '../pages/SearchPage.tsx'
 import {
   InterviewTypesPage,
   NotFoundPage,
   NotificationsPage,
-  PracticePage,
   ResourcesPage,
 } from '../pages/SupportingPages.tsx'
 
@@ -44,6 +44,7 @@ export function AppRouter() {
             <Route path="/candidate/feedback/:id" element={<FeedbackPage />} />
             <Route path="/candidate/progress" element={<ProgressPage />} />
             <Route path="/candidate/practice" element={<PracticePage />} />
+            <Route path="/candidate/practice/:type" element={<PracticePage />} />
             <Route path="/candidate/interview-types" element={<InterviewTypesPage />} />
             <Route path="/candidate/resources" element={<ResourcesPage />} />
             <Route path="/candidate/notifications" element={<NotificationsPage />} />

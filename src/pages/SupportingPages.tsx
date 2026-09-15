@@ -3,33 +3,6 @@ import { Button } from '../components/ui/Button.tsx'
 import { Card, PageHeader } from '../components/ui/primitives.tsx'
 import { INTERVIEW_TYPES } from '../data/catalogs.ts'
 
-export function PracticePage() {
-  return (
-    <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
-      <PageHeader
-        title="AI Practice"
-        subtitle="A self-paced workspace for warm-ups. Matching and live mocks still happen with a human interviewer — this screen is a static prototype, not a live model."
-      />
-      <div className="mt-8 grid gap-4 md:grid-cols-2">
-        {INTERVIEW_TYPES.map((type) => (
-          <Card key={type} className="p-5">
-            <h2 className="font-semibold text-navy-950">{type} drill</h2>
-            <p className="mt-2 text-sm text-slate-600">
-              Timed prompts, a notes pane, and a recap checklist. Connect an LLM later without changing this layout.
-            </p>
-            <div className="mt-4 rounded-lg bg-slate-50 p-4 text-sm text-slate-500">Practice session placeholder</div>
-          </Card>
-        ))}
-      </div>
-      <div className="mt-8">
-        <Link to="/candidate/find">
-          <Button>Find a human interviewer instead</Button>
-        </Link>
-      </div>
-    </div>
-  )
-}
-
 export function InterviewTypesPage() {
   const copy: Record<string, string> = {
     Coding: 'Data structures, algorithms, and follow-ups on complexity.',
