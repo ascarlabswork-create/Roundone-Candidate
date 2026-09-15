@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Button } from '../components/ui/Button.tsx'
 import { Badge, Card, FieldLabel, PageHeader, TextArea } from '../components/ui/primitives.tsx'
 import {
@@ -12,12 +12,31 @@ import {
   type PracticeQuestion,
 } from '../data/practiceDrills.ts'
 import { INTERVIEW_TYPES } from '../data/catalogs.ts'
+import { removeSession, readSessionJson, writeSessionJson } from '../lib/storage.ts'
 
 type SessionAnswer = {
   questionId: string
   text: string
   covered: string[]
   missed: string[]
+}
+
+type SavedPractice = {
+  version: 1
+  type: string
+  started: boolean
+  done: boolean
+  index: number
+  revealed: boolean
+  notes: string
+  checked: string[]
+  answers: Record<string, string>
+  recap: SessionAnswer[]
+  endsAt: number | null
+}
+
+function storageKey(type: string) {
+  return `roundone.practice.${type}`
 }
 
 function formatClock(totalSeconds: number) {
@@ -31,9 +50,18 @@ function emptyAnswers(drill: PracticeDrill): Record<string, string> {
   return Object.fromEntries(drill.questions.map((question) => [question.id, question.starterCode ?? '']))
 }
 
+function secondsLeft(endsAt: number | null) {
+  if (!endsAt) return 0
+  return Math.max(0, Math.ceil((endsAt - Date.now()) / 1000))
+}
+
+function scoredAnswer(item: PracticeQuestion, text: string): SessionAnswer {
+  const points = coverageForAnswer(text, item.expectedPoints)
+  return { questionId: item.id, text, covered: points.covered, missed: points.missed }
+}
+
 export function PracticePage() {
   const { type: typeSlug } = useParams()
-  const navigate = useNavigate()
   const selectedType = practiceTypeFromSlug(typeSlug)
 
   if (typeSlug && !selectedType) {
@@ -41,114 +69,182 @@ export function PracticePage() {
       <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
         <PageHeader title="Practice session not found" subtitle="Pick a drill from AI Practice to start a timed session." />
         <div className="mt-8">
-          <Link to="/candidate/practice">
-            <Button>Back to AI Practice</Button>
+          <Link to="/candidate/practice" className="text-sm font-medium text-blue-700">
+            ← Back to AI Practice
           </Link>
         </div>
       </div>
     )
   }
 
-  if (!selectedType) {
-    return <PracticeHub />
-  }
+  if (!selectedType) return <PracticeHub />
 
-  return <PracticeSession drill={PRACTICE_DRILLS[selectedType]} onExit={() => navigate('/candidate/practice')} />
+  return <PracticeSession key={selectedType} drill={PRACTICE_DRILLS[selectedType]} />
 }
 
 function PracticeHub() {
+  const navigate = useNavigate()
+
   return (
     <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
       <PageHeader
         title="AI Practice"
-        subtitle="Start a timed warm-up with real interview prompts, a notes pane, and a recap. Live mocks still happen with a human interviewer."
+        subtitle="Start a timed warm-up with real interview prompts, notes, and a recap. Live mocks still happen with a human interviewer."
       />
       <div className="mt-8 grid gap-4 md:grid-cols-2">
         {INTERVIEW_TYPES.map((type) => {
           const drill = PRACTICE_DRILLS[type]
+          const saved = readSessionJson<SavedPractice | null>(storageKey(type), null)
+          const inProgress = Boolean(saved?.started && !saved.done)
           return (
             <Card key={type} className="flex flex-col p-5">
               <div className="flex items-start justify-between gap-3">
                 <h2 className="font-semibold text-navy-950">{type} drill</h2>
-                <Badge tone="blue">{drill.durationMin} min</Badge>
+                <Badge tone={inProgress ? 'violet' : 'blue'}>{inProgress ? 'In progress' : `${drill.durationMin} min`}</Badge>
               </div>
               <p className="mt-2 flex-1 text-sm text-slate-600">{drill.summary}</p>
               <p className="mt-3 text-xs text-slate-500">{drill.questions.length} prompts · notes + recap</p>
               <div className="mt-4">
-                <Link to={`/candidate/practice/${practiceTypeSlug(type)}`}>
-                  <Button fullWidth>Start session</Button>
-                </Link>
+                <Button
+                  fullWidth
+                  onClick={() => navigate(`/candidate/practice/${practiceTypeSlug(type)}?start=1`)}
+                >
+                  {inProgress ? 'Resume session' : 'Start session'}
+                </Button>
               </div>
             </Card>
           )
         })}
       </div>
       <div className="mt-8">
-        <Link to="/candidate/find">
-          <Button variant="outline">Find a human interviewer instead</Button>
-        </Link>
+        <Button variant="outline" onClick={() => navigate('/candidate/find')}>
+          Find a human interviewer instead
+        </Button>
       </div>
     </div>
   )
 }
 
-function PracticeSession({ drill, onExit }: { drill: PracticeDrill; onExit: () => void }) {
-  const [started, setStarted] = useState(false)
-  const [done, setDone] = useState(false)
-  const [index, setIndex] = useState(0)
-  const [revealed, setRevealed] = useState(false)
-  const [notes, setNotes] = useState('')
-  const [checked, setChecked] = useState<string[]>([])
-  const [answers, setAnswers] = useState<Record<string, string>>(() => emptyAnswers(drill))
-  const [recap, setRecap] = useState<SessionAnswer[]>([])
-  const [remaining, setRemaining] = useState(drill.durationMin * 60)
+function PracticeSession({ drill }: { drill: PracticeDrill }) {
+  const navigate = useNavigate()
+  const [params] = useSearchParams()
+  const autoStart = params.get('start') === '1'
+  const saved = readSessionJson<SavedPractice | null>(storageKey(drill.type), null)
+  const initial = saved?.version === 1 && saved.type === drill.type ? saved : null
+  const canResume = Boolean(initial?.started && !initial.done)
+  const startFresh = autoStart && !canResume
 
-  const question = drill.questions[index] ?? drill.questions[0]
-  const answerText = question ? (answers[question.id] ?? '') : ''
+  const [started, setStarted] = useState(() => canResume || startFresh || Boolean(initial?.started && initial.done && !autoStart))
+  const [done, setDone] = useState(() => (startFresh ? false : Boolean(initial?.done)))
+  const [index, setIndex] = useState(() => (canResume ? (initial?.index ?? 0) : 0))
+  const [revealed, setRevealed] = useState(() => (canResume ? Boolean(initial?.revealed) : false))
+  const [notes, setNotes] = useState(() => (canResume ? (initial?.notes ?? '') : ''))
+  const [checked, setChecked] = useState<string[]>(() => (canResume ? (initial?.checked ?? []) : []))
+  const [answers, setAnswers] = useState<Record<string, string>>(
+    () => (canResume && initial?.answers ? initial.answers : emptyAnswers(drill)),
+  )
+  const [recap, setRecap] = useState<SessionAnswer[]>(() => (canResume ? (initial?.recap ?? []) : startFresh ? [] : (initial?.recap ?? [])))
+  const [endsAt, setEndsAt] = useState<number | null>(() => {
+    if (canResume && initial?.endsAt) return initial.endsAt
+    if (startFresh) return Date.now() + drill.durationMin * 60_000
+    if (initial?.done) return initial.endsAt
+    return null
+  })
+  const [remaining, setRemaining] = useState(() =>
+    initial?.done ? secondsLeft(initial.endsAt) : secondsLeft(endsAt) || drill.durationMin * 60,
+  )
+
+  const finishingRef = useRef(false)
   const recapRef = useRef(recap)
   const answersRef = useRef(answers)
-  const finishingRef = useRef(false)
   recapRef.current = recap
   answersRef.current = answers
 
+  const question = drill.questions[index] ?? drill.questions[0]
+  const answerText = question ? (answers[question.id] ?? '') : ''
   const coverage = useMemo(
     () => (revealed && question ? coverageForAnswer(answerText, question.expectedPoints) : null),
     [answerText, question, revealed],
   )
 
-  function scoredAnswer(item: PracticeQuestion, text: string): SessionAnswer {
-    const points = coverageForAnswer(text, item.expectedPoints)
-    return { questionId: item.id, text, covered: points.covered, missed: points.missed }
+  function persist(next: Partial<SavedPractice> & Pick<SavedPractice, 'started' | 'done'>) {
+    const payload: SavedPractice = {
+      version: 1,
+      type: drill.type,
+      index,
+      revealed,
+      notes,
+      checked,
+      answers,
+      recap,
+      endsAt,
+      ...next,
+    }
+    writeSessionJson(storageKey(drill.type), payload)
   }
 
-  function finishSession(
-    currentRecap: SessionAnswer[] = recapRef.current,
-    currentAnswers: Record<string, string> = answersRef.current,
-  ) {
+  function finishSession() {
     if (finishingRef.current) return
     finishingRef.current = true
+    const currentRecap = recapRef.current
+    const currentAnswers = answersRef.current
     const completedIds = new Set(currentRecap.map((item) => item.questionId))
     const pending = drill.questions
       .filter((item) => !completedIds.has(item.id) && isAttemptedAnswer(item, currentAnswers[item.id] ?? ''))
       .map((item) => scoredAnswer(item, currentAnswers[item.id] ?? ''))
-    setRecap([...currentRecap, ...pending])
+    const nextRecap = [...currentRecap, ...pending]
+    setRecap(nextRecap)
     setDone(true)
+    persist({ started: true, done: true, recap: nextRecap, answers: currentAnswers })
+  }
+
+  function beginSession() {
+    const nextEnds = Date.now() + drill.durationMin * 60_000
+    finishingRef.current = false
+    setStarted(true)
+    setDone(false)
+    setIndex(0)
+    setRevealed(false)
+    setRecap([])
+    setAnswers(emptyAnswers(drill))
+    setChecked([])
+    setNotes('')
+    setEndsAt(nextEnds)
+    setRemaining(drill.durationMin * 60)
+    persist({
+      started: true,
+      done: false,
+      index: 0,
+      revealed: false,
+      notes: '',
+      checked: [],
+      answers: emptyAnswers(drill),
+      recap: [],
+      endsAt: nextEnds,
+    })
   }
 
   useEffect(() => {
-    if (!started || done) return
-    const id = window.setInterval(() => {
-      setRemaining((value) => Math.max(0, value - 1))
-    }, 1000)
+    if (!started || done || !endsAt) return
+    const tick = () => {
+      const left = secondsLeft(endsAt)
+      setRemaining(left)
+      if (left <= 0) finishSession()
+    }
+    tick()
+    const id = window.setInterval(tick, 250)
     return () => window.clearInterval(id)
-  }, [done, started])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [started, done, endsAt])
 
   useEffect(() => {
-    if (started && remaining === 0 && !done) finishSession()
-  }, [done, remaining, started])
+    if (!started) return
+    persist({ started, done, index, revealed, notes, checked, answers, recap, endsAt })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [started, done, index, revealed, notes, checked, answers, recap, endsAt])
 
   function submitCurrent() {
-    if (!question) return
+    if (!question || !isAttemptedAnswer(question, answerText)) return
     const next = scoredAnswer(question, answerText)
     setRecap((current) => [...current.filter((item) => item.questionId !== question.id), next])
     setRevealed(true)
@@ -163,15 +259,31 @@ function PracticeSession({ drill, onExit }: { drill: PracticeDrill; onExit: () =
     setRevealed(false)
   }
 
+  function skipCurrent() {
+    if (!question) return
+    setRecap((current) => current.filter((item) => item.questionId !== question.id))
+    if (index >= drill.questions.length - 1) {
+      finishSession()
+      return
+    }
+    setIndex((value) => value + 1)
+    setRevealed(false)
+  }
+
+  function resetAndExit() {
+    removeSession(storageKey(drill.type))
+    navigate('/candidate/practice')
+  }
+
   if (!started) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
-        <button type="button" className="text-sm font-medium text-blue-700" onClick={onExit}>
+        <button type="button" className="text-sm font-medium text-blue-700" onClick={() => navigate('/candidate/practice')}>
           ← All drills
         </button>
         <PageHeader
           title={`${drill.type} practice`}
-          subtitle={`${drill.durationMin}-minute timed session · ${drill.questions.length} prompts. This is a guided warm-up, not a live model.`}
+          subtitle={`${drill.durationMin}-minute timed session · ${drill.questions.length} prompts.`}
         />
         <Card className="mt-8 p-6">
           <p className="text-sm leading-6 text-slate-600">{drill.summary}</p>
@@ -181,15 +293,8 @@ function PracticeSession({ drill, onExit }: { drill: PracticeDrill; onExit: () =
             ))}
           </ul>
           <div className="mt-6 flex flex-wrap gap-3">
-            <Button
-              onClick={() => {
-                setStarted(true)
-                setRemaining(drill.durationMin * 60)
-              }}
-            >
-              Start {drill.durationMin}-minute session
-            </Button>
-            <Button variant="outline" onClick={onExit}>
+            <Button onClick={beginSession}>Start {drill.durationMin}-minute session</Button>
+            <Button variant="outline" onClick={() => navigate('/candidate/practice')}>
               Cancel
             </Button>
           </div>
@@ -199,7 +304,10 @@ function PracticeSession({ drill, onExit }: { drill: PracticeDrill; onExit: () =
   }
 
   if (done) {
-    const answered = recap.filter((item) => item.text.trim())
+    const answered = recap.filter((item) => {
+      const q = drill.questions.find((question) => question.id === item.questionId)
+      return q ? isAttemptedAnswer(q, item.text) : Boolean(item.text.trim())
+    })
     const coveredCount = recap.reduce((sum, item) => sum + item.covered.length, 0)
     const missedCount = recap.reduce((sum, item) => sum + item.missed.length, 0)
 
@@ -227,18 +335,19 @@ function PracticeSession({ drill, onExit }: { drill: PracticeDrill; onExit: () =
           <div className="mt-6 space-y-4">
             {drill.questions.map((item) => {
               const result = recap.find((entry) => entry.questionId === item.id)
+              const attempted = result ? isAttemptedAnswer(item, result.text) : false
               return (
                 <div key={item.id} className="rounded-lg border border-slate-200 p-4">
                   <h2 className="font-semibold text-navy-950">{item.title}</h2>
-                  {result && isAttemptedAnswer(item, result.text) ? (
-                    <p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">{result.text}</p>
+                  {attempted ? (
+                    <p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">{result?.text}</p>
                   ) : (
                     <p className="mt-2 text-sm text-slate-500">Skipped</p>
                   )}
-                  {result?.covered.length ? (
+                  {attempted && result?.covered.length ? (
                     <p className="mt-3 text-sm text-emerald-700">Covered: {result.covered.join(' · ')}</p>
                   ) : null}
-                  {result?.missed.length ? (
+                  {attempted && result?.missed.length ? (
                     <p className="mt-1 text-sm text-slate-600">Coach still wants: {result.missed.join(' · ')}</p>
                   ) : null}
                   <p className="mt-3 text-sm leading-6 text-slate-600">
@@ -258,24 +367,17 @@ function PracticeSession({ drill, onExit }: { drill: PracticeDrill; onExit: () =
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
             <Button
               onClick={() => {
-                setStarted(false)
-                setDone(false)
-                setIndex(0)
-                setRevealed(false)
-                setRecap([])
-                setAnswers(emptyAnswers(drill))
-                setChecked([])
-                setNotes('')
-                setRemaining(drill.durationMin * 60)
                 finishingRef.current = false
+                removeSession(storageKey(drill.type))
+                beginSession()
               }}
             >
               Practice again
             </Button>
-            <Link to={`/candidate/find?type=${encodeURIComponent(drill.type)}`}>
-              <Button variant="outline">Book a human {drill.type} mock</Button>
-            </Link>
-            <Button variant="ghost" onClick={onExit}>
+            <Button variant="outline" onClick={() => navigate(`/candidate/find?type=${encodeURIComponent(drill.type)}`)}>
+              Book a human {drill.type} mock
+            </Button>
+            <Button variant="ghost" onClick={resetAndExit}>
               All drills
             </Button>
           </div>
@@ -286,10 +388,12 @@ function PracticeSession({ drill, onExit }: { drill: PracticeDrill; onExit: () =
 
   if (!question) return null
 
+  const canSubmit = isAttemptedAnswer(question, answerText)
+
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <button type="button" className="text-sm font-medium text-blue-700" onClick={onExit}>
+        <button type="button" className="text-sm font-medium text-blue-700" onClick={() => navigate('/candidate/practice')}>
           ← Exit drill
         </button>
         <div className="flex items-center gap-3">
@@ -298,6 +402,12 @@ function PracticeSession({ drill, onExit }: { drill: PracticeDrill; onExit: () =
             Question {index + 1} of {drill.questions.length}
           </span>
         </div>
+      </div>
+      <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-slate-200">
+        <div
+          className="h-full rounded-full bg-navy-900 transition-[width]"
+          style={{ width: `${((index + (revealed ? 1 : 0)) / drill.questions.length) * 100}%` }}
+        />
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
@@ -312,10 +422,17 @@ function PracticeSession({ drill, onExit }: { drill: PracticeDrill; onExit: () =
               id="practice-answer"
               value={answerText}
               onChange={(event) => setAnswers((current) => ({ ...current, [question.id]: event.target.value }))}
+              onKeyDown={(event) => {
+                if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+                  event.preventDefault()
+                  submitCurrent()
+                }
+              }}
               className={question.kind === 'coding' ? 'min-h-48 font-mono text-[13px]' : 'min-h-40'}
               placeholder={question.kind === 'coding' ? 'Write your approach or code here…' : 'Write your answer here…'}
               spellCheck={question.kind !== 'coding'}
             />
+            <p className="mt-1 text-xs text-slate-500">Ctrl+Enter to submit</p>
           </div>
 
           {revealed && coverage ? (
@@ -344,13 +461,18 @@ function PracticeSession({ drill, onExit }: { drill: PracticeDrill; onExit: () =
 
           <div className="mt-6 flex flex-wrap gap-3">
             {!revealed ? (
-              <Button onClick={submitCurrent} disabled={!question || !isAttemptedAnswer(question, answerText)}>
+              <Button onClick={submitCurrent} disabled={!canSubmit}>
                 Submit answer
               </Button>
             ) : (
               <Button onClick={goNext}>{index >= drill.questions.length - 1 ? 'Finish session' : 'Next question'}</Button>
             )}
-            <Button variant="outline" onClick={() => finishSession()}>
+            {!revealed ? (
+              <Button variant="outline" onClick={skipCurrent}>
+                Skip
+              </Button>
+            ) : null}
+            <Button variant="ghost" onClick={finishSession}>
               End session
             </Button>
           </div>
