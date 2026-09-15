@@ -3,6 +3,7 @@ import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   CANDIDATE_LEVELS,
+  COMPANIES,
   INTERVIEW_TYPES,
   POPULAR_COMPANIES,
   TARGET_ROLES,
@@ -21,7 +22,6 @@ export function HomePage() {
   const navigate = useNavigate()
   const [goal, setGoal] = useState({
     targetRole: '',
-    interviewType: '',
     candidateLevel: '',
     targetCompany: '',
   })
@@ -30,7 +30,6 @@ export function HomePage() {
     event.preventDefault()
     const params = new URLSearchParams()
     if (goal.targetRole) params.set('role', goal.targetRole)
-    if (goal.interviewType) params.set('type', goal.interviewType)
     if (goal.candidateLevel) params.set('level', goal.candidateLevel)
     if (goal.targetCompany) params.set('company', goal.targetCompany)
     navigate(`/candidate/find?${params.toString()}`)
@@ -86,21 +85,6 @@ export function HomePage() {
                 </SelectInput>
               </div>
               <div>
-                <FieldLabel htmlFor="home-type">Interview Type</FieldLabel>
-                <SelectInput
-                  id="home-type"
-                  value={goal.interviewType}
-                  onChange={(event) => setGoal({ ...goal, interviewType: event.target.value })}
-                >
-                  <option value="">Select type</option>
-                  {INTERVIEW_TYPES.map((type) => (
-                    <option key={type} value={type}>
-                      {type}
-                    </option>
-                  ))}
-                </SelectInput>
-              </div>
-              <div>
                 <FieldLabel htmlFor="home-level">Target Level</FieldLabel>
                 <SelectInput
                   id="home-level"
@@ -115,14 +99,20 @@ export function HomePage() {
                   ))}
                 </SelectInput>
               </div>
-              <div>
+              <div className="sm:col-span-2">
                 <FieldLabel htmlFor="home-company">Target Company</FieldLabel>
                 <TextInput
                   id="home-company"
-                  placeholder="Google"
+                  list="home-company-options"
+                  placeholder="e.g. Google, Amazon, Flipkart"
                   value={goal.targetCompany}
                   onChange={(event) => setGoal({ ...goal, targetCompany: event.target.value })}
                 />
+                <datalist id="home-company-options">
+                  {COMPANIES.map((company) => (
+                    <option key={company} value={company} />
+                  ))}
+                </datalist>
               </div>
               <div className="sm:col-span-2">
                 <Button type="submit" fullWidth>
