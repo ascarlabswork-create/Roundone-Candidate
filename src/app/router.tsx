@@ -8,6 +8,7 @@ import { BookPage } from '../pages/BookPage.tsx'
 import { CandidateProfilePage } from '../pages/CandidateProfilePage.tsx'
 import { ConfirmationPage } from '../pages/ConfirmationPage.tsx'
 import { FeedbackPage } from '../pages/FeedbackPage.tsx'
+import { ReviewPage } from '../pages/ReviewPage.tsx'
 import { FindPage } from '../pages/FindPage.tsx'
 import { HomePage } from '../pages/HomePage.tsx'
 import { InterviewRoomPage } from '../pages/InterviewRoomPage.tsx'
@@ -42,6 +43,7 @@ export function AppRouter() {
             <Route path="/candidate/interviewers/:id/book" element={<BookPage />} />
             <Route path="/candidate/interviews" element={<InterviewsPage />} />
             <Route path="/candidate/feedback/:id" element={<FeedbackPage />} />
+            <Route path="/candidate/reviews/:id" element={<ReviewPage />} />
             <Route path="/candidate/progress" element={<ProgressPage />} />
             <Route path="/candidate/practice" element={<PracticePage />} />
             <Route path="/candidate/practice/:type" element={<PracticePage />} />

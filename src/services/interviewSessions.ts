@@ -7,6 +7,7 @@ import {
   type CandidateBooking,
 } from './bookings.ts'
 import { getCandidateFeedbackBookingIds } from './candidateFeedback.ts'
+import { getCandidateReviewBookingIds } from './candidateReviews.ts'
 import { getPublicInterviewer, getPublicInterviewerService } from './interviewerPublic.ts'
 import { parseInterviewSession, type CandidateInterviewSession } from './interviewSessionModel.ts'
 
@@ -29,6 +30,7 @@ export type CandidateInterview = CandidateBooking & {
   interviewType: string
   session: CandidateInterviewSession | null
   hasFeedback: boolean
+  hasReview: boolean
 }
 
 async function requireAuthenticatedUser() {
@@ -43,6 +45,7 @@ async function decorateBooking(
   booking: CandidateBooking,
   session: CandidateInterviewSession | null,
   hasFeedback: boolean,
+  hasReview: boolean,
 ): Promise<CandidateInterview> {
   let interviewerName = 'Interviewer'
   let interviewerPhoto: string | null = null
@@ -71,6 +74,7 @@ async function decorateBooking(
     interviewType,
     session,
     hasFeedback,
+    hasReview,
   }
 }
 
@@ -100,9 +104,10 @@ export async function getCandidateInterviewSessions(): Promise<CandidateIntervie
   if (!bookings.length) return []
 
   const ids = bookings.map((booking) => booking.id)
-  const [sessionResult, feedbackIds] = await Promise.all([
+  const [sessionResult, feedbackIds, reviewIds] = await Promise.all([
     supabase.from('interview_sessions').select(SESSION_SELECT).in('booking_id', ids),
     getCandidateFeedbackBookingIds(ids),
+    getCandidateReviewBookingIds(ids),
   ])
 
   if (sessionResult.error) {
@@ -120,7 +125,12 @@ export async function getCandidateInterviewSessions(): Promise<CandidateIntervie
 
   return Promise.all(
     bookings.map((booking) =>
-      decorateBooking(booking, sessions.get(booking.id) ?? null, feedbackIds.has(booking.id)),
+      decorateBooking(
+        booking,
+        sessions.get(booking.id) ?? null,
+        feedbackIds.has(booking.id),
+        reviewIds.has(booking.id),
+      ),
     ),
   )
 }
@@ -154,9 +164,10 @@ export async function getCandidateInterviewByBooking(bookingId: string): Promise
     throw error
   }
 
-  const [session, feedbackIds] = await Promise.all([
+  const [session, feedbackIds, reviewIds] = await Promise.all([
     getInterviewSessionByBooking(booking.id),
     getCandidateFeedbackBookingIds([booking.id]),
+    getCandidateReviewBookingIds([booking.id]),
   ])
-  return decorateBooking(booking, session, feedbackIds.has(booking.id))
+  return decorateBooking(booking, session, feedbackIds.has(booking.id), reviewIds.has(booking.id))
 }

@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { CandidateFeedbackAction } from './CandidateFeedbackAction.tsx'
+import { CandidateReviewAction } from './CandidateReviewAction.tsx'
 import { Button } from '../ui/Button.tsx'
 import { Badge, Card } from '../ui/primitives.tsx'
 import { Avatar } from '../ui/identity.tsx'
@@ -76,6 +77,11 @@ export function InterviewSummaryCard({
             bookingId={interview.id}
             status={interview.status}
             hasFeedback={interview.hasFeedback}
+          />
+          <CandidateReviewAction
+            bookingId={interview.id}
+            status={interview.status}
+            hasReview={interview.hasReview}
           />
         </div>
       </div>
