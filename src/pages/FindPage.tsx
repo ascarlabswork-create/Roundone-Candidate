@@ -2,8 +2,8 @@ import { useMemo, useState, type FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   CANDIDATE_LEVELS,
+  COMPANIES,
   INTERVIEW_TYPES,
-  LANGUAGES,
   SKILLS,
   TARGET_ROLES,
   TIME_WINDOWS,
@@ -27,6 +27,8 @@ export function FindPage() {
       interviewType: params.get('type') || preferences?.interviewType || '',
       candidateLevel: params.get('level') || preferences?.candidateLevel || '',
       targetCompany: params.get('company') || preferences?.targetCompany || '',
+      budget: 0,
+      language: '',
     }),
     [params, preferences],
   )
@@ -43,7 +45,11 @@ export function FindPage() {
 
   function submit(event: FormEvent) {
     event.preventDefault()
-    setPreferences(form)
+    setPreferences({
+      ...form,
+      budget: 0,
+      language: '',
+    })
     navigate('/candidate/matches')
   }
 
@@ -60,60 +66,66 @@ export function FindPage() {
         <div className="grid gap-5 sm:grid-cols-2">
           <div>
             <FieldLabel htmlFor="targetRole">Target Role</FieldLabel>
-            <SelectInput
+            <TextInput
               id="targetRole"
               required
+              list="find-role-options"
+              placeholder="Select or type a role"
               value={form.targetRole}
               onChange={(event) => setForm({ ...form, targetRole: event.target.value })}
-            >
-              <option value="">e.g. Software Engineer</option>
+            />
+            <datalist id="find-role-options">
               {TARGET_ROLES.map((role) => (
-                <option key={role} value={role}>
-                  {role}
-                </option>
+                <option key={role} value={role} />
               ))}
-            </SelectInput>
+            </datalist>
           </div>
           <div>
             <FieldLabel htmlFor="level">Candidate Level</FieldLabel>
-            <SelectInput
+            <TextInput
               id="level"
               required
+              list="find-level-options"
+              placeholder="Select or type a level"
               value={form.candidateLevel}
               onChange={(event) => setForm({ ...form, candidateLevel: event.target.value })}
-            >
-              <option value="">e.g. SDE 2</option>
+            />
+            <datalist id="find-level-options">
               {CANDIDATE_LEVELS.map((level) => (
-                <option key={level} value={level}>
-                  {level}
-                </option>
+                <option key={level} value={level} />
               ))}
-            </SelectInput>
+            </datalist>
           </div>
           <div>
             <FieldLabel htmlFor="type">Interview Type</FieldLabel>
-            <SelectInput
+            <TextInput
               id="type"
               required
+              list="find-type-options"
+              placeholder="Select or type a type"
               value={form.interviewType}
               onChange={(event) => setForm({ ...form, interviewType: event.target.value })}
-            >
-              <option value="">e.g. System Design</option>
+            />
+            <datalist id="find-type-options">
               {INTERVIEW_TYPES.map((type) => (
-                <option key={type} value={type}>
-                  {type}
-                </option>
+                <option key={type} value={type} />
               ))}
-            </SelectInput>
+            </datalist>
           </div>
           <div>
             <FieldLabel htmlFor="company">Target Company</FieldLabel>
             <TextInput
               id="company"
-              placeholder="Google"
+              list="find-company-options"
+              placeholder="Select or type a company"
               value={form.targetCompany}
               onChange={(event) => setForm({ ...form, targetCompany: event.target.value })}
             />
+            <datalist id="find-company-options">
+              {COMPANIES.map((company) => (
+                <option key={company} value={company} />
+              ))}
+            </datalist>
           </div>
         </div>
 
@@ -178,31 +190,6 @@ export function FindPage() {
               {TIME_WINDOWS.map((window) => (
                 <option key={window.id} value={window.id}>
                   {window.label}
-                </option>
-              ))}
-            </SelectInput>
-          </div>
-          <div>
-            <FieldLabel htmlFor="budget">Budget (₹)</FieldLabel>
-            <TextInput
-              id="budget"
-              type="number"
-              min={0}
-              placeholder="2000"
-              value={form.budget || ''}
-              onChange={(event) => setForm({ ...form, budget: Number(event.target.value) || 0 })}
-            />
-          </div>
-          <div>
-            <FieldLabel htmlFor="language">Language</FieldLabel>
-            <SelectInput
-              id="language"
-              value={form.language}
-              onChange={(event) => setForm({ ...form, language: event.target.value })}
-            >
-              {LANGUAGES.map((language) => (
-                <option key={language} value={language}>
-                  {language}
                 </option>
               ))}
             </SelectInput>

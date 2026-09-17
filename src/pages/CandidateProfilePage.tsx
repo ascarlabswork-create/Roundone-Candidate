@@ -17,7 +17,6 @@ import {
   CANDIDATE_LEVELS,
   COMPANIES,
   INTERVIEW_TYPES,
-  LANGUAGES,
   SKILLS,
   TARGET_ROLES,
   TIME_WINDOWS,
@@ -46,10 +45,8 @@ type ProfileForm = {
   targetCompany: string
   interviewType: string
   skills: string[]
-  language: string
   preferredDate: string
   preferredTime: TimeWindow | ''
-  budgetRupees: string
 }
 
 const emptyForm: ProfileForm = {
@@ -62,10 +59,8 @@ const emptyForm: ProfileForm = {
   targetCompany: '',
   interviewType: '',
   skills: [],
-  language: 'English',
   preferredDate: '',
   preferredTime: '',
-  budgetRupees: '',
 }
 
 export function CandidateProfilePage() {
@@ -106,11 +101,8 @@ export function CandidateProfilePage() {
           targetCompany: snapshot.candidate.target_company ?? '',
           interviewType: preferences.interview_type ?? '',
           skills,
-          language: preferences.language || 'English',
           preferredDate: preferences.preferred_date ?? '',
           preferredTime: (preferences.preferred_time_window ?? '') as TimeWindow | '',
-          budgetRupees:
-            preferences.budget_max_paise != null ? String(Math.round(preferences.budget_max_paise / 100)) : '',
         })
         setReady(true)
       } catch (caught) {
@@ -139,12 +131,6 @@ export function CandidateProfilePage() {
     setSaveError(null)
     setSaveSuccess(false)
     try {
-      const budgetRupees = form.budgetRupees.trim()
-      const budgetMaxPaise = budgetRupees === '' ? null : Math.round(Number(budgetRupees) * 100)
-      if (budgetRupees !== '' && (!Number.isFinite(budgetMaxPaise) || (budgetMaxPaise ?? 0) < 0)) {
-        throw new Error('Budget must be a positive amount in rupees.')
-      }
-
       await updateCandidateProfile({
         fullName: form.fullName,
         timezone: form.timezone,
@@ -153,15 +139,12 @@ export function CandidateProfilePage() {
         targetRole: form.targetRole.trim() || null,
         candidateLevel: form.candidateLevel.trim() || null,
         targetCompany: form.targetCompany.trim() || null,
-        languages: form.language ? [form.language] : [],
       })
       await updateCandidatePreferences({
         interviewType: form.interviewType.trim() || null,
         skills: form.skills,
         preferredDate: form.preferredDate || null,
         preferredTimeWindow: form.preferredTime || null,
-        budgetMaxPaise,
-        language: form.language || null,
       })
       await updateCandidateSkills(form.skills)
       await refreshAccount()
@@ -266,20 +249,6 @@ export function CandidateProfilePage() {
                 {timezoneOptions.map((zone) => (
                   <option key={zone} value={zone}>
                     {zone}
-                  </option>
-                ))}
-              </SelectInput>
-            </div>
-            <div>
-              <FieldLabel htmlFor="language">Language</FieldLabel>
-              <SelectInput
-                id="language"
-                value={form.language}
-                onChange={(event) => setForm({ ...form, language: event.target.value })}
-              >
-                {LANGUAGES.map((language) => (
-                  <option key={language} value={language}>
-                    {language}
                   </option>
                 ))}
               </SelectInput>
@@ -441,17 +410,6 @@ export function CandidateProfilePage() {
                   </option>
                 ))}
               </SelectInput>
-            </div>
-            <div>
-              <FieldLabel htmlFor="budget">Budget (₹)</FieldLabel>
-              <TextInput
-                id="budget"
-                type="number"
-                min={0}
-                placeholder="2000"
-                value={form.budgetRupees}
-                onChange={(event) => setForm({ ...form, budgetRupees: event.target.value })}
-              />
             </div>
           </div>
         </Card>
