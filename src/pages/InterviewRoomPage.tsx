@@ -12,6 +12,8 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { formatBookingTime, formatCivilDateWithYear, isoDateInZone } from '../availability/index.ts'
 import { Logo } from '../components/layout/Logo.tsx'
+import { CandidateFeedbackAction } from '../components/interviews/CandidateFeedbackAction.tsx'
+import { CandidateReviewAction } from '../components/interviews/CandidateReviewAction.tsx'
 import { Button } from '../components/ui/Button.tsx'
 import { ErrorState, Skeleton } from '../components/ui/primitives.tsx'
 import { useAsync } from '../lib/useAsync.ts'
@@ -178,9 +180,27 @@ function InterviewStatusScreen({
       <div className="mt-8 rounded-xl border border-slate-200 bg-white p-6 text-center">
         <h1 className="text-xl font-semibold text-navy-950">{title}</h1>
         <p className="mt-2 text-sm text-slate-600">Join is unavailable for this booking.</p>
-        <Button className="mt-6" variant="outline" onClick={() => navigate('/candidate/interviews')}>
-          Back to My Interviews
-        </Button>
+        <div className="mt-6 flex flex-col items-center gap-3">
+          {joinState === 'completed' ? (
+            <>
+              <CandidateFeedbackAction
+                bookingId={interview.id}
+                status={interview.status}
+                hasFeedback={interview.hasFeedback}
+                size="md"
+              />
+              <CandidateReviewAction
+                bookingId={interview.id}
+                status={interview.status}
+                hasReview={interview.hasReview}
+                size="md"
+              />
+            </>
+          ) : null}
+          <Button variant="outline" onClick={() => navigate('/candidate/interviews')}>
+            Back to My Interviews
+          </Button>
+        </div>
       </div>
     </div>
   )
