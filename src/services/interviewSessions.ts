@@ -6,6 +6,7 @@ import {
   listCandidateBookings,
   type CandidateBooking,
 } from './bookings.ts'
+import { getCandidateFeedbackBookingIds } from './candidateFeedback.ts'
 import { getPublicInterviewer, getPublicInterviewerService } from './interviewerPublic.ts'
 import { parseInterviewSession, type CandidateInterviewSession } from './interviewSessionModel.ts'
 
@@ -27,6 +28,7 @@ export type CandidateInterview = CandidateBooking & {
   serviceName: string
   interviewType: string
   session: CandidateInterviewSession | null
+  hasFeedback: boolean
 }
 
 async function requireAuthenticatedUser() {
@@ -37,7 +39,11 @@ async function requireAuthenticatedUser() {
   return data.user
 }
 
-async function decorateBooking(booking: CandidateBooking, session: CandidateInterviewSession | null): Promise<CandidateInterview> {
+async function decorateBooking(
+  booking: CandidateBooking,
+  session: CandidateInterviewSession | null,
+  hasFeedback: boolean,
+): Promise<CandidateInterview> {
   let interviewerName = 'Interviewer'
   let interviewerPhoto: string | null = null
   let interviewerCompany: string | null = null
@@ -64,6 +70,7 @@ async function decorateBooking(booking: CandidateBooking, session: CandidateInte
     serviceName,
     interviewType,
     session,
+    hasFeedback,
   }
 }
 
@@ -93,22 +100,29 @@ export async function getCandidateInterviewSessions(): Promise<CandidateIntervie
   if (!bookings.length) return []
 
   const ids = bookings.map((booking) => booking.id)
-  const { data, error } = await supabase.from('interview_sessions').select(SESSION_SELECT).in('booking_id', ids)
+  const [sessionResult, feedbackIds] = await Promise.all([
+    supabase.from('interview_sessions').select(SESSION_SELECT).in('booking_id', ids),
+    getCandidateFeedbackBookingIds(ids),
+  ])
 
-  if (error) {
-    console.error('getCandidateInterviewSessions failed', error)
+  if (sessionResult.error) {
+    console.error('getCandidateInterviewSessions failed', sessionResult.error)
     throw new BookingError('rpc', 'Unable to load your interview sessions.')
   }
 
   const sessions = new Map<string, CandidateInterviewSession>()
-  if (Array.isArray(data)) {
-    for (const row of data) {
+  if (Array.isArray(sessionResult.data)) {
+    for (const row of sessionResult.data) {
       const session = parseInterviewSession(row)
       if (session) sessions.set(session.bookingId, session)
     }
   }
 
-  return Promise.all(bookings.map((booking) => decorateBooking(booking, sessions.get(booking.id) ?? null)))
+  return Promise.all(
+    bookings.map((booking) =>
+      decorateBooking(booking, sessions.get(booking.id) ?? null, feedbackIds.has(booking.id)),
+    ),
+  )
 }
 
 export async function getCandidateUpcomingInterviews(): Promise<CandidateInterview[]> {
@@ -140,6 +154,9 @@ export async function getCandidateInterviewByBooking(bookingId: string): Promise
     throw error
   }
 
-  const session = await getInterviewSessionByBooking(booking.id)
-  return decorateBooking(booking, session)
+  const [session, feedbackIds] = await Promise.all([
+    getInterviewSessionByBooking(booking.id),
+    getCandidateFeedbackBookingIds([booking.id]),
+  ])
+  return decorateBooking(booking, session, feedbackIds.has(booking.id))
 }

@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom'
+import { CandidateFeedbackAction } from './CandidateFeedbackAction.tsx'
 import { Button } from '../ui/Button.tsx'
 import { Badge, Card } from '../ui/primitives.tsx'
 import { Avatar } from '../ui/identity.tsx'
@@ -71,6 +72,11 @@ export function InterviewSummaryCard({
               Join Interview
             </Button>
           ) : null}
+          <CandidateFeedbackAction
+            bookingId={interview.id}
+            status={interview.status}
+            hasFeedback={interview.hasFeedback}
+          />
         </div>
       </div>
     </Card>
