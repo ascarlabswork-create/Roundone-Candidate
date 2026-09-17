@@ -15,6 +15,7 @@ import {
 } from '../components/ui/primitives.tsx'
 import {
   CANDIDATE_LEVELS,
+  COMPANIES,
   INTERVIEW_TYPES,
   LANGUAGES,
   SKILLS,
@@ -309,57 +310,63 @@ export function CandidateProfilePage() {
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
             <div>
               <FieldLabel htmlFor="targetRole">Target role</FieldLabel>
-              <SelectInput
+              <TextInput
                 id="targetRole"
+                list="profile-role-options"
+                placeholder="Select or type a role"
                 value={form.targetRole}
                 onChange={(event) => setForm({ ...form, targetRole: event.target.value })}
-              >
-                <option value="">Select role</option>
+              />
+              <datalist id="profile-role-options">
                 {TARGET_ROLES.map((role) => (
-                  <option key={role} value={role}>
-                    {role}
-                  </option>
+                  <option key={role} value={role} />
                 ))}
-              </SelectInput>
+              </datalist>
             </div>
             <div>
               <FieldLabel htmlFor="candidateLevel">Candidate level</FieldLabel>
-              <SelectInput
+              <TextInput
                 id="candidateLevel"
+                list="profile-level-options"
+                placeholder="Select or type a level"
                 value={form.candidateLevel}
                 onChange={(event) => setForm({ ...form, candidateLevel: event.target.value })}
-              >
-                <option value="">Select level</option>
+              />
+              <datalist id="profile-level-options">
                 {CANDIDATE_LEVELS.map((level) => (
-                  <option key={level} value={level}>
-                    {level}
-                  </option>
+                  <option key={level} value={level} />
                 ))}
-              </SelectInput>
+              </datalist>
             </div>
             <div>
               <FieldLabel htmlFor="targetCompany">Target company</FieldLabel>
               <TextInput
                 id="targetCompany"
-                placeholder="Google"
+                list="profile-company-options"
+                placeholder="Select or type a company"
                 value={form.targetCompany}
                 onChange={(event) => setForm({ ...form, targetCompany: event.target.value })}
               />
+              <datalist id="profile-company-options">
+                {COMPANIES.map((company) => (
+                  <option key={company} value={company} />
+                ))}
+              </datalist>
             </div>
             <div>
               <FieldLabel htmlFor="interviewType">Interview type</FieldLabel>
-              <SelectInput
+              <TextInput
                 id="interviewType"
+                list="profile-type-options"
+                placeholder="Select or type a type"
                 value={form.interviewType}
                 onChange={(event) => setForm({ ...form, interviewType: event.target.value })}
-              >
-                <option value="">Select type</option>
+              />
+              <datalist id="profile-type-options">
                 {INTERVIEW_TYPES.map((type) => (
-                  <option key={type} value={type}>
-                    {type}
-                  </option>
+                  <option key={type} value={type} />
                 ))}
-              </SelectInput>
+              </datalist>
             </div>
           </div>
 

@@ -66,6 +66,25 @@ export async function createBooking(input: CreateBookingInput): Promise<Candidat
   return booking
 }
 
+export async function listCandidateBookings(): Promise<CandidateBooking[]> {
+  await requireAuthenticatedUser()
+  const { data, error } = await supabase
+    .from('bookings')
+    .select(BOOKING_SELECT)
+    .order('starts_at', { ascending: true })
+
+  if (error) {
+    console.error('listCandidateBookings failed', error)
+    throw mapBookingError(error)
+  }
+
+  if (!Array.isArray(data)) return []
+  return data.flatMap((row) => {
+    const booking = parseCandidateBooking(row)
+    return booking ? [booking] : []
+  })
+}
+
 export async function getCandidateBooking(bookingId: string): Promise<CandidateBooking> {
   await requireAuthenticatedUser()
   if (!isUuid(bookingId)) {
