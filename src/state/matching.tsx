@@ -13,7 +13,11 @@ const emptyPreferences: MatchingPreferences = {
   preferredDate: '',
   preferredTime: '',
   budget: 0,
-  language: 'English',
+  language: '',
+}
+
+function withoutBudgetAndLanguage(prefs: MatchingPreferences): MatchingPreferences {
+  return { ...prefs, budget: 0, language: '' }
 }
 
 type MatchingContextValue = {
@@ -25,16 +29,18 @@ type MatchingContextValue = {
 const MatchingContext = createContext<MatchingContextValue | null>(null)
 
 export function MatchingProvider({ children }: { children: ReactNode }) {
-  const [preferences, setPreferencesState] = useState<MatchingPreferences | null>(() =>
-    readSessionJson<MatchingPreferences | null>(STORAGE_KEY, null),
-  )
+  const [preferences, setPreferencesState] = useState<MatchingPreferences | null>(() => {
+    const stored = readSessionJson<MatchingPreferences | null>(STORAGE_KEY, null)
+    return stored ? withoutBudgetAndLanguage(stored) : null
+  })
 
   const value = useMemo<MatchingContextValue>(
     () => ({
       preferences,
       setPreferences: (prefs) => {
-        setPreferencesState(prefs)
-        writeSessionJson(STORAGE_KEY, prefs)
+        const next = withoutBudgetAndLanguage(prefs)
+        setPreferencesState(next)
+        writeSessionJson(STORAGE_KEY, next)
       },
       clearPreferences: () => {
         setPreferencesState(null)

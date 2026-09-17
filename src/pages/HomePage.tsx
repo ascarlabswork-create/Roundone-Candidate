@@ -10,7 +10,7 @@ import {
 } from '../data/catalogs.ts'
 import { InterviewSummaryCard } from '../components/interviews/InterviewSummaryCard.tsx'
 import { Button } from '../components/ui/Button.tsx'
-import { Card, FieldLabel, SelectInput, TextInput } from '../components/ui/primitives.tsx'
+import { Card, FieldLabel, TextInput } from '../components/ui/primitives.tsx'
 import { useAsync } from '../lib/useAsync.ts'
 import { getCandidateUpcomingInterviews } from '../services/interviewSessions.ts'
 
@@ -87,33 +87,33 @@ export function HomePage() {
             <form className="mt-6 grid gap-4 sm:grid-cols-2" onSubmit={submitGoal}>
               <div>
                 <FieldLabel htmlFor="home-role">Target Role</FieldLabel>
-                <SelectInput
+                <TextInput
                   id="home-role"
+                  list="home-role-options"
+                  placeholder="Select or type a role"
                   value={goal.targetRole}
                   onChange={(event) => setGoal({ ...goal, targetRole: event.target.value })}
-                >
-                  <option value="">Select role</option>
+                />
+                <datalist id="home-role-options">
                   {TARGET_ROLES.map((role) => (
-                    <option key={role} value={role}>
-                      {role}
-                    </option>
+                    <option key={role} value={role} />
                   ))}
-                </SelectInput>
+                </datalist>
               </div>
               <div>
                 <FieldLabel htmlFor="home-level">Target Level</FieldLabel>
-                <SelectInput
+                <TextInput
                   id="home-level"
+                  list="home-level-options"
+                  placeholder="Select or type a level"
                   value={goal.candidateLevel}
                   onChange={(event) => setGoal({ ...goal, candidateLevel: event.target.value })}
-                >
-                  <option value="">Select level</option>
+                />
+                <datalist id="home-level-options">
                   {CANDIDATE_LEVELS.map((level) => (
-                    <option key={level} value={level}>
-                      {level}
-                    </option>
+                    <option key={level} value={level} />
                   ))}
-                </SelectInput>
+                </datalist>
               </div>
               <div className="sm:col-span-2">
                 <FieldLabel htmlFor="home-company">Target Company</FieldLabel>
