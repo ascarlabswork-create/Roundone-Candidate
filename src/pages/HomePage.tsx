@@ -8,11 +8,9 @@ import {
   POPULAR_COMPANIES,
   TARGET_ROLES,
 } from '../data/catalogs.ts'
-import { InterviewSummaryCard } from '../components/interviews/InterviewSummaryCard.tsx'
+import { CandidateDashboard } from '../components/dashboard/CandidateDashboard.tsx'
 import { Button } from '../components/ui/Button.tsx'
 import { Card, FieldLabel, TextInput } from '../components/ui/primitives.tsx'
-import { useAsync } from '../lib/useAsync.ts'
-import { getCandidateUpcomingInterviews } from '../services/interviewSessions.ts'
 
 const steps = [
   { n: '01', title: 'Tell us your goal', body: 'Share the role, interview type, skills, and when you can meet.' },
@@ -23,8 +21,6 @@ const steps = [
 
 export function HomePage() {
   const navigate = useNavigate()
-  const upcomingState = useAsync(() => getCandidateUpcomingInterviews(), [])
-  const nearest = upcomingState.status === 'success' ? upcomingState.data[0] ?? null : null
   const [goal, setGoal] = useState({
     targetRole: '',
     candidateLevel: '',
@@ -42,16 +38,7 @@ export function HomePage() {
 
   return (
     <div>
-      {nearest ? (
-        <section className="border-b border-slate-200 bg-white">
-          <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
-            <h2 className="text-lg font-semibold text-navy-950">Upcoming Interview</h2>
-            <div className="mt-4">
-              <InterviewSummaryCard interview={nearest} />
-            </div>
-          </div>
-        </section>
-      ) : null}
+      <CandidateDashboard />
 
       <section className="bg-white">
         <div className="mx-auto grid max-w-7xl gap-12 px-4 py-14 sm:px-6 lg:grid-cols-2 lg:items-center lg:py-20">

@@ -68,28 +68,60 @@ export async function createBooking(input: CreateBookingInput): Promise<Candidat
   return booking
 }
 
-export async function listCandidateBookings(): Promise<CandidateBooking[]> {
+function mapListError(error: unknown) {
+  const mapped = mapBookingError(error)
+  if (mapped.code === 'unauthenticated') return mapped
+  if (mapped.code === 'network') {
+    return new BookingError('network', 'Unable to load your interviews. Check your connection.')
+  }
+  return new BookingError('rpc', 'Unable to load your interviews. Please try again.')
+}
+
+export async function countCandidateBookings(statuses: string[]): Promise<number> {
   await requireAuthenticatedUser()
-  const { data, error } = await supabase
+  let query = supabase.from('bookings').select('id', { count: 'exact', head: true })
+  if (statuses.length === 1) query = query.eq('status', statuses[0])
+  else if (statuses.length > 1) query = query.in('status', statuses)
+
+  const { count, error } = await query
+  if (error) {
+    console.error('countCandidateBookings failed', error)
+    throw mapListError(error)
+  }
+  return count ?? 0
+}
+
+export async function listCandidateBookingsWhere(options: {
+  statuses: string[]
+  ascending?: boolean
+  limit: number
+}): Promise<CandidateBooking[]> {
+  await requireAuthenticatedUser()
+  let query = supabase
     .from('bookings')
     .select(BOOKING_SELECT)
-    .order('starts_at', { ascending: false })
-    .limit(BOOKING_LIST_LIMIT)
+    .order('starts_at', { ascending: options.ascending ?? false })
+    .limit(options.limit)
+  if (options.statuses.length === 1) query = query.eq('status', options.statuses[0])
+  else if (options.statuses.length > 1) query = query.in('status', options.statuses)
 
+  const { data, error } = await query
   if (error) {
-    console.error('listCandidateBookings failed', error)
-    const mapped = mapBookingError(error)
-    if (mapped.code === 'unauthenticated') throw mapped
-    if (mapped.code === 'network') {
-      throw new BookingError('network', 'Unable to load your interviews. Check your connection.')
-    }
-    throw new BookingError('rpc', 'Unable to load your interviews. Please try again.')
+    console.error('listCandidateBookingsWhere failed', error)
+    throw mapListError(error)
   }
-
   if (!Array.isArray(data)) return []
   return data.flatMap((row) => {
     const booking = parseCandidateBooking(row)
     return booking ? [booking] : []
+  })
+}
+
+export async function listCandidateBookings(): Promise<CandidateBooking[]> {
+  return listCandidateBookingsWhere({
+    statuses: [],
+    ascending: false,
+    limit: BOOKING_LIST_LIMIT,
   })
 }
 

@@ -140,25 +140,29 @@ export async function updateCandidateProfile(updates: CandidateProfileUpdates): 
   return getCandidateProfile()
 }
 
-export async function getCandidatePreferences(): Promise<CandidatePreferencesRecord> {
+const CANDIDATE_PREFERENCES_SELECT =
+  'candidate_profile_id, interview_type, skills, preferred_date, preferred_time_window, budget_max_paise, language'
+
+export async function getCandidatePreferencesIfPresent(): Promise<CandidatePreferencesRecord | null> {
   const account = await getCandidateProfile()
   const { data, error } = await supabase
     .from('candidate_preferences')
-    .select(
-      'candidate_profile_id, interview_type, skills, preferred_date, preferred_time_window, budget_max_paise, language',
-    )
+    .select(CANDIDATE_PREFERENCES_SELECT)
     .eq('candidate_profile_id', account.candidate.id)
     .maybeSingle()
   fail(error)
+  return data
+}
 
-  if (data) return data
+export async function getCandidatePreferences(): Promise<CandidatePreferencesRecord> {
+  const existing = await getCandidatePreferencesIfPresent()
+  if (existing) return existing
+  const account = await getCandidateProfile()
 
   const { data: created, error: insertError } = await supabase
     .from('candidate_preferences')
     .insert({ candidate_profile_id: account.candidate.id })
-    .select(
-      'candidate_profile_id, interview_type, skills, preferred_date, preferred_time_window, budget_max_paise, language',
-    )
+    .select(CANDIDATE_PREFERENCES_SELECT)
     .single()
   fail(insertError)
   if (!created) throw new Error('Could not create candidate preferences.')

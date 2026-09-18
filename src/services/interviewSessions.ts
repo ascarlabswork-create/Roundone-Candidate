@@ -100,9 +100,7 @@ export async function getInterviewSessionByBooking(bookingId: string): Promise<C
   return parseInterviewSession(data)
 }
 
-export async function getCandidateInterviewSessions(): Promise<CandidateInterview[]> {
-  await requireAuthenticatedUser()
-  const bookings = await listCandidateBookings()
+async function loadDecoratedInterviews(bookings: CandidateBooking[]): Promise<CandidateInterview[]> {
   if (!bookings.length) return []
 
   const ids = bookings.map((booking) => booking.id)
@@ -118,7 +116,7 @@ export async function getCandidateInterviewSessions(): Promise<CandidateIntervie
 
   if (sessionResult.status === 'fulfilled') {
     if (sessionResult.value.error) {
-      console.error('getCandidateInterviewSessions failed', sessionResult.value.error)
+      console.error('loadDecoratedInterviews failed', sessionResult.value.error)
     } else if (Array.isArray(sessionResult.value.data)) {
       for (const row of sessionResult.value.data) {
         const session = parseInterviewSession(row)
@@ -126,7 +124,7 @@ export async function getCandidateInterviewSessions(): Promise<CandidateIntervie
       }
     }
   } else {
-    console.error('getCandidateInterviewSessions failed', sessionResult.reason)
+    console.error('loadDecoratedInterviews failed', sessionResult.reason)
   }
 
   if (feedbackResult.status === 'fulfilled') feedbackIds = feedbackResult.value
@@ -136,6 +134,16 @@ export async function getCandidateInterviewSessions(): Promise<CandidateIntervie
   else console.error('getCandidateReviewBookingIds failed', reviewResult.reason)
 
   return decorateBookings(bookings, sessions, feedbackIds, reviewIds)
+}
+
+export async function decorateCandidateInterviews(bookings: CandidateBooking[]): Promise<CandidateInterview[]> {
+  return loadDecoratedInterviews(bookings)
+}
+
+export async function getCandidateInterviewSessions(): Promise<CandidateInterview[]> {
+  await requireAuthenticatedUser()
+  const bookings = await listCandidateBookings()
+  return loadDecoratedInterviews(bookings)
 }
 
 export async function getCandidateUpcomingInterviews(): Promise<CandidateInterview[]> {

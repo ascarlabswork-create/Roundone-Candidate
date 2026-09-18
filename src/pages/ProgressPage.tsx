@@ -1,33 +1,27 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { listBookings, listMyReviews } from '../api/index.ts'
-import { CompletedSessionCtas } from '../components/interviews/CompletedSessionCtas.tsx'
+import { CandidateFeedbackAction } from '../components/interviews/CandidateFeedbackAction.tsx'
+import { CandidateReviewAction } from '../components/interviews/CandidateReviewAction.tsx'
 import { Button } from '../components/ui/Button.tsx'
-import { Card, ErrorState, PageHeader, Skeleton } from '../components/ui/primitives.tsx'
-import { progressSnapshot } from '../data/feedback.ts'
-import { formatDateShort } from '../lib/dates.ts'
+import { Card, EmptyState, ErrorState, PageHeader, Skeleton } from '../components/ui/primitives.tsx'
+import { formatBookingTime, formatCivilDateWithYear, isoDateInZone } from '../availability/index.ts'
 import { useAsync } from '../lib/useAsync.ts'
+import { getCandidateDashboard } from '../services/candidateDashboard.ts'
+import { interviewStatusLabel } from '../services/interviewSessions.ts'
 
-const metrics = [
-  ['Coding', progressSnapshot.metrics.coding],
-  ['System Design', progressSnapshot.metrics.systemDesign],
-  ['Behavioral', progressSnapshot.metrics.behavioral],
-  ['Communication', progressSnapshot.metrics.communication],
-  ['Problem Solving', progressSnapshot.metrics.problemSolving],
-] as const
+function metricValue(value: number | null) {
+  return value == null ? '—' : value
+}
 
 export function ProgressPage() {
-  const bookings = useAsync(() => listBookings(), [])
-  const myReviews = useAsync(() => listMyReviews(), [])
-  const recent = bookings.status === 'success' ? bookings.data.filter((item) => item.status === 'completed') : []
-  const reviewedIds = new Set(
-    myReviews.status === 'success' ? myReviews.data.map((item) => item.bookingId) : [],
-  )
+  const [retryNonce, setRetryNonce] = useState(0)
+  const state = useAsync(() => getCandidateDashboard(), [retryNonce])
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
       <PageHeader
         title="Your Interview Progress"
-        subtitle="Readiness is based on recent mock interviews. Use it to decide what to practice next."
+        subtitle="Counts come from your real bookings, feedback, and reviews."
         actions={
           <Link to="/candidate/find">
             <Button>Find Next Interviewer</Button>
@@ -35,82 +29,81 @@ export function ProgressPage() {
         }
       />
 
-      <div className="mt-8 grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
-        <Card className="flex flex-col items-center justify-center p-8">
-          <p className="text-sm font-medium text-slate-600">Overall readiness</p>
-          <p className="mt-2 text-5xl font-semibold text-navy-950">{progressSnapshot.overall}%</p>
-          <p className="mt-2 text-sm text-emerald-700">Up from {progressSnapshot.history[0]}%</p>
-        </Card>
-        <Card className="p-6">
-          <h2 className="text-base font-semibold text-navy-950">Metrics</h2>
-          <div className="mt-4 space-y-3">
-            {metrics.map(([label, value]) => (
-              <div key={label}>
-                <div className="mb-1 flex justify-between text-sm">
-                  <span>{label}</span>
-                  <span className="font-semibold text-navy-950">{value}%</span>
-                </div>
-                <div className="h-2 rounded-full bg-slate-100">
-                  <div className="h-2 rounded-full bg-blue-600" style={{ width: `${value}%` }} />
-                </div>
-              </div>
-            ))}
-          </div>
-        </Card>
-      </div>
-
-      <Card className="mt-6 p-6">
-        <h2 className="text-base font-semibold text-navy-950">Historical improvement</h2>
-        <div className="mt-6 flex items-end gap-4">
-          {progressSnapshot.history.map((value, index) => (
-            <div key={`${value}-${index}`} className="flex flex-1 flex-col items-center gap-2">
-              <div className="w-full rounded-t-md bg-navy-800" style={{ height: `${value * 1.4}px` }} />
-              <span className="text-sm font-semibold text-navy-950">{value}%</span>
-            </div>
-          ))}
+      {state.status === 'loading' ? (
+        <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Skeleton className="h-24" />
+          <Skeleton className="h-24" />
+          <Skeleton className="h-24" />
+          <Skeleton className="h-24" />
         </div>
-      </Card>
+      ) : null}
+      {state.status === 'error' ? (
+        <div className="mt-8">
+          <ErrorState title="Unable to load your progress" body={state.error} onRetry={() => setRetryNonce((value) => value + 1)} />
+        </div>
+      ) : null}
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-2">
-        <Card className="p-6">
-          <h2 className="text-base font-semibold text-navy-950">Recent Interviews</h2>
-          {bookings.status === 'loading' ? <Skeleton className="mt-4 h-24" /> : null}
-          {bookings.status === 'error' ? <ErrorState body={bookings.error} /> : null}
-          <ul className="mt-4 space-y-4 text-sm">
-            {recent.map((item) => (
-              <li key={item.id} className="rounded-lg border border-slate-100 p-3">
-                <div className="flex items-start justify-between gap-3">
-                  <span>
-                    {item.serviceName}
-                    <span className="mt-1 block text-slate-500">{formatDateShort(item.start)}</span>
-                  </span>
-                </div>
-                <div className="mt-3">
-                  <CompletedSessionCtas
-                    bookingId={item.id}
-                    completed
-                    hasReview={reviewedIds.has(item.id)}
-                  />
-                </div>
-              </li>
-            ))}
-          </ul>
-        </Card>
-        <Card className="p-6">
-          <h2 className="text-base font-semibold text-navy-950">Recent Feedback</h2>
-          <p className="mt-3 text-sm leading-6 text-slate-700">
-            Latest overall score {progressSnapshot.overall}%. System design is the remaining gap vs coding.
-          </p>
-          <h3 className="mt-6 text-base font-semibold text-navy-950">Recommended Next Interview</h3>
-          <p className="mt-2 text-sm leading-6 text-slate-700">{progressSnapshot.recommendation.body}</p>
-          <Link
-            to={`/candidate/find?type=${encodeURIComponent(progressSnapshot.recommendation.interviewType)}`}
-            className="mt-4 inline-block"
-          >
-            <Button>Find Next Interviewer</Button>
-          </Link>
-        </Card>
-      </div>
+      {state.status === 'success' ? (
+        <>
+          <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <Card className="p-4">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Completed</p>
+              <p className="mt-1 text-2xl font-semibold text-navy-950">{metricValue(state.data.counts.completed)}</p>
+            </Card>
+            <Card className="p-4">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Upcoming</p>
+              <p className="mt-1 text-2xl font-semibold text-navy-950">{metricValue(state.data.counts.upcoming)}</p>
+            </Card>
+            <Card className="p-4">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Feedback received</p>
+              <p className="mt-1 text-2xl font-semibold text-navy-950">{metricValue(state.data.counts.feedbackReceived)}</p>
+            </Card>
+            <Card className="p-4">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Reviews submitted</p>
+              <p className="mt-1 text-2xl font-semibold text-navy-950">{metricValue(state.data.counts.reviewsSubmitted)}</p>
+            </Card>
+          </div>
+
+          <Card className="mt-6 p-6">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-base font-semibold text-navy-950">Recent Interviews</h2>
+              <Link to="/candidate/interviews" className="text-sm font-medium text-blue-700">
+                View All Interviews
+              </Link>
+            </div>
+            {state.data.recentCompleted.length === 0 ? (
+              <div className="mt-4">
+                <EmptyState title="You haven't completed an interview yet." body="Completed interviews will appear here." />
+              </div>
+            ) : (
+              <ul className="mt-4 space-y-4">
+                {state.data.recentCompleted.map((item) => {
+                  const zone = item.displayTimezone
+                  return (
+                    <li key={item.id} className="rounded-lg border border-slate-100 p-3">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <p className="font-medium text-navy-950">{item.serviceName}</p>
+                          <p className="mt-1 text-sm text-slate-600">{item.interviewerName}</p>
+                          <p className="mt-1 text-sm text-slate-500">
+                            {formatCivilDateWithYear(isoDateInZone(new Date(item.startsAtUtc), zone))} ·{' '}
+                            {formatBookingTime(item.startsAtUtc, zone)}
+                          </p>
+                          <p className="mt-1 text-xs font-medium text-emerald-700">{interviewStatusLabel(item.status)}</p>
+                        </div>
+                        <div className="flex flex-col gap-2 sm:items-end">
+                          <CandidateFeedbackAction bookingId={item.id} status={item.status} hasFeedback={item.hasFeedback} />
+                          <CandidateReviewAction bookingId={item.id} status={item.status} hasReview={item.hasReview} />
+                        </div>
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+          </Card>
+        </>
+      ) : null}
     </div>
   )
 }
