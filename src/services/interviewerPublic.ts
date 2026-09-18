@@ -274,3 +274,92 @@ export async function listPublicServicesFor(ids: string[]): Promise<PublicInterv
     return mapped ? [mapped] : []
   })
 }
+
+const VOCABULARY_ROW_LIMIT = 800
+
+function uniqueVocabulary(values: string[], max: number) {
+  const result: string[] = []
+  const seen = new Set<string>()
+  for (const value of values) {
+    const text = value.trim()
+    if (!text) continue
+    const key = text.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    result.push(text)
+    if (result.length >= max) break
+  }
+  return result
+}
+
+export type PublicMatchingVocabulary = {
+  roles: string[]
+  skills: string[]
+  interviewTypes: string[]
+  candidateLevels: string[]
+  companies: string[]
+}
+
+export async function listPublicMatchingVocabulary(): Promise<PublicMatchingVocabulary> {
+  const empty: PublicMatchingVocabulary = {
+    roles: [],
+    skills: [],
+    interviewTypes: [],
+    candidateLevels: [],
+    companies: [],
+  }
+  try {
+    const [rolesResult, skillsResult, servicesResult, directoryResult] = await Promise.all([
+      supabase.from('interviewer_roles_public').select('target_role, candidate_level').limit(VOCABULARY_ROW_LIMIT),
+      supabase.from('interviewer_skills_public').select('skill').limit(VOCABULARY_ROW_LIMIT),
+      supabase.from('interviewer_services_public').select('interview_type').limit(VOCABULARY_ROW_LIMIT),
+      supabase.from('interviewer_public_directory').select('company').limit(VOCABULARY_ROW_LIMIT),
+    ])
+    if (rolesResult.error) console.error('listPublicMatchingVocabulary roles failed', rolesResult.error)
+    if (skillsResult.error) console.error('listPublicMatchingVocabulary skills failed', skillsResult.error)
+    if (servicesResult.error) console.error('listPublicMatchingVocabulary services failed', servicesResult.error)
+    if (directoryResult.error) console.error('listPublicMatchingVocabulary companies failed', directoryResult.error)
+
+    const roles: string[] = []
+    const candidateLevels: string[] = []
+    for (const row of rolesResult.data ?? []) {
+      const parsed = asRecord(row)
+      const role = parsed ? readString(parsed, 'target_role') : null
+      const level = parsed ? readString(parsed, 'candidate_level') : null
+      if (role) roles.push(role)
+      if (level) candidateLevels.push(level)
+    }
+
+    const skills: string[] = []
+    for (const row of skillsResult.data ?? []) {
+      const parsed = asRecord(row)
+      const skill = parsed ? readString(parsed, 'skill') : null
+      if (skill) skills.push(skill)
+    }
+
+    const interviewTypes: string[] = []
+    for (const row of servicesResult.data ?? []) {
+      const parsed = asRecord(row)
+      const interviewType = parsed ? readString(parsed, 'interview_type') : null
+      if (interviewType) interviewTypes.push(interviewType)
+    }
+
+    const companies: string[] = []
+    for (const row of directoryResult.data ?? []) {
+      const parsed = asRecord(row)
+      const company = parsed ? readString(parsed, 'company') : null
+      if (company) companies.push(company)
+    }
+
+    return {
+      roles: uniqueVocabulary(roles, 150),
+      skills: uniqueVocabulary(skills, 200),
+      interviewTypes: uniqueVocabulary(interviewTypes, 40),
+      candidateLevels: uniqueVocabulary(candidateLevels, 30),
+      companies: uniqueVocabulary(companies, 80),
+    }
+  } catch (error) {
+    console.error('listPublicMatchingVocabulary failed', error)
+    return empty
+  }
+}

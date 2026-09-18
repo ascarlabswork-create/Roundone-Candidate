@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   CANDIDATE_LEVELS,
@@ -8,8 +8,11 @@ import {
   TARGET_ROLES,
   TIME_WINDOWS,
 } from '../data/catalogs.ts'
+import { NormalizationSuggestions } from '../components/matching/NormalizationSuggestions.tsx'
 import { Button } from '../components/ui/Button.tsx'
 import { Chip, FieldLabel, PageHeader, SelectInput, TextInput } from '../components/ui/primitives.tsx'
+import { toNormalizationInput, type NormalizationPatch } from '../matching/normalizeModel.ts'
+import { usePreferenceNormalization } from '../matching/usePreferenceNormalization.ts'
 import { emptyPreferences, useMatching } from '../state/matching.tsx'
 import type { TimeWindow } from '../data/catalogs.ts'
 import type { MatchingPreferences } from '../types.ts'
@@ -18,6 +21,9 @@ export function FindPage() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const { preferences, setPreferences } = useMatching()
+  const { status: suggestionStatus, suggestions, suggest, clear } = usePreferenceNormalization()
+  const intentTimer = useRef<number>(0)
+  const autoSuggested = useRef(false)
 
   const initial = useMemo<MatchingPreferences>(
     () => ({
@@ -44,6 +50,47 @@ export function FindPage() {
     setSkillDraft('')
   }
 
+  function normalizationInput(next: MatchingPreferences = form) {
+    return toNormalizationInput({
+      targetRole: next.targetRole,
+      candidateLevel: next.candidateLevel,
+      skills: next.skills,
+      interviewType: next.interviewType,
+      targetCompany: next.targetCompany,
+      intent: next.naturalLanguageQuery ?? '',
+      skillDraft,
+    })
+  }
+
+  function requestSuggestions(next: MatchingPreferences = form) {
+    void suggest(normalizationInput(next))
+  }
+
+  function applySuggestions(patch: NormalizationPatch) {
+    setForm((prev) => ({
+      ...prev,
+      targetRole: patch.targetRole ?? prev.targetRole,
+      candidateLevel: patch.candidateLevel ?? prev.candidateLevel,
+      interviewType: patch.interviewType ?? prev.interviewType,
+      targetCompany: patch.targetCompany ?? prev.targetCompany,
+      skills: patch.skills ?? prev.skills,
+    }))
+    setSkillDraft('')
+    clear()
+  }
+
+  useEffect(() => {
+    const intent = initial.naturalLanguageQuery?.trim() ?? ''
+    if (autoSuggested.current || intent.length < 12) return
+    if (initial.targetRole && initial.interviewType) return
+    autoSuggested.current = true
+    requestSuggestions(initial)
+  }, [initial])
+
+  useEffect(() => {
+    return () => window.clearTimeout(intentTimer.current)
+  }, [])
+
   function submit(event: FormEvent) {
     event.preventDefault()
     setPreferences({
@@ -57,6 +104,7 @@ export function FindPage() {
   const canSubmit =
     Boolean(form.targetRole && form.interviewType && form.candidateLevel) ||
     Boolean(form.naturalLanguageQuery && form.naturalLanguageQuery.trim().length >= 12)
+  const structuredRequired = !(form.naturalLanguageQuery && form.naturalLanguageQuery.trim().length >= 12)
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
@@ -71,7 +119,7 @@ export function FindPage() {
             <FieldLabel htmlFor="targetRole">Target Role</FieldLabel>
             <TextInput
               id="targetRole"
-              required
+              required={structuredRequired}
               list="find-role-options"
               placeholder="Select or type a role"
               value={form.targetRole}
@@ -87,7 +135,7 @@ export function FindPage() {
             <FieldLabel htmlFor="level">Candidate Level</FieldLabel>
             <TextInput
               id="level"
-              required
+              required={structuredRequired}
               list="find-level-options"
               placeholder="Select or type a level"
               value={form.candidateLevel}
@@ -103,7 +151,7 @@ export function FindPage() {
             <FieldLabel htmlFor="type">Interview Type</FieldLabel>
             <TextInput
               id="type"
-              required
+              required={structuredRequired}
               list="find-type-options"
               placeholder="Select or type a type"
               value={form.interviewType}
@@ -177,10 +225,28 @@ export function FindPage() {
             placeholder="I want a backend interview for Python and FastAPI, preferably someone who has worked with startups."
             value={form.naturalLanguageQuery ?? ''}
             onChange={(event) => setForm({ ...form, naturalLanguageQuery: event.target.value })}
+            onBlur={() => {
+              window.clearTimeout(intentTimer.current)
+              const intent = form.naturalLanguageQuery?.trim() ?? ''
+              if (intent.length < 12) return
+              intentTimer.current = window.setTimeout(() => requestSuggestions(), 700)
+            }}
           />
           <p className="mt-1 text-xs text-slate-500">
             We’ll turn this into structured matching signals. Ranking still uses verified interviewer data.
           </p>
+        </div>
+
+        <div className="space-y-3">
+          <Button variant="outline" onClick={() => requestSuggestions()} disabled={suggestionStatus === 'loading'}>
+            {suggestionStatus === 'loading' ? 'Suggesting…' : 'Suggest matches'}
+          </Button>
+          <NormalizationSuggestions
+            status={suggestionStatus}
+            suggestions={suggestions}
+            currentSkills={form.skills}
+            onApply={applySuggestions}
+          />
         </div>
 
         <div className="grid gap-5 sm:grid-cols-2">

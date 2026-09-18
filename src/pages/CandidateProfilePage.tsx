@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
+import { NormalizationSuggestions } from '../components/matching/NormalizationSuggestions.tsx'
 import { NotificationPreferencesCard } from '../components/notifications/NotificationPreferencesCard.tsx'
 import { Button } from '../components/ui/Button.tsx'
 import {
@@ -24,6 +25,8 @@ import {
   TIMEZONES,
 } from '../data/catalogs.ts'
 import { getInterviewerById } from '../data/interviewers.ts'
+import { toNormalizationInput, type NormalizationPatch } from '../matching/normalizeModel.ts'
+import { usePreferenceNormalization } from '../matching/usePreferenceNormalization.ts'
 import {
   getCandidatePreferences,
   getCandidateSkills,
@@ -76,6 +79,8 @@ export function CandidateProfilePage() {
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [ready, setReady] = useState(false)
+  const [goalDraft, setGoalDraft] = useState('')
+  const { status: suggestionStatus, suggestions, suggest, clear } = usePreferenceNormalization()
 
   useEffect(() => {
     if (!account) return
@@ -124,6 +129,33 @@ export function CandidateProfilePage() {
     if (!skill || form.skills.includes(skill)) return
     setForm({ ...form, skills: [...form.skills, skill] })
     setSkillDraft('')
+  }
+
+  function applySuggestions(patch: NormalizationPatch) {
+    setForm((prev) => ({
+      ...prev,
+      targetRole: patch.targetRole ?? prev.targetRole,
+      candidateLevel: patch.candidateLevel ?? prev.candidateLevel,
+      interviewType: patch.interviewType ?? prev.interviewType,
+      targetCompany: patch.targetCompany ?? prev.targetCompany,
+      skills: patch.skills ?? prev.skills,
+    }))
+    setSkillDraft('')
+    clear()
+  }
+
+  function requestSuggestions() {
+    void suggest(
+      toNormalizationInput({
+        targetRole: form.targetRole,
+        candidateLevel: form.candidateLevel,
+        skills: form.skills,
+        interviewType: form.interviewType,
+        targetCompany: form.targetCompany,
+        intent: goalDraft,
+        skillDraft,
+      }),
+    )
   }
 
   async function save(event: FormEvent) {
@@ -286,6 +318,9 @@ export function CandidateProfilePage() {
                 placeholder="Select or type a role"
                 value={form.targetRole}
                 onChange={(event) => setForm({ ...form, targetRole: event.target.value })}
+                onBlur={() => {
+                  if (form.targetRole.trim().length >= 3) requestSuggestions()
+                }}
               />
               <datalist id="profile-role-options">
                 {TARGET_ROLES.map((role) => (
@@ -331,6 +366,9 @@ export function CandidateProfilePage() {
                 placeholder="Select or type a type"
                 value={form.interviewType}
                 onChange={(event) => setForm({ ...form, interviewType: event.target.value })}
+                onBlur={() => {
+                  if (form.interviewType.trim().length >= 3) requestSuggestions()
+                }}
               />
               <datalist id="profile-type-options">
                 {INTERVIEW_TYPES.map((type) => (
@@ -338,6 +376,23 @@ export function CandidateProfilePage() {
                 ))}
               </datalist>
             </div>
+          </div>
+
+          <div className="mt-5">
+            <FieldLabel htmlFor="profileGoal">Describe your interview goal (optional)</FieldLabel>
+            <TextArea
+              id="profileGoal"
+              placeholder="I am looking for a backend interview focused on Python, FastAPI and APIs."
+              value={goalDraft}
+              onChange={(event) => setGoalDraft(event.target.value)}
+              onBlur={() => {
+                if (goalDraft.trim().length >= 12) requestSuggestions()
+              }}
+            />
+            <p className="mt-1 text-xs text-slate-500">
+              Used only to suggest a role, skills, and interview type. It is not saved unless you apply those
+              suggestions and save the profile.
+            </p>
           </div>
 
           <div className="mt-5">
@@ -380,6 +435,18 @@ export function CandidateProfilePage() {
                 ))
               )}
             </div>
+          </div>
+
+          <div className="mt-5 space-y-3">
+            <Button variant="outline" onClick={requestSuggestions} disabled={suggestionStatus === 'loading'}>
+              {suggestionStatus === 'loading' ? 'Suggesting…' : 'Suggest matches'}
+            </Button>
+            <NormalizationSuggestions
+              status={suggestionStatus}
+              suggestions={suggestions}
+              currentSkills={form.skills}
+              onApply={applySuggestions}
+            />
           </div>
         </Card>
 

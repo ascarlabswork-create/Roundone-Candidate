@@ -8,8 +8,11 @@ import {
   toAiPreferences,
   type MatchingAiMatch,
 } from './aiModel.ts'
+import { keepInterviewersWithBookableSlots } from './liveAvailability.ts'
 import { loadMatchingCatalog, type MatchingCatalogPerson } from './catalog.ts'
+import { constrainNormalizedToVocabulary } from './normalizeModel.ts'
 import { rankInterviewers } from './score.ts'
+import { loadMatchingVocabulary } from './vocabulary.ts'
 
 export type RecommendedMatch = {
   interviewer: MatchingCatalogPerson
@@ -37,8 +40,11 @@ export async function recommendMatchedInterviewers(prefs: MatchingPreferences): 
   }
   if (catalog.length === 0) return []
 
-  const initialRank = rankInterviewers(catalog, prefs)
-  const byId = new Map(catalog.map((person) => [person.id, person]))
+  const available = await keepInterviewersWithBookableSlots(catalog, prefs)
+  if (available.length === 0) return []
+
+  const initialRank = rankInterviewers(available, prefs)
+  const byId = new Map(available.map((person) => [person.id, person]))
   const top = initialRank
     .slice(0, MATCHING_AI_CANDIDATE_LIMIT)
     .flatMap((item) => {
@@ -48,8 +54,11 @@ export async function recommendMatchedInterviewers(prefs: MatchingPreferences): 
 
   const assist =
     top.length === 0 ? null : await requestMatchingAssist(toAiPreferences(prefs), top.map(toAiCandidate))
-  const mergedPrefs = mergeNormalizedPreferences(prefs, assist?.normalized ?? null)
-  const ranked = mergedPrefs === prefs ? initialRank : rankInterviewers(catalog, mergedPrefs)
+  const grounded = assist?.normalized
+    ? constrainNormalizedToVocabulary(assist.normalized, await loadMatchingVocabulary())
+    : null
+  const mergedPrefs = mergeNormalizedPreferences(prefs, grounded)
+  const ranked = mergedPrefs === prefs ? initialRank : rankInterviewers(available, mergedPrefs)
   const aiByService = new Map((assist?.matches ?? []).map((item) => [item.serviceId, item]))
 
   return ranked.flatMap((match) => {

@@ -34,7 +34,7 @@ export function MatchesPage() {
       <PageHeader
         eyebrow="Recommended for you"
         title="Best matches for your interview goal"
-        subtitle="Ranked by the existing compatibility score. Short explanations appear when matching assist is available."
+        subtitle="Only interviewers with current bookable availability are shown, then ranked by compatibility. Short explanations appear when matching assist is available."
         actions={
           <Link to="/candidate/find">
             <Button variant="outline">Edit goal</Button>
@@ -82,8 +82,8 @@ export function MatchesPage() {
       {ready && state.status === 'success' && state.data.length === 0 ? (
         <div className="mt-8">
           <EmptyState
-            title="No listed interviewers match yet"
-            body="Try a broader role or interview type, or browse the public interviewer directory."
+            title="No available interviewers match yet"
+            body="Matches only include listed interviewers who currently have a bookable slot. Try another date or browse the directory."
             action={
               <Link to="/candidate/interviewers">
                 <Button>Browse Interviewers</Button>
