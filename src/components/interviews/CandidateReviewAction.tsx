@@ -28,7 +28,7 @@ export function CandidateReviewAction({
 
   return (
     <Link to={`/candidate/reviews/${bookingId}`}>
-      <Button size={size}>Rate Interviewer</Button>
+        <Button size={size}>Review Interviewer</Button>
     </Link>
   )
 }

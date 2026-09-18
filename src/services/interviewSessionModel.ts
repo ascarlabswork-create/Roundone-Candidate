@@ -48,7 +48,53 @@ export function interviewStatusLabel(status: string) {
   if (status === 'pending_payment') return 'Payment pending'
   if (status === 'rejected') return 'Booking declined'
   if (status === 'expired') return 'Hold expired'
+  if (status === 'rescheduled') return 'Rescheduled'
   return status
+}
+
+export const INTERVIEW_HISTORY_LIMIT = 50
+
+export type InterviewHistorySection = 'upcoming' | 'completed' | 'cancelled'
+
+export function interviewHistorySection(status: string): InterviewHistorySection | null {
+  if (status === 'confirmed' || status === 'in_progress' || status === 'requested') return 'upcoming'
+  if (status === 'completed') return 'completed'
+  if (
+    status === 'cancelled' ||
+    status === 'no_show' ||
+    status === 'rejected' ||
+    status === 'expired' ||
+    status === 'rescheduled' ||
+    status === 'pending_payment'
+  ) {
+    return 'cancelled'
+  }
+  return null
+}
+
+export function sortUpcomingInterviews<T extends { startsAtUtc: string }>(items: T[]) {
+  return [...items].sort((left, right) => left.startsAtUtc.localeCompare(right.startsAtUtc))
+}
+
+export function sortRecentInterviews<T extends { startsAtUtc: string }>(items: T[]) {
+  return [...items].sort((left, right) => right.startsAtUtc.localeCompare(left.startsAtUtc))
+}
+
+export function groupInterviewHistory<T extends { status: string; startsAtUtc: string }>(items: T[]) {
+  const upcoming: T[] = []
+  const completed: T[] = []
+  const cancelled: T[] = []
+  for (const item of items) {
+    const section = interviewHistorySection(item.status)
+    if (section === 'upcoming') upcoming.push(item)
+    else if (section === 'completed') completed.push(item)
+    else if (section === 'cancelled') cancelled.push(item)
+  }
+  return {
+    upcoming: sortUpcomingInterviews(upcoming),
+    completed: sortRecentInterviews(completed),
+    cancelled: sortRecentInterviews(cancelled),
+  }
 }
 
 export function interviewJoinState(

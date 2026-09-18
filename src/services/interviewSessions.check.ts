@@ -1,6 +1,8 @@
 import {
   canJoinInterview,
   canViewInterview,
+  groupInterviewHistory,
+  interviewHistorySection,
   interviewJoinState,
   interviewStatusLabel,
   parseInterviewSession,
@@ -56,6 +58,23 @@ export function runInterviewSessionChecks() {
   expect(canViewInterview({ status: 'confirmed' }, session), 'Confirmed bookings with a session can be viewed')
   expect(!canViewInterview({ status: 'confirmed' }, null), 'Confirmed booking without a session has nothing to join')
   expect(!canJoinInterview(confirmed, null, now), 'Join requires an existing session row')
+  expect(interviewHistorySection('confirmed') === 'upcoming', 'Confirmed bookings are upcoming')
+  expect(interviewHistorySection('requested') === 'upcoming', 'Requested bookings stay in upcoming until confirmed')
+  expect(interviewHistorySection('completed') === 'completed', 'Completed bookings are completed')
+  expect(interviewHistorySection('rescheduled') === 'cancelled', 'Retired rescheduled bookings are not upcoming')
+  expect(interviewHistorySection('cancelled') === 'cancelled', 'Cancelled bookings use the cancelled section')
+  expect(interviewStatusLabel('rescheduled') === 'Rescheduled', 'Rescheduled uses a candidate-facing label')
+
+  const grouped = groupInterviewHistory([
+    { status: 'completed', startsAtUtc: '2026-09-10T13:00:00.000Z' },
+    { status: 'confirmed', startsAtUtc: '2026-09-20T13:00:00.000Z' },
+    { status: 'rescheduled', startsAtUtc: '2026-09-12T13:00:00.000Z' },
+    { status: 'confirmed', startsAtUtc: '2026-09-18T13:00:00.000Z' },
+    { status: 'completed', startsAtUtc: '2026-09-14T13:00:00.000Z' },
+  ])
+  expect(grouped.upcoming[0]?.startsAtUtc === '2026-09-18T13:00:00.000Z', 'Upcoming sorts nearest first')
+  expect(grouped.completed[0]?.startsAtUtc === '2026-09-14T13:00:00.000Z', 'Completed sorts most recent first')
+  expect(grouped.cancelled.length === 1 && grouped.cancelled[0]?.status === 'rescheduled', 'Rescheduled stays out of upcoming')
 
   return true
 }

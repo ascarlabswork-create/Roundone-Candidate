@@ -119,6 +119,48 @@ export async function getPublicInterviewerServices(
   })
 }
 
+export async function getPublicInterviewersByIds(ids: string[]): Promise<Map<string, PublicInterviewer>> {
+  const result = new Map<string, PublicInterviewer>()
+  const unique = [...new Set(ids.filter((id) => isUuid(id)))]
+  if (unique.length === 0) return result
+  const { data, error } = await supabase
+    .from('interviewer_public_directory')
+    .select(
+      'interviewer_profile_id, full_name, avatar_url, headline, current_role, company, timezone, identity_verified, employment_verified',
+    )
+    .in('interviewer_profile_id', unique)
+  if (error) {
+    console.error('getPublicInterviewersByIds failed', error)
+    return result
+  }
+  for (const row of data ?? []) {
+    const mapped = mapPublicInterviewer(row)
+    if (mapped) result.set(mapped.id, mapped)
+  }
+  return result
+}
+
+export async function getPublicServicesByIds(ids: string[]): Promise<Map<string, PublicInterviewerService>> {
+  const result = new Map<string, PublicInterviewerService>()
+  const unique = [...new Set(ids.filter((id) => isUuid(id)))]
+  if (unique.length === 0) return result
+  const { data, error } = await supabase
+    .from('interviewer_services_public')
+    .select(
+      'id, interviewer_profile_id, name, interview_type, duration_min, price_paise, currency, description',
+    )
+    .in('id', unique)
+  if (error) {
+    console.error('getPublicServicesByIds failed', error)
+    return result
+  }
+  for (const row of data ?? []) {
+    const mapped = mapPublicService(row)
+    if (mapped) result.set(mapped.id, mapped)
+  }
+  return result
+}
+
 export async function getPublicBookingContext(interviewerProfileId: string): Promise<{
   interviewer: PublicInterviewer | null
   services: PublicInterviewerService[]
