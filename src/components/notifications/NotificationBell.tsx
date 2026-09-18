@@ -107,13 +107,16 @@ export function NotificationBell() {
                 <Skeleton className="h-14" />
               </div>
             ) : null}
-            {status === 'error' ? (
+            {status === 'error' && items.length === 0 ? (
               <div className="px-4 py-6 text-center">
                 <p className="text-sm text-red-700">{error ?? 'Unable to load notifications. Please try again.'}</p>
                 <Button size="sm" variant="outline" className="mt-3" onClick={() => void refresh()}>
                   Try again
                 </Button>
               </div>
+            ) : null}
+            {status === 'error' && items.length > 0 ? (
+              <p className="px-4 py-2 text-xs text-red-700">{error ?? 'Unable to refresh notifications.'}</p>
             ) : null}
             {status === 'success' && items.length === 0 ? (
               <p className="px-4 py-10 text-center text-sm text-slate-600">No notifications yet</p>

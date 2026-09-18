@@ -64,16 +64,17 @@ function mapPreferenceError(error: unknown, action: 'load' | 'update') {
 }
 
 export async function listMyNotifications(): Promise<CandidateNotification[]> {
-  await requireAuthenticatedUser()
+  const user = await requireAuthenticatedUser()
   const { data, error } = await supabase
     .from(NOTIFICATIONS_TABLE)
     .select(NOTIFICATION_SELECT)
+    .eq('profile_id', user.id)
     .order('created_at', { ascending: false })
     .limit(NOTIFICATION_LIST_LIMIT)
 
   if (error) {
     console.error('listMyNotifications failed', error)
-    throw mapNotificationError(error)
+    throw mapNotificationError(error, 'load')
   }
 
   return (data ?? [])
@@ -82,21 +83,22 @@ export async function listMyNotifications(): Promise<CandidateNotification[]> {
 }
 
 export async function getUnreadNotificationCount(): Promise<number> {
-  await requireAuthenticatedUser()
+  const user = await requireAuthenticatedUser()
   const { count, error } = await supabase
     .from(NOTIFICATIONS_TABLE)
     .select('id', { count: 'exact', head: true })
+    .eq('profile_id', user.id)
     .is('read_at', null)
 
   if (error) {
     console.error('getUnreadNotificationCount failed', error)
-    throw mapNotificationError(error)
+    throw mapNotificationError(error, 'load')
   }
   return count ?? 0
 }
 
 export async function markNotificationRead(notificationId: string): Promise<void> {
-  await requireAuthenticatedUser()
+  const user = await requireAuthenticatedUser()
   if (!isUuid(notificationId)) {
     throw new NotificationError('unauthorized', 'You don’t have access to these notifications.')
   }
@@ -105,12 +107,13 @@ export async function markNotificationRead(notificationId: string): Promise<void
     .from(NOTIFICATIONS_TABLE)
     .update({ read_at: new Date().toISOString() })
     .eq('id', notificationId)
+    .eq('profile_id', user.id)
     .select('id')
     .maybeSingle()
 
   if (error) {
     console.error('markNotificationRead failed', error)
-    throw mapNotificationError(error)
+    throw mapNotificationError(error, 'update')
   }
   if (!data) {
     throw new NotificationError('unauthorized', 'You don’t have access to these notifications.')
@@ -118,16 +121,17 @@ export async function markNotificationRead(notificationId: string): Promise<void
 }
 
 export async function markAllNotificationsRead(): Promise<void> {
-  await requireAuthenticatedUser()
+  const user = await requireAuthenticatedUser()
   const { error } = await supabase
     .from(NOTIFICATIONS_TABLE)
     .update({ read_at: new Date().toISOString() })
+    .eq('profile_id', user.id)
     .is('read_at', null)
     .select('id')
 
   if (error) {
     console.error('markAllNotificationsRead failed', error)
-    throw mapNotificationError(error)
+    throw mapNotificationError(error, 'update')
   }
 }
 

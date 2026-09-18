@@ -81,6 +81,18 @@ export function runNotificationChecks() {
   )
   expect(
     notificationHref({
+      id: '00000000-0000-4000-8000-000000000065',
+      kind: 'booking_rescheduled',
+      title: 'Interview rescheduled',
+      body: 'Your interview time was updated.',
+      bookingId: '00000000-0000-4000-8000-000000000024',
+      readAt: null,
+      createdAt: '2026-09-18T08:00:00.000Z',
+    }) === '/candidate/interview/00000000-0000-4000-8000-000000000024',
+    'Rescheduled bookings route to interview details',
+  )
+  expect(
+    notificationHref({
       id: '00000000-0000-4000-8000-000000000064',
       kind: 'booking_confirmed',
       title: 'Interview confirmed',

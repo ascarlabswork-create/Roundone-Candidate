@@ -72,7 +72,7 @@ function isNetworkFailure(error: unknown) {
   return /failed to fetch|networkerror|network request failed|load failed|fetch failed/i.test(`${text} ${message}`)
 }
 
-export function mapNotificationError(error: unknown): NotificationError {
+export function mapNotificationError(error: unknown, action: 'load' | 'update' = 'load'): NotificationError {
   if (error instanceof NotificationError) return error
   if (isNetworkFailure(error)) {
     return new NotificationError('network', 'Unable to reach notifications. Check your connection.')
@@ -81,7 +81,10 @@ export function mapNotificationError(error: unknown): NotificationError {
   if (text.includes('42501') || text.includes('not_authorized') || text.includes('row-level security')) {
     return new NotificationError('unauthorized', 'You don’t have access to these notifications.')
   }
-  return new NotificationError('rpc', 'Unable to load notifications. Please try again.')
+  return new NotificationError(
+    'rpc',
+    action === 'update' ? 'Unable to update that notification. Please try again.' : 'Unable to load notifications. Please try again.',
+  )
 }
 
 function readPayloadBookingId(payload: unknown): string | null {
@@ -132,14 +135,17 @@ export function notificationHref(notification: CandidateNotification): string | 
   if (notification.kind === 'feedback_ready' || notification.kind === 'interview_completed') {
     return `/candidate/feedback/${bookingId}`
   }
-  if (notification.kind === 'booking_confirmed' || notification.kind === 'interview_reminder') {
+  if (
+    notification.kind === 'booking_confirmed' ||
+    notification.kind === 'booking_rescheduled' ||
+    notification.kind === 'interview_reminder'
+  ) {
     return `/candidate/interview/${bookingId}`
   }
   if (
     notification.kind === 'booking_requested' ||
     notification.kind === 'booking_rejected' ||
     notification.kind === 'booking_cancelled' ||
-    notification.kind === 'booking_rescheduled' ||
     notification.kind === 'booking_expired'
   ) {
     return '/candidate/interviews'

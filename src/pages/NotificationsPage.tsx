@@ -63,12 +63,21 @@ export function NotificationsPage() {
           </div>
         ) : null}
 
-        {status === 'error' ? (
+        {status === 'error' && items.length === 0 ? (
           <ErrorState
             title="Unable to load notifications"
             body={error ?? 'Please try again.'}
             onRetry={() => void refresh()}
           />
+        ) : null}
+
+        {status === 'error' && items.length > 0 ? (
+          <p className="mb-4 text-sm text-red-700">
+            {error ?? 'Unable to refresh notifications.'}{' '}
+            <button type="button" className="font-semibold underline" onClick={() => void refresh()}>
+              Try again
+            </button>
+          </p>
         ) : null}
 
         {status === 'success' && items.length === 0 ? (
