@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { Button } from '../components/ui/Button.tsx'
 import {
   Badge,
@@ -19,6 +19,7 @@ import {
   PRACTICE_QUESTION_COUNTS,
   averagePracticeScore,
   difficultyFromCandidateLevel,
+  isPracticeDifficulty,
   uniqueThemes,
   type PracticeDifficulty,
   type PracticeQuestionCount,
@@ -32,9 +33,21 @@ import {
   type SavedPracticeSession,
 } from '../practice/session.ts'
 import { getCandidatePreferencesIfPresent, getCandidateSkills } from '../services/candidateProfile.ts'
+import { saveCompletedPracticeSession } from '../services/practiceProgress.ts'
 import { useSession } from '../state/session.tsx'
 
 const UNAVAILABLE = 'AI practice is temporarily unavailable. Please try again.'
+
+let saveInFlight: { fingerprint: string; promise: Promise<string> } | null = null
+
+function practiceSaveFingerprint(session: SavedPracticeSession) {
+  return JSON.stringify({
+    role: session.setup.targetRole,
+    type: session.setup.interviewType,
+    questions: session.questions.map((item) => item.question),
+    answers: session.turns.map((item) => [item.question.id, item.answer, item.feedback?.score]),
+  })
+}
 
 function difficultyLabel(value: PracticeDifficulty) {
   if (value === 'beginner') return 'Beginner'
@@ -44,17 +57,84 @@ function difficultyLabel(value: PracticeDifficulty) {
 
 export function AiPracticePage() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { account } = useSession()
   const [session, setSession] = useState<SavedPracticeSession>(() => readPracticeSession())
   const [skillDraft, setSkillDraft] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [persistError, setPersistError] = useState<string | null>(null)
+  const [persisting, setPersisting] = useState(false)
+  const [persistNonce, setPersistNonce] = useState(0)
   const [prefilled, setPrefilled] = useState(false)
   const submittingRef = useRef(false)
+  const sessionRef = useRef(session)
+  sessionRef.current = session
 
   useEffect(() => {
     writePracticeSession(session)
   }, [session])
+
+  useEffect(() => {
+    const again = searchParams.get('again') === '1'
+    const fresh = searchParams.get('fresh') === '1'
+    if (!again && !fresh) return
+    const next = emptyPracticeSession()
+    if (again) {
+      const difficultyRaw = (searchParams.get('difficulty') ?? '').trim().toLowerCase()
+      next.setup = {
+        ...next.setup,
+        targetRole: (searchParams.get('role') ?? '').trim().slice(0, 80),
+        interviewType: (searchParams.get('type') ?? '').trim().slice(0, 60),
+        difficulty: isPracticeDifficulty(difficultyRaw) ? difficultyRaw : 'intermediate',
+        skills: (searchParams.get('skills') ?? '')
+          .split(',')
+          .map((item) => item.trim())
+          .filter(Boolean)
+          .slice(0, 6),
+      }
+    }
+    setSession(next)
+    setError(null)
+    setPersistError(null)
+    setPrefilled(again)
+    setSearchParams({}, { replace: true })
+  }, [searchParams, setSearchParams])
+
+  useEffect(() => {
+    if (session.phase !== 'complete' || session.savedSessionId || session.questions.length === 0) return
+    const snapshot = sessionRef.current
+    const fingerprint = practiceSaveFingerprint(snapshot)
+    if (!saveInFlight || saveInFlight.fingerprint !== fingerprint) {
+      saveInFlight = { fingerprint, promise: saveCompletedPracticeSession(snapshot) }
+    }
+    const pending = saveInFlight.promise
+    let cancelled = false
+    setPersisting(true)
+    setPersistError(null)
+    void pending
+      .then((id) => {
+        const stored = readPracticeSession()
+        if (stored.phase === 'complete' && !stored.savedSessionId) {
+          writePracticeSession({ ...stored, savedSessionId: id })
+        }
+        if (cancelled) return
+        setSession((current) =>
+          current.phase === 'complete' && !current.savedSessionId ? { ...current, savedSessionId: id } : current,
+        )
+      })
+      .catch((caught: unknown) => {
+        if (saveInFlight?.fingerprint === fingerprint) saveInFlight = null
+        if (cancelled) return
+        setPersistError(caught instanceof Error ? caught.message : 'Unable to save this practice session. Please try again.')
+      })
+      .finally(() => {
+        if (!cancelled) setPersisting(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [session.phase, session.savedSessionId, session.questions.length, persistNonce])
 
   useEffect(() => {
     if (prefilled || session.phase !== 'setup' || !account) return
@@ -121,6 +201,7 @@ export function AiPracticePage() {
       index: 0,
       turns: [],
       currentAnswer: '',
+      savedSessionId: null,
     })
   }
 
@@ -160,9 +241,11 @@ export function AiPracticePage() {
   }
 
   function restartSetup() {
+    saveInFlight = null
     clearPracticeSession()
     setSession(emptyPracticeSession())
     setError(null)
+    setPersistError(null)
     setPrefilled(false)
   }
 
@@ -201,7 +284,28 @@ export function AiPracticePage() {
           <SummaryList title="Strengths" items={strengths} />
           <SummaryList title="Areas to improve" items={improvements} />
           <SummaryList title="Topics to review" items={review} />
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+          {persisting ? <p className="mt-4 text-sm text-slate-600">Saving this practice session…</p> : null}
+          {persistError ? (
+            <div className="mt-4">
+              <p className="text-sm text-red-700">{persistError}</p>
+              <button
+                type="button"
+                className="mt-2 text-sm font-medium text-blue-700"
+                onClick={() => setPersistNonce((value) => value + 1)}
+              >
+                Try saving again
+              </button>
+            </div>
+          ) : null}
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+            {session.savedSessionId ? (
+              <Link to={`/candidate/practice/history/${session.savedSessionId}`}>
+                <Button variant="outline">View saved results</Button>
+              </Link>
+            ) : null}
+            <Link to="/candidate/practice/history">
+              <Button variant="outline">Practice progress</Button>
+            </Link>
             <Button onClick={restartSetup}>New practice</Button>
             <Button variant="outline" onClick={() => navigate('/candidate/find')}>
               Book a human interviewer

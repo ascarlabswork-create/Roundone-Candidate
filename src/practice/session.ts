@@ -11,6 +11,7 @@ export type SavedPracticeSession = {
   index: number
   turns: PracticeTurn[]
   currentAnswer: string
+  savedSessionId: string | null
 }
 
 const STORAGE_KEY = 'roundone.practice.ai-mock'
@@ -30,13 +31,14 @@ export function emptyPracticeSession(): SavedPracticeSession {
     index: 0,
     turns: [],
     currentAnswer: '',
+    savedSessionId: null,
   }
 }
 
 export function readPracticeSession(): SavedPracticeSession {
   const saved = readSessionJson<SavedPracticeSession | null>(STORAGE_KEY, null)
   if (saved?.version !== 1) return emptyPracticeSession()
-  return saved
+  return { ...saved, savedSessionId: saved.savedSessionId ?? null }
 }
 
 export function writePracticeSession(session: SavedPracticeSession) {

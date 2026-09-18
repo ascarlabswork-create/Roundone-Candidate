@@ -67,6 +67,9 @@ export function PracticePage() {
   if (typeSlug === 'mock') {
     return <Navigate to="/candidate/practice/mock" replace />
   }
+  if (typeSlug === 'history') {
+    return <Navigate to="/candidate/practice/history" replace />
+  }
 
   if (typeSlug && !selectedType) {
     return (
@@ -105,7 +108,12 @@ function PracticeHub() {
               official interviewer feedback.
             </p>
           </div>
-          <Button onClick={() => navigate('/candidate/practice/mock')}>Practice Interview</Button>
+          <div className="flex flex-col gap-2 sm:items-end">
+            <Button onClick={() => navigate('/candidate/practice/mock')}>Practice Interview</Button>
+            <Button variant="outline" onClick={() => navigate('/candidate/practice/history')}>
+              View Progress
+            </Button>
+          </div>
         </div>
       </Card>
       <h2 className="mt-10 text-lg font-semibold text-navy-950">Timed drills</h2>

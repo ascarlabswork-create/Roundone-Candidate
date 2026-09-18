@@ -9,6 +9,11 @@ import { formatBookingTime, formatCivilDateWithYear, isoDateInZone } from '../..
 import { useAsync } from '../../lib/useAsync.ts'
 import { getCandidateDashboard, type CandidateDashboard } from '../../services/candidateDashboard.ts'
 import { interviewStatusLabel } from '../../services/interviewSessions.ts'
+import {
+  formatPracticeDate,
+  formatPracticeScore,
+  getPracticeProgress,
+} from '../../services/practiceProgress.ts'
 import { useNotifications } from '../../state/notifications.tsx'
 import { useSession } from '../../state/session.tsx'
 
@@ -84,6 +89,70 @@ function RecentInterviewRow({ dashboard }: { dashboard: CandidateDashboard }) {
   )
 }
 
+function PracticeDashboardCard({ userId }: { userId: string | undefined }) {
+  const [retryNonce, setRetryNonce] = useState(0)
+  const state = useAsync(() => getPracticeProgress(), [userId, retryNonce])
+
+  return (
+    <Card className="p-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="font-semibold text-navy-950">AI Practice</h2>
+          {state.status === 'loading' ? <Skeleton className="mt-3 h-12 w-48" /> : null}
+          {state.status === 'error' ? (
+            <div className="mt-2">
+              <p className="text-sm text-slate-600">Unable to load practice progress.</p>
+              <button type="button" className="mt-1 text-sm font-medium text-blue-700" onClick={() => setRetryNonce((value) => value + 1)}>
+                Try again
+              </button>
+            </div>
+          ) : null}
+          {state.status === 'success' && state.data.sessionCount === 0 ? (
+            <p className="mt-2 text-sm text-slate-600">You haven&apos;t completed an AI practice session yet.</p>
+          ) : null}
+          {state.status === 'success' && state.data.sessionCount > 0 ? (
+            <>
+              <p className="mt-2 text-sm text-slate-600">
+                {state.data.sessionCount} session{state.data.sessionCount === 1 ? '' : 's'} · Average{' '}
+                {formatPracticeScore(state.data.averageScore)}
+              </p>
+              {state.data.latest ? (
+                <div className="mt-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Recent practice</p>
+                  <p className="mt-1 text-sm font-medium text-navy-950">
+                    {state.data.latest.targetRole} · {state.data.latest.interviewType}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-600">
+                    {formatPracticeScore(state.data.latest.averageScore)} · {formatPracticeDate(state.data.latest.completedAt)}
+                  </p>
+                </div>
+              ) : null}
+            </>
+          ) : null}
+        </div>
+        <div className="flex flex-col gap-2 sm:items-end">
+          <Link to="/candidate/practice/history">
+            <Button size="sm">View Progress</Button>
+          </Link>
+          {state.status === 'success' && state.data.latest ? (
+            <Link to={`/candidate/practice/history/${state.data.latest.id}`}>
+              <Button size="sm" variant="outline">
+                View Practice
+              </Button>
+            </Link>
+          ) : (
+            <Link to="/candidate/practice/mock">
+              <Button size="sm" variant="outline">
+                Practice Interview
+              </Button>
+            </Link>
+          )}
+        </div>
+      </div>
+    </Card>
+  )
+}
+
 export function CandidateDashboard() {
   const { account } = useSession()
   const { unreadCount } = useNotifications()
@@ -153,6 +222,8 @@ export function CandidateDashboard() {
               <Metric label="Feedback received" value={state.data.counts.feedbackReceived} />
               <Metric label="Reviews submitted" value={state.data.counts.reviewsSubmitted} />
             </div>
+
+            <PracticeDashboardCard userId={account?.userId} />
 
             <div className="grid gap-4 lg:grid-cols-2">
               <Card className="p-5">
