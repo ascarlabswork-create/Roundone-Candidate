@@ -27,6 +27,8 @@ export function InterviewerCard({
   interviewer,
   matchScore,
   reasons,
+  matchedFactors,
+  matchExplanation,
   selected,
   onToggleCompare,
   compareFull,
@@ -35,6 +37,8 @@ export function InterviewerCard({
   interviewer: Interviewer
   matchScore?: number
   reasons?: MatchReason[]
+  matchedFactors?: string[]
+  matchExplanation?: string
   selected?: boolean
   onToggleCompare?: () => void
   compareFull?: boolean
@@ -101,6 +105,24 @@ export function InterviewerCard({
         <span className="font-medium text-slate-800">Suitable for:</span>{' '}
         {interviewer.candidateLevels.join(' · ')}
       </p>
+
+      {matchExplanation || (matchedFactors && matchedFactors.length > 0) ? (
+        <div className="mt-4 rounded-lg bg-slate-50 p-3">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Why this match?
+          </p>
+          {matchedFactors && matchedFactors.length > 0 ? (
+            <div className="mb-2 flex flex-wrap gap-1.5">
+              {matchedFactors.map((factor) => (
+                <Badge key={factor} tone="blue">
+                  {factor}
+                </Badge>
+              ))}
+            </div>
+          ) : null}
+          {matchExplanation ? <p className="text-sm text-slate-700">{matchExplanation}</p> : null}
+        </div>
+      ) : null}
 
       {reasons ? (
         <div className="mt-4 rounded-lg bg-slate-50 p-3">

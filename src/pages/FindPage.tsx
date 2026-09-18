@@ -29,6 +29,7 @@ export function FindPage() {
       targetCompany: params.get('company') || preferences?.targetCompany || '',
       budget: 0,
       language: '',
+      naturalLanguageQuery: params.get('q') || preferences?.naturalLanguageQuery || '',
     }),
     [params, preferences],
   )
@@ -53,7 +54,9 @@ export function FindPage() {
     navigate('/candidate/matches')
   }
 
-  const canSubmit = Boolean(form.targetRole && form.interviewType && form.candidateLevel)
+  const canSubmit =
+    Boolean(form.targetRole && form.interviewType && form.candidateLevel) ||
+    Boolean(form.naturalLanguageQuery && form.naturalLanguageQuery.trim().length >= 12)
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
@@ -165,6 +168,19 @@ export function FindPage() {
               </Chip>
             ))}
           </div>
+        </div>
+
+        <div>
+          <FieldLabel htmlFor="intent">Describe what you want (optional)</FieldLabel>
+          <TextInput
+            id="intent"
+            placeholder="I want a backend interview for Python and FastAPI, preferably someone who has worked with startups."
+            value={form.naturalLanguageQuery ?? ''}
+            onChange={(event) => setForm({ ...form, naturalLanguageQuery: event.target.value })}
+          />
+          <p className="mt-1 text-xs text-slate-500">
+            We’ll turn this into structured matching signals. Ranking still uses verified interviewer data.
+          </p>
         </div>
 
         <div className="grid gap-5 sm:grid-cols-2">

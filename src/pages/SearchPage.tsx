@@ -1,6 +1,6 @@
 import { Search, SlidersHorizontal } from 'lucide-react'
 import { useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { listInterviewers } from '../api/index.ts'
 import { COMPARE_MAX, ComparePanel } from '../components/interviewer/ComparePanel.tsx'
 import { FilterPanel } from '../components/interviewer/FilterPanel.tsx'
@@ -10,7 +10,7 @@ import { EmptyState, ErrorState, SelectInput, TextInput } from '../components/ui
 import { SORT_OPTIONS, type SortOption } from '../data/catalogs.ts'
 import { getNextSlot } from '../data/interviewers.ts'
 import { useAsync } from '../lib/useAsync.ts'
-import { hasMeaningfulPreferences, scoreInterviewer } from '../matching/index.ts'
+import { hasMeaningfulPreferences, looksLikeNaturalLanguage, scoreInterviewer } from '../matching/index.ts'
 import { useMatching } from '../state/matching.tsx'
 import { useToast } from '../state/toast.tsx'
 import type { Interviewer, InterviewerFilters } from '../types.ts'
@@ -150,6 +150,11 @@ export function SearchPage() {
             onChange={(event) => updateFilters({ ...filters, query: event.target.value })}
           />
         </div>
+        {looksLikeNaturalLanguage(filters.query) ? (
+          <Link to={`/candidate/find?q=${encodeURIComponent(filters.query)}`} className="text-sm font-medium text-blue-700">
+            Find matches from this description
+          </Link>
+        ) : null}
         <label className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
           <input
             type="checkbox"

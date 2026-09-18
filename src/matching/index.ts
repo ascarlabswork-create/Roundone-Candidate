@@ -5,3 +5,6 @@ export {
   rankInterviewers,
   scoreInterviewer,
 } from './score.ts'
+export { recommendMatchedInterviewers, type RecommendedMatch } from './recommend.ts'
+export { looksLikeNaturalLanguage } from './aiModel.ts'
+export { loadMatchingCatalog, loadMatchingInterviewer } from './catalog.ts'

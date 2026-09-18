@@ -2,16 +2,45 @@ import { supabase } from '../lib/supabase.ts'
 import { asRecord, readBoolean, readNullableString, readNumber, readString } from '../lib/rows.ts'
 import { isUuid } from '../lib/uuid.ts'
 
+export const PUBLIC_DIRECTORY_SELECT =
+  'interviewer_profile_id, full_name, avatar_url, headline, bio, current_role, company, experience_years, timezone, languages, list_price_paise, currency, is_online, rating_avg, review_count, completed_interviews_count, identity_verified, employment_verified, linkedin_verified'
+
+export const PUBLIC_SERVICE_SELECT =
+  'id, interviewer_profile_id, name, interview_type, duration_min, price_paise, currency, description'
+
+export const MATCHING_CATALOG_LIMIT = 100
+
 export type PublicInterviewer = {
   id: string
   name: string
   photo: string | null
   headline: string | null
+  bio: string | null
   currentRole: string | null
   company: string | null
+  experienceYears: number
   timezone: string
+  languages: string[]
+  listPricePaise: number | null
+  currency: string
+  isOnline: boolean
+  ratingAvg: number | null
+  reviewCount: number
+  completedInterviews: number
   identityVerified: boolean
   employmentVerified: boolean
+  linkedinVerified: boolean
+}
+
+export type PublicInterviewerSkill = {
+  interviewerProfileId: string
+  skill: string
+}
+
+export type PublicInterviewerRole = {
+  interviewerProfileId: string
+  targetRole: string
+  candidateLevel: string
 }
 
 export type PublicInterviewerService = {
@@ -29,6 +58,12 @@ function fail(error: { message: string } | null) {
   if (error) throw new Error(error.message)
 }
 
+function readStringList(row: Record<string, unknown>, key: string) {
+  const value = row[key]
+  if (!Array.isArray(value)) return []
+  return value.filter((item): item is string => typeof item === 'string' && item.trim() !== '')
+}
+
 function mapPublicInterviewer(value: unknown): PublicInterviewer | null {
   const row = asRecord(value)
   if (!row) return null
@@ -41,11 +76,21 @@ function mapPublicInterviewer(value: unknown): PublicInterviewer | null {
     name,
     photo: readNullableString(row, 'avatar_url'),
     headline: readNullableString(row, 'headline'),
+    bio: readNullableString(row, 'bio'),
     currentRole: readNullableString(row, 'current_role'),
     company: readNullableString(row, 'company'),
+    experienceYears: readNumber(row, 'experience_years') ?? 0,
     timezone,
+    languages: readStringList(row, 'languages'),
+    listPricePaise: readNumber(row, 'list_price_paise'),
+    currency: readString(row, 'currency') ?? 'INR',
+    isOnline: readBoolean(row, 'is_online') ?? false,
+    ratingAvg: readNumber(row, 'rating_avg'),
+    reviewCount: readNumber(row, 'review_count') ?? 0,
+    completedInterviews: readNumber(row, 'completed_interviews_count') ?? 0,
     identityVerified: readBoolean(row, 'identity_verified') ?? false,
     employmentVerified: readBoolean(row, 'employment_verified') ?? false,
+    linkedinVerified: readBoolean(row, 'linkedin_verified') ?? false,
   }
 }
 
@@ -78,9 +123,7 @@ export async function getPublicInterviewer(interviewerProfileId: string): Promis
   if (!isUuid(interviewerProfileId)) return null
   const { data, error } = await supabase
     .from('interviewer_public_directory')
-    .select(
-      'interviewer_profile_id, full_name, avatar_url, headline, current_role, company, timezone, identity_verified, employment_verified',
-    )
+    .select(PUBLIC_DIRECTORY_SELECT)
     .eq('interviewer_profile_id', interviewerProfileId)
     .maybeSingle()
   fail(error)
@@ -91,9 +134,7 @@ export async function getPublicInterviewerService(serviceId: string): Promise<Pu
   if (!isUuid(serviceId)) return null
   const { data, error } = await supabase
     .from('interviewer_services_public')
-    .select(
-      'id, interviewer_profile_id, name, interview_type, duration_min, price_paise, currency, description',
-    )
+    .select(PUBLIC_SERVICE_SELECT)
     .eq('id', serviceId)
     .maybeSingle()
   fail(error)
@@ -106,9 +147,7 @@ export async function getPublicInterviewerServices(
   if (!isUuid(interviewerProfileId)) return []
   const { data, error } = await supabase
     .from('interviewer_services_public')
-    .select(
-      'id, interviewer_profile_id, name, interview_type, duration_min, price_paise, currency, description',
-    )
+    .select(PUBLIC_SERVICE_SELECT)
     .eq('interviewer_profile_id', interviewerProfileId)
     .order('name', { ascending: true })
   fail(error)
@@ -125,9 +164,7 @@ export async function getPublicInterviewersByIds(ids: string[]): Promise<Map<str
   if (unique.length === 0) return result
   const { data, error } = await supabase
     .from('interviewer_public_directory')
-    .select(
-      'interviewer_profile_id, full_name, avatar_url, headline, current_role, company, timezone, identity_verified, employment_verified',
-    )
+    .select(PUBLIC_DIRECTORY_SELECT)
     .in('interviewer_profile_id', unique)
   if (error) {
     console.error('getPublicInterviewersByIds failed', error)
@@ -146,9 +183,7 @@ export async function getPublicServicesByIds(ids: string[]): Promise<Map<string,
   if (unique.length === 0) return result
   const { data, error } = await supabase
     .from('interviewer_services_public')
-    .select(
-      'id, interviewer_profile_id, name, interview_type, duration_min, price_paise, currency, description',
-    )
+    .select(PUBLIC_SERVICE_SELECT)
     .in('id', unique)
   if (error) {
     console.error('getPublicServicesByIds failed', error)
@@ -173,4 +208,69 @@ export async function getPublicBookingContext(interviewerProfileId: string): Pro
     getPublicInterviewerServices(interviewerProfileId),
   ])
   return { interviewer, services }
+}
+
+export async function listPublicDirectory(limit = MATCHING_CATALOG_LIMIT): Promise<PublicInterviewer[]> {
+  const { data, error } = await supabase
+    .from('interviewer_public_directory')
+    .select(PUBLIC_DIRECTORY_SELECT)
+    .limit(limit)
+  fail(error)
+  if (!Array.isArray(data)) return []
+  return data.flatMap((row) => {
+    const mapped = mapPublicInterviewer(row)
+    return mapped ? [mapped] : []
+  })
+}
+
+export async function listPublicSkillsFor(ids: string[]): Promise<PublicInterviewerSkill[]> {
+  const unique = [...new Set(ids.filter((id) => isUuid(id)))]
+  if (unique.length === 0) return []
+  const { data, error } = await supabase
+    .from('interviewer_skills_public')
+    .select('interviewer_profile_id, skill')
+    .in('interviewer_profile_id', unique)
+  fail(error)
+  if (!Array.isArray(data)) return []
+  return data.flatMap((row) => {
+    const parsed = asRecord(row)
+    const interviewerProfileId = parsed ? readString(parsed, 'interviewer_profile_id') : null
+    const skill = parsed ? readString(parsed, 'skill') : null
+    if (!interviewerProfileId || !skill) return []
+    return [{ interviewerProfileId, skill }]
+  })
+}
+
+export async function listPublicRolesFor(ids: string[]): Promise<PublicInterviewerRole[]> {
+  const unique = [...new Set(ids.filter((id) => isUuid(id)))]
+  if (unique.length === 0) return []
+  const { data, error } = await supabase
+    .from('interviewer_roles_public')
+    .select('interviewer_profile_id, target_role, candidate_level')
+    .in('interviewer_profile_id', unique)
+  fail(error)
+  if (!Array.isArray(data)) return []
+  return data.flatMap((row) => {
+    const parsed = asRecord(row)
+    const interviewerProfileId = parsed ? readString(parsed, 'interviewer_profile_id') : null
+    const targetRole = parsed ? readString(parsed, 'target_role') : null
+    const candidateLevel = parsed ? readString(parsed, 'candidate_level') : null
+    if (!interviewerProfileId || !targetRole || !candidateLevel) return []
+    return [{ interviewerProfileId, targetRole, candidateLevel }]
+  })
+}
+
+export async function listPublicServicesFor(ids: string[]): Promise<PublicInterviewerService[]> {
+  const unique = [...new Set(ids.filter((id) => isUuid(id)))]
+  if (unique.length === 0) return []
+  const { data, error } = await supabase
+    .from('interviewer_services_public')
+    .select(PUBLIC_SERVICE_SELECT)
+    .in('interviewer_profile_id', unique)
+  fail(error)
+  if (!Array.isArray(data)) return []
+  return data.flatMap((row) => {
+    const mapped = mapPublicService(row)
+    return mapped ? [mapped] : []
+  })
 }

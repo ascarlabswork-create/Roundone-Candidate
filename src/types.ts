@@ -172,6 +172,7 @@ export type MatchingPreferences = {
   preferredTime: TimeWindow | ''
   budget: number
   language: string
+  naturalLanguageQuery?: string
 }
 
 export type MatchReason = {

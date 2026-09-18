@@ -14,6 +14,7 @@ const emptyPreferences: MatchingPreferences = {
   preferredTime: '',
   budget: 0,
   language: '',
+  naturalLanguageQuery: '',
 }
 
 function withoutBudgetAndLanguage(prefs: MatchingPreferences): MatchingPreferences {

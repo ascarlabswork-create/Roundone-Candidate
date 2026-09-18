@@ -2,6 +2,7 @@ import { Bookmark, MessageSquare } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { getAvailability, getInterviewer, getInterviewerReviewSummary, listReviews } from '../api/index.ts'
+import { ApiError } from '../api/client.ts'
 import { MatchReasonList } from '../components/interviewer/InterviewerCard.tsx'
 import { Button } from '../components/ui/Button.tsx'
 import { Badge, Card, EmptyState, ErrorState, Skeleton } from '../components/ui/primitives.tsx'
@@ -9,8 +10,10 @@ import { Avatar, MatchScore, StarRating, VerifiedBadge } from '../components/ui/
 import { getNextSlot, isVerified } from '../data/interviewers.ts'
 import { formatDateTimeInZone } from '../availability/index.ts'
 import { formatCount, formatINR } from '../lib/format.ts'
+import { isUuid } from '../lib/uuid.ts'
 import { useAsync, type AsyncState } from '../lib/useAsync.ts'
-import { scoreInterviewer } from '../matching/index.ts'
+import { loadMatchingInterviewer, scoreInterviewer } from '../matching/index.ts'
+import { getPublicCandidateReviews } from '../services/candidateReviews.ts'
 import { useBookingDraft } from '../state/booking.tsx'
 import { useMatching } from '../state/matching.tsx'
 import { useSavedInterviewers } from '../state/saved.tsx'
@@ -19,13 +22,45 @@ import type { Interviewer, PublicCandidateReview, PublicReviewSummary, ReviewDim
 
 const tabs = ['About', 'Expertise', 'Services', 'Availability', 'Reviews'] as const
 
+async function loadProfileInterviewer(id: string) {
+  if (isUuid(id)) {
+    const live = await loadMatchingInterviewer(id)
+    if (!live) throw new ApiError('Interviewer not found', 404)
+    return live
+  }
+  return getInterviewer(id)
+}
+
+async function loadProfileReviews(id: string): Promise<PublicCandidateReview[]> {
+  if (!isUuid(id)) return listReviews(id)
+  const rows = await getPublicCandidateReviews(id)
+  return rows.map((row) => ({
+    id: row.id,
+    interviewerId: row.interviewerProfileId,
+    displayName: row.displayName,
+    overallRating: row.overallRating,
+    date: row.createdAt,
+    writtenReview: row.writtenReview,
+    dimensions: {
+      technicalExpertise: row.technicalExpertise ?? 0,
+      communication: row.communication ?? 0,
+      interviewRealism: row.interviewRealism ?? 0,
+      feedbackQuality: row.feedbackQuality ?? 0,
+      professionalism: row.professionalism ?? 0,
+    },
+  }))
+}
+
 export function ProfilePage() {
   const { id = '' } = useParams()
   const [params] = useSearchParams()
   const fromMatches = params.get('from') === 'matches'
-  const interviewerState = useAsync(() => getInterviewer(id), [id])
-  const reviewsState = useAsync(() => listReviews(id), [id])
-  const summaryState = useAsync(() => getInterviewerReviewSummary(id), [id])
+  const interviewerState = useAsync(() => loadProfileInterviewer(id), [id])
+  const reviewsState = useAsync(() => loadProfileReviews(id), [id])
+  const summaryState = useAsync(
+    () => (isUuid(id) ? Promise.resolve(null) : getInterviewerReviewSummary(id)),
+    [id],
+  )
   const { preferences } = useMatching()
   const { isSaved, toggleSaved } = useSavedInterviewers()
   const { pushToast } = useToast()
@@ -325,19 +360,34 @@ function ServicesTab({ interviewer }: { interviewer: Interviewer }) {
 }
 
 function AvailabilityTab({ interviewer }: { interviewer: Interviewer }) {
-  const next = getNextSlot(interviewer)
+  const live = isUuid(interviewer.id)
+  const next = live ? null : getNextSlot(interviewer)
   const calendar = useAsync(
-    () => getAvailability(interviewer.id, interviewer.services[0]?.id, interviewer.availability.timezone),
-    [interviewer.id],
+    () =>
+      live
+        ? Promise.resolve(null)
+        : getAvailability(interviewer.id, interviewer.services[0]?.id, interviewer.availability.timezone),
+    [interviewer.id, live],
   )
   const tz = interviewer.availability.timezone
 
   return (
     <div className="space-y-6">
-      <p className="text-sm text-slate-600">
-        Timezone {tz}. Next available:{' '}
-        {next ? formatDateTimeInZone(next.start, tz) : 'None in the next four weeks'}.
-      </p>
+      {live ? (
+        <p className="text-sm text-slate-600">
+          Live bookable times are shown in the existing booking flow. Timezone {tz}.
+        </p>
+      ) : (
+        <p className="text-sm text-slate-600">
+          Timezone {tz}. Next available:{' '}
+          {next ? formatDateTimeInZone(next.start, tz) : 'None in the next four weeks'}.
+        </p>
+      )}
+      {live ? (
+        <Link to={`/candidate/interviewers/${interviewer.id}/book`}>
+          <Button>Book this interviewer</Button>
+        </Link>
+      ) : null}
       <div>
         <h3 className="text-sm font-semibold text-navy-950">Typical hours</h3>
         <ul className="mt-2 space-y-1 text-sm text-slate-700">

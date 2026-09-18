@@ -207,7 +207,8 @@ export function hasMeaningfulPreferences(prefs: MatchingPreferences | null) {
       prefs.targetCompany ||
       prefs.skills.length ||
       prefs.preferredDate ||
-      prefs.budget,
+      prefs.budget ||
+      Boolean(prefs.naturalLanguageQuery?.trim()),
   )
 }
 

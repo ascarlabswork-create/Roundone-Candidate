@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { recommendInterviewers } from '../api/index.ts'
+import { recommendMatchedInterviewers } from '../matching/index.ts'
 import { InterviewerCard, InterviewerCardSkeleton } from '../components/interviewer/InterviewerCard.tsx'
 import { Button } from '../components/ui/Button.tsx'
 import { Badge, EmptyState, ErrorState, PageHeader } from '../components/ui/primitives.tsx'
@@ -13,7 +13,7 @@ export function MatchesPage() {
   const { preferences } = useMatching()
   const ready = hasMeaningfulPreferences(preferences)
   const state = useAsync(
-    () => (preferences ? recommendInterviewers(preferences) : Promise.resolve([])),
+    () => (preferences ? recommendMatchedInterviewers(preferences) : Promise.resolve([])),
     [JSON.stringify(preferences)],
   )
 
@@ -34,7 +34,7 @@ export function MatchesPage() {
       <PageHeader
         eyebrow="Recommended for you"
         title="Best matches for your interview goal"
-        subtitle="Ranked by a deterministic compatibility score. Each card explains why the interviewer was recommended."
+        subtitle="Ranked by the existing compatibility score. Short explanations appear when matching assist is available."
         actions={
           <Link to="/candidate/find">
             <Button variant="outline">Edit goal</Button>
@@ -79,14 +79,30 @@ export function MatchesPage() {
         </div>
       ) : null}
 
-      {ready && state.status === 'success' ? (
+      {ready && state.status === 'success' && state.data.length === 0 ? (
+        <div className="mt-8">
+          <EmptyState
+            title="No listed interviewers match yet"
+            body="Try a broader role or interview type, or browse the public interviewer directory."
+            action={
+              <Link to="/candidate/interviewers">
+                <Button>Browse Interviewers</Button>
+              </Link>
+            }
+          />
+        </div>
+      ) : null}
+
+      {ready && state.status === 'success' && state.data.length > 0 ? (
         <div className="mt-8 space-y-4">
-          {state.data.map(({ interviewer, match }) => (
+          {state.data.map(({ interviewer, match, ai }) => (
             <InterviewerCard
               key={interviewer.id}
               interviewer={interviewer}
               matchScore={match.score}
               reasons={match.reasons}
+              matchedFactors={ai?.matchedFactors}
+              matchExplanation={ai?.explanation}
               fromMatches
             />
           ))}
