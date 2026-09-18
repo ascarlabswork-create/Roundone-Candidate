@@ -4,7 +4,8 @@ import {
   notificationHref,
   parseCandidateNotification,
   parseNotificationPreferences,
-  prefersBookingUpdates,
+  prefersOptionalNotification,
+  toPreferencePatch,
 } from './notificationModel.ts'
 
 function expect(condition: boolean, message: string) {
@@ -39,8 +40,14 @@ export function runNotificationChecks() {
   })
   expect(Boolean(prefs), 'Preferences must parse')
   expect(prefs?.bookingUpdates === false, 'booking_updates maps')
-  expect(prefersBookingUpdates(prefs!, 'booking_confirmed') === false, 'Booking events respect booking_updates')
-  expect(prefersBookingUpdates(prefs!, 'feedback_ready') === true, 'Feedback events use feedback_updates')
+  expect(prefersOptionalNotification(prefs!, 'booking_confirmed') === true, 'Transactional booking events stay on')
+  expect(prefersOptionalNotification(prefs!, 'booking_rejected') === true, 'Rejected bookings stay mandatory')
+  expect(prefersOptionalNotification(prefs!, 'interview_reminder') === false, 'Reminders follow booking_updates')
+  expect(prefersOptionalNotification(prefs!, 'feedback_ready') === true, 'Feedback follows feedback_updates')
+  expect(toPreferencePatch({ bookingUpdates: false })?.booking_updates === false, 'Optional reminder patch uses booking_updates')
+  expect(toPreferencePatch({ feedbackUpdates: false })?.feedback_updates === false, 'Optional feedback patch uses feedback_updates')
+  expect(toPreferencePatch({}) === null, 'Empty preference updates are rejected')
+  expect(!('email_enabled' in (toPreferencePatch({ bookingUpdates: true }) ?? {})), 'Email preferences are not updated here')
 
   const read = parseCandidateNotification({
     id: '00000000-0000-4000-8000-000000000062',
@@ -71,6 +78,18 @@ export function runNotificationChecks() {
       createdAt: '2026-09-18T08:00:00.000Z',
     }) === '/candidate/interviews',
     'Rejected bookings route to My Interviews',
+  )
+  expect(
+    notificationHref({
+      id: '00000000-0000-4000-8000-000000000065',
+      kind: 'booking_rescheduled',
+      title: 'Interview rescheduled',
+      body: 'Your interview time was updated.',
+      bookingId: '00000000-0000-4000-8000-000000000024',
+      readAt: null,
+      createdAt: '2026-09-18T08:00:00.000Z',
+    }) === '/candidate/interview/00000000-0000-4000-8000-000000000024',
+    'Rescheduled bookings route to interview details',
   )
   expect(
     notificationHref({

@@ -49,9 +49,12 @@ export type CandidateNotificationPreferences = {
   marketing: boolean
 }
 
-function isNotificationKind(value: string): value is CandidateNotificationKind {
-  return (CANDIDATE_NOTIFICATION_KINDS as readonly string[]).includes(value)
+export type NotificationPreferenceUpdate = {
+  bookingUpdates?: boolean
+  feedbackUpdates?: boolean
 }
+
+export const OPTIONAL_NOTIFICATION_KINDS = ['interview_reminder', 'feedback_ready'] as const
 
 function errorText(error: unknown) {
   if (!error || typeof error !== 'object') return typeof error === 'string' ? error.toLowerCase() : ''
@@ -69,7 +72,7 @@ function isNetworkFailure(error: unknown) {
   return /failed to fetch|networkerror|network request failed|load failed|fetch failed/i.test(`${text} ${message}`)
 }
 
-export function mapNotificationError(error: unknown): NotificationError {
+export function mapNotificationError(error: unknown, action: 'load' | 'update' = 'load'): NotificationError {
   if (error instanceof NotificationError) return error
   if (isNetworkFailure(error)) {
     return new NotificationError('network', 'Unable to reach notifications. Check your connection.')
@@ -78,7 +81,10 @@ export function mapNotificationError(error: unknown): NotificationError {
   if (text.includes('42501') || text.includes('not_authorized') || text.includes('row-level security')) {
     return new NotificationError('unauthorized', 'You don’t have access to these notifications.')
   }
-  return new NotificationError('rpc', 'Unable to load notifications. Please try again.')
+  return new NotificationError(
+    'rpc',
+    action === 'update' ? 'Unable to update that notification. Please try again.' : 'Unable to load notifications. Please try again.',
+  )
 }
 
 function readPayloadBookingId(payload: unknown): string | null {
@@ -129,14 +135,17 @@ export function notificationHref(notification: CandidateNotification): string | 
   if (notification.kind === 'feedback_ready' || notification.kind === 'interview_completed') {
     return `/candidate/feedback/${bookingId}`
   }
-  if (notification.kind === 'booking_confirmed' || notification.kind === 'interview_reminder') {
+  if (
+    notification.kind === 'booking_confirmed' ||
+    notification.kind === 'booking_rescheduled' ||
+    notification.kind === 'interview_reminder'
+  ) {
     return `/candidate/interview/${bookingId}`
   }
   if (
     notification.kind === 'booking_requested' ||
     notification.kind === 'booking_rejected' ||
     notification.kind === 'booking_cancelled' ||
-    notification.kind === 'booking_rescheduled' ||
     notification.kind === 'booking_expired'
   ) {
     return '/candidate/interviews'
@@ -158,8 +167,15 @@ export function formatNotificationTime(iso: string, nowMs = Date.now()) {
   return new Date(then).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
 }
 
-export function prefersBookingUpdates(prefs: CandidateNotificationPreferences, kind: string) {
-  if (!isNotificationKind(kind)) return true
+export function prefersOptionalNotification(prefs: CandidateNotificationPreferences, kind: string) {
   if (kind === 'feedback_ready') return prefs.feedbackUpdates
-  return prefs.bookingUpdates
+  if (kind === 'interview_reminder') return prefs.bookingUpdates
+  return true
+}
+
+export function toPreferencePatch(updates: NotificationPreferenceUpdate) {
+  const patch: Record<string, boolean> = {}
+  if (typeof updates.bookingUpdates === 'boolean') patch.booking_updates = updates.bookingUpdates
+  if (typeof updates.feedbackUpdates === 'boolean') patch.feedback_updates = updates.feedbackUpdates
+  return Object.keys(patch).length > 0 ? patch : null
 }

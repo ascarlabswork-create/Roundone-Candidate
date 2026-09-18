@@ -23,6 +23,8 @@ type NotificationsContextValue = {
   markAllRead: () => Promise<void>
 }
 
+const UNREAD_REFRESH_MS = 60_000
+
 const NotificationsContext = createContext<NotificationsContextValue | null>(null)
 
 export function NotificationsProvider({ children }: { children: ReactNode }) {
@@ -62,8 +64,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
       setUnreadCount(count)
       setStatus('success')
     } catch (caught) {
-      const mapped = mapNotificationError(caught)
-      setItems([])
+      const mapped = mapNotificationError(caught, 'load')
       setStatus('error')
       setError(mapped.message)
     }
@@ -100,8 +101,19 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     function onFocus() {
       void refreshUnread()
     }
+    function onVisibility() {
+      if (document.visibilityState === 'visible') void refreshUnread()
+    }
     window.addEventListener('focus', onFocus)
-    return () => window.removeEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onVisibility)
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void refreshUnread()
+    }, UNREAD_REFRESH_MS)
+    return () => {
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onVisibility)
+      window.clearInterval(timer)
+    }
   }, [sessionStatus, refreshUnread])
 
   const value = useMemo<NotificationsContextValue>(

@@ -2,6 +2,7 @@ import { CalendarCheck, Menu, X } from 'lucide-react'
 import { useState } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
 import { cn } from '../../lib/cn.ts'
+import { useNotifications } from '../../state/notifications.tsx'
 import { useSession } from '../../state/session.tsx'
 import { Button } from '../ui/Button.tsx'
 import { NotificationBell } from '../notifications/NotificationBell.tsx'
@@ -36,9 +37,11 @@ function initials(name: string) {
 export function Navbar() {
   const [open, setOpen] = useState(false)
   const { status, account, user, signOut } = useSession()
+  const { unreadCount } = useNotifications()
   const location = useLocation()
   const displayName = account?.profile.full_name || user?.email || ''
   const isAuthRoute = AUTH_ROUTES.includes(location.pathname)
+  const unreadBadge = unreadCount != null && unreadCount > 0 ? (unreadCount > 99 ? '99+' : String(unreadCount)) : null
 
   if (isAuthRoute) {
     return (
@@ -156,7 +159,14 @@ export function Navbar() {
             </NavLink>
             {status === 'authenticated' ? (
               <NavLink to="/candidate/notifications" onClick={() => setOpen(false)} className="rounded-lg px-3 py-2 text-sm font-medium text-slate-700">
-                Notifications
+                <span className="flex items-center justify-between gap-3">
+                  Notifications
+                  {unreadBadge ? (
+                    <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-blue-600 px-1.5 text-[10px] font-semibold leading-4 text-white">
+                      {unreadBadge}
+                    </span>
+                  ) : null}
+                </span>
               </NavLink>
             ) : null}
             {status === 'authenticated' ? (
