@@ -1,5 +1,7 @@
 import {
+  formatNotificationTime,
   isUnread,
+  notificationHref,
   parseCandidateNotification,
   parseNotificationPreferences,
   prefersBookingUpdates,
@@ -50,6 +52,42 @@ export function runNotificationChecks() {
     created_at: '2026-09-18T08:30:00.000Z',
   })
   expect(read != null && !isUnread(read), 'read_at marks a notification as read')
+  expect(
+    notificationHref(parsed!) === '/candidate/feedback/00000000-0000-4000-8000-000000000021',
+    'Feedback notifications route to the feedback page',
+  )
+  expect(
+    notificationHref(read!) === '/candidate/interview/00000000-0000-4000-8000-000000000022',
+    'Confirmed bookings route to the interview room',
+  )
+  expect(
+    notificationHref({
+      id: '00000000-0000-4000-8000-000000000063',
+      kind: 'booking_rejected',
+      title: 'Booking declined',
+      body: 'The interviewer declined this request.',
+      bookingId: '00000000-0000-4000-8000-000000000023',
+      readAt: null,
+      createdAt: '2026-09-18T08:00:00.000Z',
+    }) === '/candidate/interviews',
+    'Rejected bookings route to My Interviews',
+  )
+  expect(
+    notificationHref({
+      id: '00000000-0000-4000-8000-000000000064',
+      kind: 'booking_confirmed',
+      title: 'Interview confirmed',
+      body: 'Your interviewer confirmed the booking.',
+      bookingId: null,
+      readAt: null,
+      createdAt: '2026-09-18T08:00:00.000Z',
+    }) === null,
+    'Notifications without a booking stay informational',
+  )
+  expect(
+    formatNotificationTime('2026-09-18T08:50:00.000Z', Date.parse('2026-09-18T09:00:00.000Z')) === '10 min ago',
+    'Relative timestamps use minutes',
+  )
 
   return true
 }
