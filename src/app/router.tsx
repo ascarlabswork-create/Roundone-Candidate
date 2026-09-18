@@ -17,6 +17,7 @@ import { MatchesPage } from '../pages/MatchesPage.tsx'
 import { NotificationsPage } from '../pages/NotificationsPage.tsx'
 import { ProfilePage } from '../pages/ProfilePage.tsx'
 import { PracticePage } from '../pages/PracticePage.tsx'
+import { AiPracticePage } from '../pages/AiPracticePage.tsx'
 import { ProgressPage } from '../pages/ProgressPage.tsx'
 import { SearchPage } from '../pages/SearchPage.tsx'
 import {
@@ -46,6 +47,7 @@ export function AppRouter() {
             <Route path="/candidate/reviews/:id" element={<ReviewPage />} />
             <Route path="/candidate/progress" element={<ProgressPage />} />
             <Route path="/candidate/practice" element={<PracticePage />} />
+            <Route path="/candidate/practice/mock" element={<AiPracticePage />} />
             <Route path="/candidate/practice/:type" element={<PracticePage />} />
             <Route path="/candidate/interview-types" element={<InterviewTypesPage />} />
             <Route path="/candidate/resources" element={<ResourcesPage />} />

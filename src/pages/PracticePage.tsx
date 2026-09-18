@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Button } from '../components/ui/Button.tsx'
 import { Badge, Card, FieldLabel, PageHeader, TextArea } from '../components/ui/primitives.tsx'
 import {
@@ -64,6 +64,10 @@ export function PracticePage() {
   const { type: typeSlug } = useParams()
   const selectedType = practiceTypeFromSlug(typeSlug)
 
+  if (typeSlug === 'mock') {
+    return <Navigate to="/candidate/practice/mock" replace />
+  }
+
   if (typeSlug && !selectedType) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
@@ -89,9 +93,23 @@ function PracticeHub() {
     <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
       <PageHeader
         title="AI Practice"
-        subtitle="Start a timed warm-up with real interview prompts, notes, and a recap. Live mocks still happen with a human interviewer."
+        subtitle="Practice with generated questions and written feedback, or use a timed drill. Live mocks still happen with a human interviewer."
       />
-      <div className="mt-8 grid gap-4 md:grid-cols-2">
+      <Card className="mt-8 p-5 sm:p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Practice interview</p>
+            <h2 className="mt-1 font-semibold text-navy-950">Answer questions and get practice feedback</h2>
+            <p className="mt-2 max-w-xl text-sm text-slate-600">
+              Choose a role, interview type, and topics. This is AI practice only — it does not create a booking or
+              official interviewer feedback.
+            </p>
+          </div>
+          <Button onClick={() => navigate('/candidate/practice/mock')}>Practice Interview</Button>
+        </div>
+      </Card>
+      <h2 className="mt-10 text-lg font-semibold text-navy-950">Timed drills</h2>
+      <div className="mt-4 grid gap-4 md:grid-cols-2">
         {INTERVIEW_TYPES.map((type) => {
           const drill = PRACTICE_DRILLS[type]
           const saved = readSessionJson<SavedPractice | null>(storageKey(type), null)

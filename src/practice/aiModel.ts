@@ -1,0 +1,155 @@
+export const PRACTICE_AI_FUNCTION = 'assist-matching'
+export const PRACTICE_QUESTION_TIMEOUT_MS = 12_000
+export const PRACTICE_FEEDBACK_TIMEOUT_MS = 8_000
+export const PRACTICE_ANSWER_MAX = 4_000
+export const PRACTICE_QUESTION_COUNTS = [3, 5, 8] as const
+export const PRACTICE_DIFFICULTIES = ['beginner', 'intermediate', 'advanced'] as const
+export const PRACTICE_QUESTION_TYPES = ['technical', 'behavioral', 'system_design', 'product'] as const
+
+export type PracticeDifficulty = (typeof PRACTICE_DIFFICULTIES)[number]
+export type PracticeQuestionType = (typeof PRACTICE_QUESTION_TYPES)[number]
+export type PracticeQuestionCount = (typeof PRACTICE_QUESTION_COUNTS)[number]
+
+export const PRACTICE_BANNED_CLAIM =
+  /\b(ready for the job|you will get hired|hiring decision|guaranteed|employability|interview success probability|real (google|amazon|meta|microsoft|netflix) interview|official interviewer feedback|percentile)\b/i
+
+export type PracticeSetup = {
+  targetRole: string
+  interviewType: string
+  skills: string[]
+  difficulty: PracticeDifficulty
+  questionCount: PracticeQuestionCount
+}
+
+export type PracticeAiQuestion = {
+  id: string
+  question: string
+  questionType: PracticeQuestionType
+  topic: string
+  difficulty: PracticeDifficulty
+  expectedFocus: string[]
+}
+
+export type PracticeAiFeedback = {
+  score: number
+  strengths: string[]
+  improvements: string[]
+  missingPoints: string[]
+  summary: string
+}
+
+export type PracticeTurn = {
+  question: PracticeAiQuestion
+  answer: string
+  feedback: PracticeAiFeedback | null
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  return value as Record<string, unknown>
+}
+
+function readTrimmed(value: unknown, max = 160) {
+  if (typeof value !== 'string') return ''
+  return value.trim().slice(0, max)
+}
+
+function uniqueStrings(values: unknown, maxItems: number, maxLen: number, minLen = 1) {
+  if (!Array.isArray(values)) return []
+  const result: string[] = []
+  for (const item of values) {
+    const text = readTrimmed(item, maxLen)
+    if (text.length < minLen) continue
+    if (PRACTICE_BANNED_CLAIM.test(text)) continue
+    if (result.some((existing) => existing.toLowerCase() === text.toLowerCase())) continue
+    result.push(text)
+    if (result.length >= maxItems) break
+  }
+  return result
+}
+
+export function isPracticeDifficulty(value: string): value is PracticeDifficulty {
+  return PRACTICE_DIFFICULTIES.includes(value as PracticeDifficulty)
+}
+
+export function isPracticeQuestionType(value: string): value is PracticeQuestionType {
+  return PRACTICE_QUESTION_TYPES.includes(value as PracticeQuestionType)
+}
+
+export function difficultyFromCandidateLevel(level: string): PracticeDifficulty {
+  const needle = level.trim().toLowerCase()
+  if (['intern', 'new grad', 'junior', 'sde 1'].includes(needle)) return 'beginner'
+  if (['staff', 'senior staff', 'principal', 'distinguished', 'director'].includes(needle)) return 'advanced'
+  return 'intermediate'
+}
+
+export function parsePracticeQuestions(
+  value: unknown,
+  setup: PracticeSetup,
+): PracticeAiQuestion[] | null {
+  const row = asRecord(value)
+  if (!row) return null
+  const raw = Array.isArray(row.questions) ? row.questions : []
+  const questions: PracticeAiQuestion[] = []
+  for (const item of raw) {
+    const parsed = asRecord(item)
+    if (!parsed) continue
+    const question = readTrimmed(parsed.question, 600)
+    if (question.length < 20 || PRACTICE_BANNED_CLAIM.test(question)) continue
+    if (questions.some((existing) => existing.question.toLowerCase() === question.toLowerCase())) continue
+    const questionTypeRaw = readTrimmed(parsed.question_type ?? parsed.questionType, 40).toLowerCase()
+    const difficultyRaw = readTrimmed(parsed.difficulty, 20).toLowerCase()
+    const expectedFocus = uniqueStrings(parsed.expected_focus ?? parsed.expectedFocus, 5, 80, 4)
+    if (expectedFocus.length < 2) continue
+    const topic = readTrimmed(parsed.topic, 40)
+    const groundedTopic =
+      setup.skills.find((skill) => skill.toLowerCase() === topic.toLowerCase()) ??
+      (topic.toLowerCase() === setup.interviewType.toLowerCase() ? setup.interviewType : setup.skills[0] || setup.interviewType)
+    questions.push({
+      id: `pq-${questions.length + 1}`,
+      question,
+      questionType: isPracticeQuestionType(questionTypeRaw) ? questionTypeRaw : 'technical',
+      topic: groundedTopic,
+      difficulty: isPracticeDifficulty(difficultyRaw) ? difficultyRaw : setup.difficulty,
+      expectedFocus,
+    })
+    if (questions.length >= setup.questionCount) break
+  }
+  return questions.length > 0 ? questions : null
+}
+
+export function parsePracticeFeedback(value: unknown): PracticeAiFeedback | null {
+  const row = asRecord(value)
+  if (!row) return null
+  const score = typeof row.score === 'number' && Number.isFinite(row.score) ? Math.round(row.score) : null
+  if (score == null || score < 1 || score > 10) return null
+  const summary = readTrimmed(row.summary, 280)
+  if (summary.length < 12 || PRACTICE_BANNED_CLAIM.test(summary)) return null
+  return {
+    score,
+    strengths: uniqueStrings(row.strengths, 5, 140, 4),
+    improvements: uniqueStrings(row.improvements, 5, 140, 4),
+    missingPoints: uniqueStrings(row.missing_points ?? row.missingPoints, 5, 140, 4),
+    summary,
+  }
+}
+
+export function averagePracticeScore(turns: PracticeTurn[]) {
+  const scored = turns.filter((turn) => turn.feedback)
+  if (scored.length === 0) return null
+  const total = scored.reduce((sum, turn) => sum + (turn.feedback?.score ?? 0), 0)
+  return Math.round((total / scored.length) * 10) / 10
+}
+
+export function uniqueThemes(turns: PracticeTurn[], key: 'strengths' | 'improvements' | 'missingPoints', max = 6) {
+  const result: string[] = []
+  for (const turn of turns) {
+    const values = turn.feedback?.[key] ?? []
+    for (const value of values) {
+      if (result.some((existing) => existing.toLowerCase() === value.toLowerCase())) continue
+      result.push(value)
+      if (result.length >= max) return result
+    }
+  }
+  return result
+}

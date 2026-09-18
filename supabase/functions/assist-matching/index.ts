@@ -86,9 +86,11 @@ async function completeJson(
   baseUrl: string,
   system: string,
   payload: unknown,
+  timeoutMs = 7000,
+  temperature = 0.1,
 ) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 7000);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(`${baseUrl}/chat/completions`, {
       method: "POST",
@@ -98,7 +100,7 @@ async function completeJson(
       },
       body: JSON.stringify({
         model,
-        temperature: 0.1,
+        temperature,
         response_format: { type: "json_object" },
         messages: [
           { role: "system", content: system },
@@ -217,6 +219,168 @@ async function handleNormalize(
   });
 }
 
+const PRACTICE_QUESTION_TYPES = ["technical", "behavioral", "system_design", "product"];
+const PRACTICE_DIFFICULTIES = ["beginner", "intermediate", "advanced"];
+const PRACTICE_BANNED =
+  /\b(ready for the job|you will get hired|hiring decision|guaranteed|employability|interview success probability|real (google|amazon|meta|microsoft|netflix) interview|official interviewer feedback|percentile)\b/i;
+
+function clampInt(value: unknown, min: number, max: number, fallback: number) {
+  const n = typeof value === "number" && Number.isFinite(value) ? Math.round(value) : fallback;
+  return Math.min(max, Math.max(min, n));
+}
+
+function defaultQuestionType(interviewType: string) {
+  const n = interviewType.trim().toLowerCase();
+  if (n === "behavioral") return "behavioral";
+  if (n === "system design") return "system_design";
+  if (n === "product") return "product";
+  return "technical";
+}
+
+function groundTopic(value: string, skills: string[], interviewType: string) {
+  const canonical = matchVocab(value, skills);
+  if (canonical) return canonical;
+  if (value.trim() && value.trim().toLowerCase() === interviewType.trim().toLowerCase()) return interviewType;
+  return skills[0] || interviewType;
+}
+
+function parseFocus(value: unknown) {
+  return readStringList(value, 6, 80).filter((item) => item.length >= 4);
+}
+
+async function handlePracticeQuestions(
+  body: Record<string, unknown>,
+  apiKey: string,
+  model: string,
+  baseUrl: string,
+) {
+  const setupRow = asRecord(body.setup) ?? {};
+  const setup = {
+    targetRole: readString(setupRow.targetRole ?? setupRow.target_role, 80),
+    interviewType: readString(setupRow.interviewType ?? setupRow.interview_type, 60),
+    skills: readStringList(setupRow.skills, 6, 40),
+    difficulty: PRACTICE_DIFFICULTIES.includes(readString(setupRow.difficulty, 20))
+      ? readString(setupRow.difficulty, 20)
+      : "intermediate",
+    questionCount: clampInt(setupRow.questionCount ?? setupRow.question_count, 3, 8, 5),
+  };
+  if (!setup.targetRole || !setup.interviewType) return json(400, { error: "invalid_body" });
+
+  const system = [
+    "You generate RoundOne AI practice interview questions.",
+    "This is practice only, not a real booked interview or official interviewer feedback.",
+    "Use only the provided role, interview type, skills, and difficulty.",
+    "Do not invent candidate experience, interviewer identity, company affiliation, or real company interview questions.",
+    "Do not claim these are real company questions.",
+    "Return JSON only: { questions: [{ question, question_type, topic, difficulty, expected_focus }] }.",
+    "question_type must be technical, behavioral, system_design, or product.",
+    "topic must be one of the provided skills, or the interview type.",
+    "difficulty must match the requested difficulty.",
+    "expected_focus is 2 to 5 short rubric bullets.",
+    "Each question must be distinct and answerable in text.",
+  ].join(" ");
+
+  const completed = await completeJson(apiKey, model, baseUrl, system, { setup }, 11000, 0.4);
+  if (completed instanceof Response) return completed;
+
+  const fallbackType = defaultQuestionType(setup.interviewType);
+  const raw = Array.isArray(completed.questions) ? completed.questions : [];
+  const questions = [];
+  for (const item of raw) {
+    const row = asRecord(item);
+    if (!row) continue;
+    const question = readString(row.question, 600);
+    if (question.length < 20 || PRACTICE_BANNED.test(question)) continue;
+    if (questions.some((existing) => existing.question.toLowerCase() === question.toLowerCase())) continue;
+    const questionType = readString(row.question_type ?? row.questionType, 40).toLowerCase();
+    const difficulty = readString(row.difficulty, 20).toLowerCase();
+    const focus = parseFocus(row.expected_focus ?? row.expectedFocus);
+    if (focus.length < 2) continue;
+    questions.push({
+      question_id: `pq-${questions.length + 1}`,
+      question,
+      question_type: PRACTICE_QUESTION_TYPES.includes(questionType) ? questionType : fallbackType,
+      topic: groundTopic(readString(row.topic, 40), setup.skills, setup.interviewType),
+      difficulty: PRACTICE_DIFFICULTIES.includes(difficulty) ? difficulty : setup.difficulty,
+      expected_focus: focus.slice(0, 5),
+    });
+    if (questions.length >= setup.questionCount) break;
+  }
+
+  if (questions.length === 0) {
+    console.log(JSON.stringify({ event: "practice_questions_empty" }));
+    return json(502, { error: "malformed_json" });
+  }
+
+  console.log(JSON.stringify({ event: "practice_questions_ok", count: questions.length }));
+  return json(200, { questions });
+}
+
+async function handlePracticeFeedback(
+  body: Record<string, unknown>,
+  apiKey: string,
+  model: string,
+  baseUrl: string,
+) {
+  const questionRow = asRecord(body.question) ?? {};
+  const question = {
+    question: readString(questionRow.question, 600),
+    topic: readString(questionRow.topic, 40),
+    difficulty: readString(questionRow.difficulty, 20),
+    expectedFocus: parseFocus(questionRow.expectedFocus ?? questionRow.expected_focus),
+  };
+  const answer = readString(body.answer, 4000);
+  if (!question.question || question.expectedFocus.length === 0 || answer.length < 8) {
+    return json(400, { error: "invalid_body" });
+  }
+
+  const system = [
+    "You give RoundOne AI practice feedback on one written answer.",
+    "This is practice feedback only, not official interviewer feedback, a hiring decision, or a candidate ranking.",
+    "Score 1-10 against expected_focus only:",
+    "1-3 little coverage, 4-6 partial coverage, 7-8 solid with gaps, 9-10 thorough coverage.",
+    "Do not mention hiring, job readiness, employability, percentiles, or guaranteed outcomes.",
+    "Do not invent interviewer identity or company evaluations.",
+    "Return JSON only: { score, strengths, improvements, missing_points, summary }.",
+    "score is an integer 1-10. Arrays have at most 5 short strings. summary is one or two sentences.",
+  ].join(" ");
+
+  const completed = await completeJson(
+    apiKey,
+    model,
+    baseUrl,
+    system,
+    { question, answer },
+    8000,
+    0.1,
+  );
+  if (completed instanceof Response) return completed;
+
+  const score = clampInt(completed.score, 1, 10, 0);
+  const summary = readString(completed.summary, 280);
+  if (score < 1 || summary.length < 12 || PRACTICE_BANNED.test(summary)) {
+    console.log(JSON.stringify({ event: "practice_feedback_invalid" }));
+    return json(502, { error: "malformed_json" });
+  }
+
+  const strengths = readStringList(completed.strengths, 5, 140).filter((item) => !PRACTICE_BANNED.test(item));
+  const improvements = readStringList(completed.improvements, 5, 140).filter((item) => !PRACTICE_BANNED.test(item));
+  const missingPoints = readStringList(
+    completed.missing_points ?? completed.missingPoints,
+    5,
+    140,
+  ).filter((item) => !PRACTICE_BANNED.test(item));
+
+  console.log(JSON.stringify({ event: "practice_feedback_ok" }));
+  return json(200, {
+    score,
+    strengths,
+    improvements,
+    missing_points: missingPoints,
+    summary,
+  });
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return json(405, { error: "method_not_allowed" });
@@ -241,6 +405,12 @@ Deno.serve(async (req) => {
 
   if (readString(body.mode, 32) === "normalize") {
     return await handleNormalize(body, apiKey, model, baseUrl);
+  }
+  if (readString(body.mode, 32) === "practice_questions") {
+    return await handlePracticeQuestions(body, apiKey, model, baseUrl);
+  }
+  if (readString(body.mode, 32) === "practice_feedback") {
+    return await handlePracticeFeedback(body, apiKey, model, baseUrl);
   }
 
   const prefsRow = asRecord(body.preferences) ?? {};

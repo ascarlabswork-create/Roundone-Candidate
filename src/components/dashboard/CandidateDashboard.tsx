@@ -187,6 +187,11 @@ export function CandidateDashboard() {
                   <Link to="/candidate/find">
                     <Button size="sm">Find an Interviewer</Button>
                   </Link>
+                  <Link to="/candidate/practice/mock">
+                    <Button size="sm" variant="outline">
+                      Practice Interview
+                    </Button>
+                  </Link>
                   <Link to="/candidate/interviews">
                     <Button size="sm" variant="outline">
                       View My Interviews
