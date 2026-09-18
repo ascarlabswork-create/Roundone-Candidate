@@ -1,4 +1,7 @@
 import { asRecord, readBoolean, readString } from '../lib/rows.ts'
+import { isUuid } from '../lib/uuid.ts'
+
+export const NOTIFICATION_LIST_LIMIT = 50
 
 export const NOTIFICATIONS_TABLE = 'notifications'
 export const NOTIFICATION_PREFERENCES_TABLE = 'notification_preferences'
@@ -117,6 +120,42 @@ export function parseNotificationPreferences(value: unknown): CandidateNotificat
 
 export function isUnread(notification: CandidateNotification) {
   return notification.readAt == null
+}
+
+export function notificationHref(notification: CandidateNotification): string | null {
+  const bookingId = notification.bookingId
+  if (!bookingId || !isUuid(bookingId)) return null
+
+  if (notification.kind === 'feedback_ready' || notification.kind === 'interview_completed') {
+    return `/candidate/feedback/${bookingId}`
+  }
+  if (notification.kind === 'booking_confirmed' || notification.kind === 'interview_reminder') {
+    return `/candidate/interview/${bookingId}`
+  }
+  if (
+    notification.kind === 'booking_requested' ||
+    notification.kind === 'booking_rejected' ||
+    notification.kind === 'booking_cancelled' ||
+    notification.kind === 'booking_rescheduled' ||
+    notification.kind === 'booking_expired'
+  ) {
+    return '/candidate/interviews'
+  }
+  return '/candidate/interviews'
+}
+
+export function formatNotificationTime(iso: string, nowMs = Date.now()) {
+  const then = Date.parse(iso)
+  if (!Number.isFinite(then)) return ''
+  const deltaMs = Math.max(0, nowMs - then)
+  const minutes = Math.floor(deltaMs / 60_000)
+  if (minutes < 1) return 'Just now'
+  if (minutes < 60) return `${minutes} min ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return hours === 1 ? '1 hr ago' : `${hours} hrs ago`
+  const days = Math.floor(hours / 24)
+  if (days < 7) return days === 1 ? '1 day ago' : `${days} days ago`
+  return new Date(then).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
 }
 
 export function prefersBookingUpdates(prefs: CandidateNotificationPreferences, kind: string) {

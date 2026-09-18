@@ -14,6 +14,7 @@ import { HomePage } from '../pages/HomePage.tsx'
 import { InterviewRoomPage } from '../pages/InterviewRoomPage.tsx'
 import { InterviewsPage } from '../pages/InterviewsPage.tsx'
 import { MatchesPage } from '../pages/MatchesPage.tsx'
+import { NotificationsPage } from '../pages/NotificationsPage.tsx'
 import { ProfilePage } from '../pages/ProfilePage.tsx'
 import { PracticePage } from '../pages/PracticePage.tsx'
 import { ProgressPage } from '../pages/ProgressPage.tsx'
@@ -21,7 +22,6 @@ import { SearchPage } from '../pages/SearchPage.tsx'
 import {
   InterviewTypesPage,
   NotFoundPage,
-  NotificationsPage,
   ResourcesPage,
 } from '../pages/SupportingPages.tsx'
 

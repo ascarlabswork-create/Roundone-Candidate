@@ -3,6 +3,7 @@ import { isUuid } from '../lib/uuid.ts'
 import {
   NOTIFICATIONS_TABLE,
   NOTIFICATION_PREFERENCES_TABLE,
+  NOTIFICATION_LIST_LIMIT,
   NotificationError,
   mapNotificationError,
   parseCandidateNotification,
@@ -15,9 +16,12 @@ export {
   CANDIDATE_NOTIFICATION_KINDS,
   NOTIFICATIONS_TABLE,
   NOTIFICATION_PREFERENCES_TABLE,
+  NOTIFICATION_LIST_LIMIT,
   NotificationError,
+  formatNotificationTime,
   isUnread,
   mapNotificationError,
+  notificationHref,
   parseCandidateNotification,
   parseNotificationPreferences,
   prefersBookingUpdates,
@@ -44,6 +48,7 @@ export async function listMyNotifications(): Promise<CandidateNotification[]> {
     .from(NOTIFICATIONS_TABLE)
     .select(NOTIFICATION_SELECT)
     .order('created_at', { ascending: false })
+    .limit(NOTIFICATION_LIST_LIMIT)
 
   if (error) {
     console.error('listMyNotifications failed', error)
@@ -88,6 +93,20 @@ export async function markNotificationRead(notificationId: string): Promise<void
   }
   if (!data) {
     throw new NotificationError('unauthorized', 'You don’t have access to these notifications.')
+  }
+}
+
+export async function markAllNotificationsRead(): Promise<void> {
+  await requireAuthenticatedUser()
+  const { error } = await supabase
+    .from(NOTIFICATIONS_TABLE)
+    .update({ read_at: new Date().toISOString() })
+    .is('read_at', null)
+    .select('id')
+
+  if (error) {
+    console.error('markAllNotificationsRead failed', error)
+    throw mapNotificationError(error)
   }
 }
 

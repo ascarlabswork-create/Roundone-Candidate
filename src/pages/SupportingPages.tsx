@@ -57,28 +57,6 @@ export function ResourcesPage() {
   )
 }
 
-export function NotificationsPage() {
-  const notes = [
-    { title: 'Rahul Sharma confirmed Saturday 7:00 PM', body: 'Join from My Interviews 10 minutes early.' },
-    { title: 'Feedback ready from Marcus Chen', body: 'Your system design scorecard is available.' },
-    { title: 'Reminder: Fatima Khan coding mock next week', body: 'Add it to your calendar if you have not already.' },
-  ]
-
-  return (
-    <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
-      <PageHeader title="Notifications" subtitle="Booking updates, feedback, and reminders." />
-      <div className="mt-8 space-y-3">
-        {notes.map((note) => (
-          <Card key={note.title} className="p-5">
-            <h2 className="font-semibold text-navy-950">{note.title}</h2>
-            <p className="mt-1 text-sm text-slate-600">{note.body}</p>
-          </Card>
-        ))}
-      </div>
-    </div>
-  )
-}
-
 export function NotFoundPage() {
   return (
     <div className="mx-auto max-w-lg px-4 py-20 text-center">

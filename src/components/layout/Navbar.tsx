@@ -1,9 +1,10 @@
-import { Bell, CalendarCheck, Menu, X } from 'lucide-react'
+import { CalendarCheck, Menu, X } from 'lucide-react'
 import { useState } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
 import { cn } from '../../lib/cn.ts'
 import { useSession } from '../../state/session.tsx'
 import { Button } from '../ui/Button.tsx'
+import { NotificationBell } from '../notifications/NotificationBell.tsx'
 import { Logo } from './Logo.tsx'
 
 const navItems = [
@@ -82,16 +83,9 @@ export function Navbar() {
             <CalendarCheck className="h-4 w-4" />
             <span className="hidden xl:inline">My Interviews</span>
           </Link>
-          <Link
-            to="/candidate/notifications"
-            className="relative rounded-lg p-2 text-slate-700 hover:bg-slate-50"
-            aria-label="Notifications"
-          >
-            <Bell className="h-5 w-5" />
-            <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-blue-600" />
-          </Link>
           {status === 'authenticated' ? (
             <>
+              <NotificationBell />
               <Link
                 to="/candidate/profile"
                 className="hidden items-center rounded-lg p-1 hover:bg-slate-50 lg:inline-flex"
@@ -160,6 +154,11 @@ export function Navbar() {
             <NavLink to="/candidate/interviews" onClick={() => setOpen(false)} className="rounded-lg px-3 py-2 text-sm font-medium text-slate-700">
               My Interviews
             </NavLink>
+            {status === 'authenticated' ? (
+              <NavLink to="/candidate/notifications" onClick={() => setOpen(false)} className="rounded-lg px-3 py-2 text-sm font-medium text-slate-700">
+                Notifications
+              </NavLink>
+            ) : null}
             {status === 'authenticated' ? (
               <>
                 <NavLink to="/candidate/profile" onClick={() => setOpen(false)} className="rounded-lg px-3 py-2 text-sm font-medium text-slate-700">
