@@ -8,16 +8,25 @@ import {
 } from './bookings.ts'
 import { getCandidateFeedbackBookingIds } from './candidateFeedback.ts'
 import { getCandidateReviewBookingIds } from './candidateReviews.ts'
-import { getPublicInterviewer, getPublicInterviewerService } from './interviewerPublic.ts'
-import { parseInterviewSession, type CandidateInterviewSession } from './interviewSessionModel.ts'
+import { getPublicInterviewersByIds, getPublicServicesByIds } from './interviewerPublic.ts'
+import {
+  parseInterviewSession,
+  sortUpcomingInterviews,
+  type CandidateInterviewSession,
+} from './interviewSessionModel.ts'
 
 export type { CandidateInterviewSession } from './interviewSessionModel.ts'
 export {
+  INTERVIEW_HISTORY_LIMIT,
   canJoinInterview,
   canViewInterview,
+  groupInterviewHistory,
+  interviewHistorySection,
   interviewJoinState,
   interviewStatusLabel,
   parseInterviewSession,
+  sortRecentInterviews,
+  sortUpcomingInterviews,
 } from './interviewSessionModel.ts'
 
 const SESSION_SELECT = 'id, booking_id, provider, started_at, ended_at'
@@ -41,41 +50,34 @@ async function requireAuthenticatedUser() {
   return data.user
 }
 
-async function decorateBooking(
-  booking: CandidateBooking,
-  session: CandidateInterviewSession | null,
-  hasFeedback: boolean,
-  hasReview: boolean,
-): Promise<CandidateInterview> {
-  let interviewerName = 'Interviewer'
-  let interviewerPhoto: string | null = null
-  let interviewerCompany: string | null = null
-  let serviceName = 'Interview'
-  let interviewType = 'Interview'
-  try {
-    const [interviewer, service] = await Promise.all([
-      getPublicInterviewer(booking.interviewerProfileId),
-      getPublicInterviewerService(booking.serviceId),
-    ])
-    interviewerName = interviewer?.name ?? interviewerName
-    interviewerPhoto = interviewer?.photo ?? null
-    interviewerCompany = interviewer?.company ?? null
-    serviceName = service?.name ?? serviceName
-    interviewType = service?.interviewType ?? interviewType
-  } catch (error) {
-    console.error('decorateBooking extras failed', error)
-  }
-  return {
-    ...booking,
-    interviewerName,
-    interviewerPhoto,
-    interviewerCompany,
-    serviceName,
-    interviewType,
-    session,
-    hasFeedback,
-    hasReview,
-  }
+async function decorateBookings(
+  bookings: CandidateBooking[],
+  sessions: Map<string, CandidateInterviewSession>,
+  feedbackIds: Set<string>,
+  reviewIds: Set<string>,
+): Promise<CandidateInterview[]> {
+  if (bookings.length === 0) return []
+
+  const [interviewers, services] = await Promise.all([
+    getPublicInterviewersByIds(bookings.map((booking) => booking.interviewerProfileId)),
+    getPublicServicesByIds(bookings.map((booking) => booking.serviceId)),
+  ])
+
+  return bookings.map((booking) => {
+    const interviewer = interviewers.get(booking.interviewerProfileId)
+    const service = services.get(booking.serviceId)
+    return {
+      ...booking,
+      interviewerName: interviewer?.name ?? 'Interviewer',
+      interviewerPhoto: interviewer?.photo ?? null,
+      interviewerCompany: interviewer?.company ?? null,
+      serviceName: service?.name ?? 'Interview',
+      interviewType: service?.interviewType ?? 'Interview',
+      session: sessions.get(booking.id) ?? null,
+      hasFeedback: feedbackIds.has(booking.id),
+      hasReview: reviewIds.has(booking.id),
+    }
+  })
 }
 
 export async function getInterviewSessionByBooking(bookingId: string): Promise<CandidateInterviewSession | null> {
@@ -104,48 +106,49 @@ export async function getCandidateInterviewSessions(): Promise<CandidateIntervie
   if (!bookings.length) return []
 
   const ids = bookings.map((booking) => booking.id)
-  const [sessionResult, feedbackIds, reviewIds] = await Promise.all([
+  const sessions = new Map<string, CandidateInterviewSession>()
+  let feedbackIds = new Set<string>()
+  let reviewIds = new Set<string>()
+
+  const [sessionResult, feedbackResult, reviewResult] = await Promise.allSettled([
     supabase.from('interview_sessions').select(SESSION_SELECT).in('booking_id', ids),
     getCandidateFeedbackBookingIds(ids),
     getCandidateReviewBookingIds(ids),
   ])
 
-  if (sessionResult.error) {
-    console.error('getCandidateInterviewSessions failed', sessionResult.error)
-    throw new BookingError('rpc', 'Unable to load your interview sessions.')
-  }
-
-  const sessions = new Map<string, CandidateInterviewSession>()
-  if (Array.isArray(sessionResult.data)) {
-    for (const row of sessionResult.data) {
-      const session = parseInterviewSession(row)
-      if (session) sessions.set(session.bookingId, session)
+  if (sessionResult.status === 'fulfilled') {
+    if (sessionResult.value.error) {
+      console.error('getCandidateInterviewSessions failed', sessionResult.value.error)
+    } else if (Array.isArray(sessionResult.value.data)) {
+      for (const row of sessionResult.value.data) {
+        const session = parseInterviewSession(row)
+        if (session) sessions.set(session.bookingId, session)
+      }
     }
+  } else {
+    console.error('getCandidateInterviewSessions failed', sessionResult.reason)
   }
 
-  return Promise.all(
-    bookings.map((booking) =>
-      decorateBooking(
-        booking,
-        sessions.get(booking.id) ?? null,
-        feedbackIds.has(booking.id),
-        reviewIds.has(booking.id),
-      ),
-    ),
-  )
+  if (feedbackResult.status === 'fulfilled') feedbackIds = feedbackResult.value
+  else console.error('getCandidateFeedbackBookingIds failed', feedbackResult.reason)
+
+  if (reviewResult.status === 'fulfilled') reviewIds = reviewResult.value
+  else console.error('getCandidateReviewBookingIds failed', reviewResult.reason)
+
+  return decorateBookings(bookings, sessions, feedbackIds, reviewIds)
 }
 
 export async function getCandidateUpcomingInterviews(): Promise<CandidateInterview[]> {
   const interviews = await getCandidateInterviewSessions()
   const now = Date.now()
-  return interviews
-    .filter((item) => {
+  return sortUpcomingInterviews(
+    interviews.filter((item) => {
       if (!item.session) return false
       if (item.status === 'in_progress') return true
       if (item.status !== 'confirmed') return false
       return new Date(item.endsAtUtc).getTime() >= now
-    })
-    .sort((a, b) => a.startsAtUtc.localeCompare(b.startsAtUtc))
+    }),
+  )
 }
 
 export async function getCandidateInterviewByBooking(bookingId: string): Promise<CandidateInterview> {
@@ -164,10 +167,30 @@ export async function getCandidateInterviewByBooking(bookingId: string): Promise
     throw error
   }
 
-  const [session, feedbackIds, reviewIds] = await Promise.all([
+  const sessions = new Map<string, CandidateInterviewSession>()
+  let feedbackIds = new Set<string>()
+  let reviewIds = new Set<string>()
+  const [sessionResult, feedbackResult, reviewResult] = await Promise.allSettled([
     getInterviewSessionByBooking(booking.id),
     getCandidateFeedbackBookingIds([booking.id]),
     getCandidateReviewBookingIds([booking.id]),
   ])
-  return decorateBooking(booking, session, feedbackIds.has(booking.id), reviewIds.has(booking.id))
+
+  if (sessionResult.status === 'fulfilled' && sessionResult.value) {
+    sessions.set(booking.id, sessionResult.value)
+  } else if (sessionResult.status === 'rejected') {
+    console.error('getInterviewSessionByBooking failed', sessionResult.reason)
+  }
+
+  if (feedbackResult.status === 'fulfilled') feedbackIds = feedbackResult.value
+  else console.error('getCandidateFeedbackBookingIds failed', feedbackResult.reason)
+
+  if (reviewResult.status === 'fulfilled') reviewIds = reviewResult.value
+  else console.error('getCandidateReviewBookingIds failed', reviewResult.reason)
+
+  const [interview] = await decorateBookings([booking], sessions, feedbackIds, reviewIds)
+  if (!interview) {
+    throw new BookingError('rpc', 'Unable to load this interview.')
+  }
+  return interview
 }
