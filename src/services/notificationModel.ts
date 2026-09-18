@@ -49,9 +49,12 @@ export type CandidateNotificationPreferences = {
   marketing: boolean
 }
 
-function isNotificationKind(value: string): value is CandidateNotificationKind {
-  return (CANDIDATE_NOTIFICATION_KINDS as readonly string[]).includes(value)
+export type NotificationPreferenceUpdate = {
+  bookingUpdates?: boolean
+  feedbackUpdates?: boolean
 }
+
+export const OPTIONAL_NOTIFICATION_KINDS = ['interview_reminder', 'feedback_ready'] as const
 
 function errorText(error: unknown) {
   if (!error || typeof error !== 'object') return typeof error === 'string' ? error.toLowerCase() : ''
@@ -158,8 +161,15 @@ export function formatNotificationTime(iso: string, nowMs = Date.now()) {
   return new Date(then).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
 }
 
-export function prefersBookingUpdates(prefs: CandidateNotificationPreferences, kind: string) {
-  if (!isNotificationKind(kind)) return true
+export function prefersOptionalNotification(prefs: CandidateNotificationPreferences, kind: string) {
   if (kind === 'feedback_ready') return prefs.feedbackUpdates
-  return prefs.bookingUpdates
+  if (kind === 'interview_reminder') return prefs.bookingUpdates
+  return true
+}
+
+export function toPreferencePatch(updates: NotificationPreferenceUpdate) {
+  const patch: Record<string, boolean> = {}
+  if (typeof updates.bookingUpdates === 'boolean') patch.booking_updates = updates.bookingUpdates
+  if (typeof updates.feedbackUpdates === 'boolean') patch.feedback_updates = updates.feedbackUpdates
+  return Object.keys(patch).length > 0 ? patch : null
 }

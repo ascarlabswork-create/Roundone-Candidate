@@ -8,8 +8,10 @@ import {
   mapNotificationError,
   parseCandidateNotification,
   parseNotificationPreferences,
+  toPreferencePatch,
   type CandidateNotification,
   type CandidateNotificationPreferences,
+  type NotificationPreferenceUpdate,
 } from './notificationModel.ts'
 
 export {
@@ -24,22 +26,41 @@ export {
   notificationHref,
   parseCandidateNotification,
   parseNotificationPreferences,
-  prefersBookingUpdates,
+  prefersOptionalNotification,
+  toPreferencePatch,
   type CandidateNotification,
   type CandidateNotificationKind,
   type CandidateNotificationPreferences,
   type NotificationErrorCode,
+  type NotificationPreferenceUpdate,
 } from './notificationModel.ts'
 
 const NOTIFICATION_SELECT = 'id, kind, title, body, payload, read_at, created_at'
 const PREFERENCE_SELECT = 'email_enabled, booking_updates, feedback_updates, marketing'
 
-async function requireAuthenticatedUser() {
+async function requireAuthenticatedUser(unauthenticatedMessage = 'Please sign in to view your notifications.') {
   const { data, error } = await supabase.auth.getUser()
   if (error || !data.user) {
-    throw new NotificationError('unauthenticated', 'Please sign in to view your notifications.')
+    throw new NotificationError('unauthenticated', unauthenticatedMessage)
   }
   return data.user
+}
+
+function mapPreferenceError(error: unknown, action: 'load' | 'update') {
+  const mapped = mapNotificationError(error)
+  if (mapped.code === 'unauthenticated') {
+    return new NotificationError('unauthenticated', 'Please sign in to manage your notification preferences.')
+  }
+  if (mapped.code === 'unauthorized') {
+    return new NotificationError('unauthorized', 'You don’t have access to these notification preferences.')
+  }
+  if (mapped.code === 'network') return mapped
+  return new NotificationError(
+    'rpc',
+    action === 'load'
+      ? 'Unable to load your notification preferences. Please try again.'
+      : 'Unable to update your notification preferences. Please try again.',
+  )
 }
 
 export async function listMyNotifications(): Promise<CandidateNotification[]> {
@@ -111,25 +132,49 @@ export async function markAllNotificationsRead(): Promise<void> {
 }
 
 export async function getMyNotificationPreferences(): Promise<CandidateNotificationPreferences> {
-  await requireAuthenticatedUser()
+  const user = await requireAuthenticatedUser('Please sign in to manage your notification preferences.')
   const { data, error } = await supabase
     .from(NOTIFICATION_PREFERENCES_TABLE)
     .select(PREFERENCE_SELECT)
+    .eq('profile_id', user.id)
     .maybeSingle()
 
   if (error) {
     console.error('getMyNotificationPreferences failed', error)
-    throw mapNotificationError(error)
+    throw mapPreferenceError(error, 'load')
   }
 
   const parsed = parseNotificationPreferences(data)
   if (!parsed) {
-    return {
-      emailEnabled: true,
-      bookingUpdates: true,
-      feedbackUpdates: true,
-      marketing: false,
-    }
+    throw new NotificationError('rpc', 'Notification preferences were not found for this account.')
+  }
+  return parsed
+}
+
+export async function updateMyNotificationPreferences(
+  updates: NotificationPreferenceUpdate,
+): Promise<CandidateNotificationPreferences> {
+  const user = await requireAuthenticatedUser('Please sign in to manage your notification preferences.')
+  const patch = toPreferencePatch(updates)
+  if (!patch) {
+    throw new NotificationError('rpc', 'Choose a valid notification preference to update.')
+  }
+
+  const { data, error } = await supabase
+    .from(NOTIFICATION_PREFERENCES_TABLE)
+    .update(patch)
+    .eq('profile_id', user.id)
+    .select(PREFERENCE_SELECT)
+    .maybeSingle()
+
+  if (error) {
+    console.error('updateMyNotificationPreferences failed', error)
+    throw mapPreferenceError(error, 'update')
+  }
+
+  const parsed = parseNotificationPreferences(data)
+  if (!parsed) {
+    throw new NotificationError('unauthorized', 'You don’t have access to these notification preferences.')
   }
   return parsed
 }

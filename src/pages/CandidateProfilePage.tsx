@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
+import { NotificationPreferencesCard } from '../components/notifications/NotificationPreferencesCard.tsx'
 import { Button } from '../components/ui/Button.tsx'
 import {
   Card,
@@ -426,6 +427,8 @@ export function CandidateProfilePage() {
           </Button>
         </div>
       </form>
+
+      <NotificationPreferencesCard />
 
       <Card className="mt-8 p-6">
         <h2 className="font-semibold text-navy-950">Saved interviewers</h2>
