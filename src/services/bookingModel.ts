@@ -46,6 +46,7 @@ export type CandidateBooking = {
   currency: string
   holdExpiresAt: string | null
   mode: string
+  rescheduledFromBookingId: string | null
 }
 
 export function remainingHoldMs(holdExpiresAt: string | null, now = new Date()) {
@@ -178,6 +179,7 @@ export function parseCandidateBooking(value: unknown): CandidateBooking | null {
     currency,
     holdExpiresAt,
     mode,
+    rescheduledFromBookingId: readNullableString(row, 'rescheduled_from_booking_id'),
   }
 }
 

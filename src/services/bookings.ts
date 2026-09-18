@@ -30,7 +30,9 @@ export type CandidateBookingView = CandidateBooking & {
 }
 
 const BOOKING_SELECT =
-  'id, candidate_profile_id, interviewer_profile_id, service_id, status, starts_at, ends_at, display_timezone, duration_min, session_fee_paise, platform_fee_paise, total_paise, currency, hold_expires_at, mode'
+  'id, candidate_profile_id, interviewer_profile_id, service_id, status, starts_at, ends_at, display_timezone, duration_min, session_fee_paise, platform_fee_paise, total_paise, currency, hold_expires_at, mode, rescheduled_from_booking_id'
+
+const BOOKING_LIST_LIMIT = 50
 
 async function requireAuthenticatedUser() {
   const { data, error } = await supabase.auth.getUser()
@@ -71,11 +73,17 @@ export async function listCandidateBookings(): Promise<CandidateBooking[]> {
   const { data, error } = await supabase
     .from('bookings')
     .select(BOOKING_SELECT)
-    .order('starts_at', { ascending: true })
+    .order('starts_at', { ascending: false })
+    .limit(BOOKING_LIST_LIMIT)
 
   if (error) {
     console.error('listCandidateBookings failed', error)
-    throw mapBookingError(error)
+    const mapped = mapBookingError(error)
+    if (mapped.code === 'unauthenticated') throw mapped
+    if (mapped.code === 'network') {
+      throw new BookingError('network', 'Unable to load your interviews. Check your connection.')
+    }
+    throw new BookingError('rpc', 'Unable to load your interviews. Please try again.')
   }
 
   if (!Array.isArray(data)) return []

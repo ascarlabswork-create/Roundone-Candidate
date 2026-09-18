@@ -75,6 +75,7 @@ export function runBookingModelChecks() {
   })
   expect(Boolean(parsed), 'Created booking row must parse')
   expect(parsed?.status === 'pending_payment', 'Status is pending_payment')
+  expect(parsed?.rescheduledFromBookingId == null, 'Missing reschedule pointer stays null')
   expect(parsed?.totalPaise === 157500, 'F: UI must keep the server total')
   const money = formatMoneyFromPaise(parsed?.totalPaise ?? 0, parsed?.currency ?? 'INR')
   expect(money.includes('1,575') || money.includes('1575'), `F: server paise is displayed, got ${money}`)
