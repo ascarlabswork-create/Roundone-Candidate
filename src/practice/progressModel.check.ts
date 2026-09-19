@@ -3,6 +3,8 @@ import {
   formatPracticeScore,
   parsePracticeProgress,
   parsePracticeSessionSummary,
+  uniqueStoredThemes,
+  type PracticeQuestionResult,
 } from './progressModel.ts'
 import { emptyPracticeSession } from './session.ts'
 import { parsePracticeQuestions, type PracticeAiQuestion } from './aiModel.ts'
@@ -124,6 +126,48 @@ export function runPracticeProgressChecks() {
   expect(!('candidate_profile_id' in payload), 'Save payload never includes candidate_profile_id')
   expect(payload.questions[0]?.answer?.score === 8, 'Stored answer keeps the practice score')
   expect(payload.question_count === 1, 'Question count matches generated questions')
+
+  const detailQuestions: PracticeQuestionResult[] = [
+    {
+      id: '00000000-0000-4000-8000-000000000041',
+      sortIndex: 0,
+      question: 'Explain FastAPI validation.',
+      questionType: 'technical',
+      topic: 'FastAPI',
+      difficulty: 'intermediate',
+      expectedFocus: ['Request models', 'Validation errors'],
+      answer: {
+        answerText: 'Uses Pydantic.',
+        score: 8,
+        strengths: ['Named the validation library', 'Clear structure'],
+        improvements: ['Mention status codes'],
+        missingPoints: ['HTTP 422'],
+        summary: 'Solid answer with a missing status-code detail.',
+      },
+    },
+    {
+      id: '00000000-0000-4000-8000-000000000042',
+      sortIndex: 1,
+      question: 'Describe REST error responses.',
+      questionType: 'technical',
+      topic: 'REST APIs',
+      difficulty: 'intermediate',
+      expectedFocus: ['Status codes', 'Error bodies'],
+      answer: {
+        answerText: 'Return structured JSON errors.',
+        score: 7,
+        strengths: ['Clear structure'],
+        improvements: ['Cover auth failures'],
+        missingPoints: ['HTTP 401'],
+        summary: 'Good outline with room for auth cases.',
+      },
+    },
+  ]
+  expect(uniqueStoredThemes(detailQuestions, 'strengths').length === 2, 'Session strengths collapse duplicates')
+  expect(
+    uniqueStoredThemes(detailQuestions, 'missingPoints').includes('HTTP 422') === true,
+    'Topics to review come from stored missing points',
+  )
 
   return true
 }

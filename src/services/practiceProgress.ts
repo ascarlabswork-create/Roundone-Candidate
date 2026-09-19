@@ -28,6 +28,7 @@ export {
   formatPracticeDateShort,
   formatPracticeScore,
   practiceAgainHref,
+  uniqueStoredThemes,
   type PracticeProgressSummary,
   type PracticeQuestionResult,
   type PracticeSessionDetail,

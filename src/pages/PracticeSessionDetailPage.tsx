@@ -8,14 +8,28 @@ import {
   formatPracticeScore,
   getPracticeSessionDetail,
   practiceAgainHref,
+  uniqueStoredThemes,
   type PracticeQuestionResult,
 } from '../services/practiceProgress.ts'
 import { useState } from 'react'
 
-function ResultList({ title, items }: { title: string; items: string[] }) {
-  if (items.length === 0) return null
+function ResultList({
+  title,
+  items,
+  empty,
+  compact,
+}: {
+  title: string
+  items: string[]
+  empty?: string
+  compact?: boolean
+}) {
+  if (items.length === 0) {
+    if (!empty) return null
+    return <p className={compact ? 'mt-3 text-sm text-slate-600' : 'mt-5 text-sm text-slate-600'}>{empty}</p>
+  }
   return (
-    <div className="mt-3">
+    <div className={compact ? 'mt-3' : 'mt-5'}>
       <h3 className="text-sm font-semibold text-navy-950">{title}</h3>
       <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-slate-700">
         {items.map((item) => (
@@ -45,9 +59,9 @@ function QuestionResult({ item, index }: { item: PracticeQuestionResult; index: 
         <>
           <p className="mt-4 text-lg font-semibold text-navy-950">Practice score: {item.answer.score} / 10</p>
           <p className="mt-2 text-sm leading-6 text-slate-700">{item.answer.summary}</p>
-          <ResultList title="Strengths" items={item.answer.strengths} />
-          <ResultList title="Areas for improvement" items={item.answer.improvements} />
-          <ResultList title="Missing points" items={item.answer.missingPoints} />
+          <ResultList title="Strengths" items={item.answer.strengths} compact />
+          <ResultList title="Areas for improvement" items={item.answer.improvements} compact />
+          <ResultList title="Missing points" items={item.answer.missingPoints} compact />
         </>
       ) : null}
     </Card>
@@ -127,6 +141,21 @@ export function PracticeSessionDetailPage() {
                 <dd className="mt-1 text-2xl font-semibold text-navy-950">{formatPracticeScore(state.data.averageScore)}</dd>
               </div>
             </dl>
+            <ResultList
+              title="Strengths"
+              items={uniqueStoredThemes(state.data.questions, 'strengths')}
+              empty="Strengths: none stored for this session."
+            />
+            <ResultList
+              title="Areas to improve"
+              items={uniqueStoredThemes(state.data.questions, 'improvements')}
+              empty="Areas to improve: none stored for this session."
+            />
+            <ResultList
+              title="Topics to review"
+              items={uniqueStoredThemes(state.data.questions, 'missingPoints')}
+              empty="Topics to review: none stored for this session."
+            />
           </Card>
 
           <div className="mt-6 space-y-4">

@@ -61,6 +61,24 @@ export type PracticeSessionDetail = PracticeSessionSummary & {
   questions: PracticeQuestionResult[]
 }
 
+/** Deterministic unique themes from stored answers in one session (no AI). */
+export function uniqueStoredThemes(
+  questions: PracticeQuestionResult[],
+  key: 'strengths' | 'improvements' | 'missingPoints',
+  max = 6,
+) {
+  const result: string[] = []
+  for (const question of questions) {
+    const values = question.answer?.[key] ?? []
+    for (const value of values) {
+      if (result.some((existing) => existing.toLowerCase() === value.toLowerCase())) continue
+      result.push(value)
+      if (result.length >= max) return result
+    }
+  }
+  return result
+}
+
 export type PracticeTrendPoint = {
   id: string
   completedAt: string
