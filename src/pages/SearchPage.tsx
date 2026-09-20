@@ -1,15 +1,15 @@
 import { Search, SlidersHorizontal } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { listInterviewers } from '../api/index.ts'
 import { COMPARE_MAX, ComparePanel } from '../components/interviewer/ComparePanel.tsx'
 import { FilterPanel } from '../components/interviewer/FilterPanel.tsx'
 import { InterviewerCard, InterviewerCardSkeleton } from '../components/interviewer/InterviewerCard.tsx'
 import { Button } from '../components/ui/Button.tsx'
 import { EmptyState, ErrorState, SelectInput, TextInput } from '../components/ui/primitives.tsx'
 import { SORT_OPTIONS, type SortOption } from '../data/catalogs.ts'
-import { getNextSlot } from '../data/interviewers.ts'
 import { useAsync } from '../lib/useAsync.ts'
+import { filterPublicInterviewers } from '../matching/browseFilter.ts'
+import { loadMatchingCatalog } from '../matching/catalog.ts'
 import { hasMeaningfulPreferences, looksLikeNaturalLanguage, scoreInterviewer } from '../matching/index.ts'
 import { useMatching } from '../state/matching.tsx'
 import { useToast } from '../state/toast.tsx'
@@ -83,9 +83,8 @@ function sortInterviewers(
     if (sort === 'most-experienced') return b.experienceYears - a.experienceYears
     if (sort === 'lowest-price') return a.price - b.price
     if (sort === 'earliest') {
-      const aSlot = getNextSlot(a)
-      const bSlot = getNextSlot(b)
-      return (aSlot ? +new Date(aSlot.start) : Infinity) - (bSlot ? +new Date(bSlot.start) : Infinity)
+      // Live bookable times are selected on the booking page; keep stable secondary sort.
+      return b.rating - a.rating || a.name.localeCompare(b.name)
     }
     const aMatch = matchById.get(a.id) ?? a.rating * 20
     const bMatch = matchById.get(b.id) ?? b.rating * 20
@@ -105,7 +104,10 @@ export function SearchPage() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [compared, setCompared] = useState<Interviewer[]>([])
 
-  const state = useAsync(() => listInterviewers(filters), [params.toString()])
+  const state = useAsync(async () => {
+    const catalog = await loadMatchingCatalog()
+    return filterPublicInterviewers(catalog, filters)
+  }, [params.toString()])
 
   const matchById = useMemo(() => {
     const map = new Map<string, number>()

@@ -40,10 +40,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : 'Could not load your profile.'
       if (message.includes('only supports candidate')) {
-        await signOutRequest()
-        setUser(null)
         setAccount(null)
-        setStatus('anonymous')
         setError(message)
         return
       }

@@ -50,6 +50,11 @@ export function Footer() {
                 AI Practice
               </Link>
             </li>
+            <li>
+              <Link to="/candidate/preparation" className="hover:text-navy-900">
+                AI Preparation
+              </Link>
+            </li>
           </ul>
         </div>
       </div>

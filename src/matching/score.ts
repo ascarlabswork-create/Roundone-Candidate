@@ -67,6 +67,12 @@ function levelScore(interviewer: Interviewer, level: string) {
 }
 
 function availabilityScore(interviewer: Interviewer, prefs: MatchingPreferences) {
+  const hasLocalCalendar =
+    interviewer.availability.recurring.length > 0 || interviewer.availability.custom.length > 0
+  // Live matching catalog does not embed private calendars; Find/Matches already filter via list_bookable_slots.
+  if (!hasLocalCalendar) {
+    return prefs.preferredDate ? 0.75 : 0.65
+  }
   const durationMin = Math.min(...interviewer.services.map((item) => item.durationMin))
   const occupied = loadAllBookings()
     .filter((item) => item.interviewerId === interviewer.id && item.status !== 'cancelled')

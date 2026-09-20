@@ -24,7 +24,9 @@ import {
   TIME_WINDOWS,
   TIMEZONES,
 } from '../data/catalogs.ts'
-import { getInterviewerById } from '../data/interviewers.ts'
+import { isUuid } from '../lib/uuid.ts'
+import { useAsync } from '../lib/useAsync.ts'
+import { loadMatchingInterviewer } from '../matching/catalog.ts'
 import { toNormalizationInput, type NormalizationPatch } from '../matching/normalizeModel.ts'
 import { usePreferenceNormalization } from '../matching/usePreferenceNormalization.ts'
 import {
@@ -71,7 +73,19 @@ export function CandidateProfilePage() {
   const { status, account, error, refreshAccount } = useSession()
   const { savedIds } = useSavedInterviewers()
   const { pushToast } = useToast()
-  const saved = savedIds.map((id) => getInterviewerById(id)).filter((person) => person !== undefined)
+  const savedState = useAsync(async () => {
+    const people = await Promise.all(
+      savedIds.filter(isUuid).map(async (id) => {
+        try {
+          return await loadMatchingInterviewer(id)
+        } catch {
+          return null
+        }
+      }),
+    )
+    return people.filter((person): person is NonNullable<typeof person> => person != null)
+  }, [savedIds.join(',')])
+  const saved = savedState.status === 'success' ? savedState.data : []
   const [form, setForm] = useState<ProfileForm>(emptyForm)
   const [skillDraft, setSkillDraft] = useState('')
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -499,9 +513,14 @@ export function CandidateProfilePage() {
 
       <Card className="mt-8 p-6">
         <h2 className="font-semibold text-navy-950">Saved interviewers</h2>
-        {saved.length === 0 ? (
+        {savedState.status === 'loading' ? <Skeleton className="mt-3 h-16" /> : null}
+        {savedState.status === 'error' ? (
+          <p className="mt-2 text-sm text-slate-600">Unable to load saved interviewers right now.</p>
+        ) : null}
+        {savedState.status === 'success' && saved.length === 0 ? (
           <p className="mt-2 text-sm text-slate-600">Save interviewers from a profile to see them here.</p>
-        ) : (
+        ) : null}
+        {savedState.status === 'success' && saved.length > 0 ? (
           <ul className="mt-3 space-y-2 text-sm">
             {saved.map((person) => (
               <li key={person.id}>
@@ -511,7 +530,7 @@ export function CandidateProfilePage() {
               </li>
             ))}
           </ul>
-        )}
+        ) : null}
       </Card>
     </div>
   )

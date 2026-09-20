@@ -38,8 +38,10 @@ function CompanyCell({ person }: { person: Interviewer }) {
 }
 
 function AvailabilityCell({ person }: { person: Interviewer }) {
-  const next = getNextSlot(person)
-  return <span>{next ? formatDateTimeInZone(next.start, person.availability.timezone) : 'No upcoming slots'}</span>
+  const next = person.availability.recurring.length > 0 || person.availability.custom.length > 0
+    ? getNextSlot(person)
+    : null
+  return <span>{next ? formatDateTimeInZone(next.start, person.availability.timezone) : 'See booking for live times'}</span>
 }
 
 function TypeBadges({ person }: { person: Interviewer }) {

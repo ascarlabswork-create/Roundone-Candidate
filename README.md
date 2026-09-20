@@ -1,31 +1,28 @@
-# RoundOne — candidate website
+# RoundOne — Candidate application
 
-Candidate-facing prototype for finding verified interviewers, booking mock interviews, and tracking feedback. This is **not** the interviewer product: there is no interviewer dashboard, earnings, host calendar, or interviewer registration.
+Candidate-facing app for finding verified interviewers, booking mock interviews, viewing private feedback, practicing with AI, and preparing for interviews.
 
-**Repo:** https://github.com/ascarlabs/roundone-candidate
+**Repo:** https://github.com/ascarlabswork-create/Roundone-Candidate  
+**Production:** https://roundone-candidate-plum.vercel.app/
 
 ## Stack
 
-React, TypeScript, Vite, Tailwind CSS, React Router, Lucide. Data is mocked in the client — no backend.
+React, TypeScript, Vite, Tailwind CSS, React Router, Supabase Auth / PostgreSQL / RLS / Edge Functions. Deployed on Vercel.
 
-## Candidate journey
+## Required frontend environment
 
-Home → goal → matching → search/compare → interviewer profile → service → availability → book/pay → confirmation → My Interviews → interview room → feedback → rating → progress → next recommendation.
+```bash
+VITE_SUPABASE_URL=
+VITE_SUPABASE_PUBLISHABLE_KEY=
+```
 
-## Routes
+Copy `.env.example` to `.env.local`. Never expose `SUPABASE_SERVICE_ROLE_KEY` or AI provider secrets through `VITE_*`.
 
-- `/` — home and goal form
-- `/candidate/find` — matching inputs
-- `/candidate/matches` — ranked matches
-- `/candidate/interviewers` — search, filters, compare
-- `/candidate/interviewers/:id` — interviewer profile (browse/book)
-- `/candidate/interviewers/:id/book` — service, slot, pay
-- `/candidate/booking/confirmation`
-- `/candidate/interviews` — My Interviews
-- `/candidate/interview/:id` — interview room
-- `/candidate/feedback/:id`
-- `/candidate/progress`
-- `/candidate/practice`, `/candidate/interview-types`, `/candidate/resources`, `/candidate/notifications`, `/candidate/profile`
+Server-side AI (Edge Function `assist-matching`) uses:
+
+- `MATCHING_AI_API_KEY` (required)
+- `MATCHING_AI_MODEL` (default `gpt-4o-mini`)
+- `MATCHING_AI_BASE_URL` (default OpenAI)
 
 ## Local development
 
@@ -34,11 +31,20 @@ npm install
 npm run dev -- --host localhost --port 5173
 ```
 
-Open http://localhost:5173/
-
 ## Scripts
 
 - `npm run dev` — Vite dev server
 - `npm run build` — typecheck and production build
 - `npm run preview` — serve the production build
 - `npm run lint` — Oxlint
+
+## Main routes
+
+- `/` — dashboard
+- `/candidate/find`, `/candidate/matches` — matching
+- `/candidate/interviewers`, `/candidate/interviewers/:id`, `.../book`
+- `/candidate/interviews`, `/candidate/interview/:id`
+- `/candidate/feedback/:id`, `/candidate/reviews/:id`
+- `/candidate/practice`, `/candidate/practice/mock`, `/candidate/practice/history`
+- `/candidate/preparation`
+- `/candidate/notifications`, `/candidate/profile`, `/candidate/progress`

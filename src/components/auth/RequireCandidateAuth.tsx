@@ -15,17 +15,17 @@ export function RequireCandidateAuth() {
     )
   }
 
-  if (!user) {
-    const next = `${location.pathname}${location.search}`
-    return <Navigate to={`/candidate/login?next=${encodeURIComponent(next)}`} replace />
-  }
-
   if (error && error.includes('only supports candidate')) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
         <ErrorState title="Candidate account required" body={error} />
       </div>
     )
+  }
+
+  if (!user) {
+    const next = `${location.pathname}${location.search}`
+    return <Navigate to={`/candidate/login?next=${encodeURIComponent(next)}`} replace />
   }
 
   return <Outlet />

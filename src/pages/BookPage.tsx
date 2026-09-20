@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { getInterviewer } from '../api/index.ts'
 import {
   formatBookingTime,
   formatCivilDateCard,
@@ -11,7 +10,6 @@ import { Button } from '../components/ui/Button.tsx'
 import { Card, EmptyState, ErrorState, FieldLabel, SelectInput, Skeleton } from '../components/ui/primitives.tsx'
 import { Avatar, VerifiedBadge } from '../components/ui/identity.tsx'
 import { TIMEZONES } from '../data/catalogs.ts'
-import { isVerified } from '../data/interviewers.ts'
 import { formatMoneyFromPaise } from '../lib/format.ts'
 import { useAsync } from '../lib/useAsync.ts'
 import { isUuid } from '../lib/uuid.ts'
@@ -37,7 +35,6 @@ import {
 } from '../services/interviewerPublic.ts'
 import { useBookingDraft } from '../state/booking.tsx'
 import { useSession } from '../state/session.tsx'
-import type { Interviewer } from '../types.ts'
 
 const steps = ['Select Service', 'Choose Date & Time', 'Review & Confirm'] as const
 const STALE_SLOT_MESSAGE = 'This slot was just taken'
@@ -61,18 +58,6 @@ function headerFromLive(interviewer: PublicInterviewer): BookingHeader {
     company: interviewer.company ?? '',
     timezone: interviewer.timezone,
     verified: interviewer.identityVerified && interviewer.employmentVerified,
-  }
-}
-
-function headerFromMock(interviewer: Interviewer): BookingHeader {
-  return {
-    id: interviewer.id,
-    name: interviewer.name,
-    photo: interviewer.photo,
-    currentRole: interviewer.currentRole,
-    company: interviewer.company,
-    timezone: interviewer.timezone,
-    verified: isVerified(interviewer),
   }
 }
 
@@ -122,11 +107,10 @@ export function BookPage() {
   const step = Number(params.get('step') ?? '1') as 1 | 2 | 3
   const preselectedService = params.get('service')
 
-  const publicState = useAsync(() => getPublicBookingContext(id), [id, pageNonce])
-  const mockState = useAsync(
-    () => (isUuid(id) ? Promise.resolve(null) : getInterviewer(id)),
-    [id, pageNonce],
-  )
+  const publicState = useAsync(() => {
+    if (!isUuid(id)) return Promise.reject(new Error('Interviewer not found'))
+    return getPublicBookingContext(id)
+  }, [id, pageNonce])
 
   useEffect(() => {
     if (draft.interviewerId === id) return
@@ -156,21 +140,7 @@ export function BookPage() {
 
   const services = publicState.data?.services ?? EMPTY_SERVICES
   const liveInterviewer = publicState.data?.interviewer ?? null
-  const header: BookingHeader | null = liveInterviewer
-    ? headerFromLive(liveInterviewer)
-    : mockState.status === 'success' && mockState.data
-      ? headerFromMock(mockState.data)
-      : isUuid(id) && publicState.status === 'success'
-        ? {
-            id,
-            name: 'Interviewer',
-            photo: '',
-            currentRole: '',
-            company: '',
-            timezone: null,
-            verified: false,
-          }
-        : null
+  const header: BookingHeader | null = liveInterviewer ? headerFromLive(liveInterviewer) : null
 
   const service = services.find((item) => item.id === draft.serviceId) ?? null
 
@@ -391,13 +361,11 @@ export function BookPage() {
   }
 
   const pageLoading =
-    publicState.status === 'loading' || (!isUuid(id) && mockState.status === 'loading')
+    publicState.status === 'loading'
   const pageError =
     publicState.status === 'error'
       ? publicState.error
-      : !isUuid(id) && mockState.status === 'error'
-        ? mockState.error
-        : null
+      : null
 
   if (pageLoading) {
     return (

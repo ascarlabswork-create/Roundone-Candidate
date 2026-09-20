@@ -225,6 +225,20 @@ export function CandidateDashboard() {
 
             <PracticeDashboardCard userId={account?.userId} />
 
+            <Card className="p-5">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <h2 className="font-semibold text-navy-950">AI Interview Preparation</h2>
+                  <p className="mt-2 text-sm text-slate-600">
+                    Personalized preparation based on your role and skills.
+                  </p>
+                </div>
+                <Link to="/candidate/preparation">
+                  <Button size="sm">Prepare for Interview</Button>
+                </Link>
+              </div>
+            </Card>
+
             <div className="grid gap-4 lg:grid-cols-2">
               <Card className="p-5">
                 <div className="flex items-center justify-between gap-3">

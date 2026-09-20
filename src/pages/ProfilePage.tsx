@@ -1,38 +1,34 @@
 import { Bookmark, MessageSquare } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
-import { getAvailability, getInterviewer, getInterviewerReviewSummary, listReviews } from '../api/index.ts'
-import { ApiError } from '../api/client.ts'
 import { MatchReasonList } from '../components/interviewer/InterviewerCard.tsx'
 import { Button } from '../components/ui/Button.tsx'
 import { Badge, Card, EmptyState, ErrorState, Skeleton } from '../components/ui/primitives.tsx'
 import { Avatar, MatchScore, StarRating, VerifiedBadge } from '../components/ui/identity.tsx'
-import { getNextSlot, isVerified } from '../data/interviewers.ts'
-import { formatDateTimeInZone } from '../availability/index.ts'
+import { isVerified } from '../data/interviewers.ts'
 import { formatCount, formatINR } from '../lib/format.ts'
 import { isUuid } from '../lib/uuid.ts'
 import { useAsync, type AsyncState } from '../lib/useAsync.ts'
 import { loadMatchingInterviewer, scoreInterviewer } from '../matching/index.ts'
 import { getPublicCandidateReviews } from '../services/candidateReviews.ts'
+import { ApiError } from '../api/client.ts'
 import { useBookingDraft } from '../state/booking.tsx'
 import { useMatching } from '../state/matching.tsx'
 import { useSavedInterviewers } from '../state/saved.tsx'
 import { useToast } from '../state/toast.tsx'
-import type { Interviewer, PublicCandidateReview, PublicReviewSummary, ReviewDimensions } from '../types.ts'
+import type { Interviewer, PublicCandidateReview } from '../types.ts'
 
 const tabs = ['About', 'Expertise', 'Services', 'Availability', 'Reviews'] as const
 
 async function loadProfileInterviewer(id: string) {
-  if (isUuid(id)) {
-    const live = await loadMatchingInterviewer(id)
-    if (!live) throw new ApiError('Interviewer not found', 404)
-    return live
-  }
-  return getInterviewer(id)
+  if (!isUuid(id)) throw new ApiError('Interviewer not found', 404)
+  const live = await loadMatchingInterviewer(id)
+  if (!live) throw new ApiError('Interviewer not found', 404)
+  return live
 }
 
 async function loadProfileReviews(id: string): Promise<PublicCandidateReview[]> {
-  if (!isUuid(id)) return listReviews(id)
+  if (!isUuid(id)) return []
   const rows = await getPublicCandidateReviews(id)
   return rows.map((row) => ({
     id: row.id,
@@ -57,10 +53,6 @@ export function ProfilePage() {
   const fromMatches = params.get('from') === 'matches'
   const interviewerState = useAsync(() => loadProfileInterviewer(id), [id])
   const reviewsState = useAsync(() => loadProfileReviews(id), [id])
-  const summaryState = useAsync(
-    () => (isUuid(id) ? Promise.resolve(null) : getInterviewerReviewSummary(id)),
-    [id],
-  )
   const { preferences } = useMatching()
   const { isSaved, toggleSaved } = useSavedInterviewers()
   const { pushToast } = useToast()
@@ -171,13 +163,7 @@ export function ProfilePage() {
         {tab === 'Expertise' ? <ExpertiseTab interviewer={interviewer} /> : null}
         {tab === 'Services' ? <ServicesTab interviewer={interviewer} /> : null}
         {tab === 'Availability' ? <AvailabilityTab interviewer={interviewer} /> : null}
-        {tab === 'Reviews' ? (
-          <ReviewsRatings
-            interviewer={interviewer}
-            reviewsState={reviewsState}
-            summaryState={summaryState}
-          />
-        ) : null}
+        {tab === 'Reviews' ? <ReviewsRatings interviewer={interviewer} reviewsState={reviewsState} /> : null}
       </div>
 
       <div className="sticky bottom-0 -mx-4 border-t border-slate-200 bg-white px-4 py-3 sm:hidden">
@@ -189,27 +175,15 @@ export function ProfilePage() {
   )
 }
 
-const breakdownLabels: Array<[keyof ReviewDimensions, string]> = [
-  ['technicalExpertise', 'Technical Expertise'],
-  ['communication', 'Communication'],
-  ['interviewRealism', 'Interview Realism'],
-  ['feedbackQuality', 'Feedback Quality'],
-  ['professionalism', 'Professionalism'],
-]
-
 function ReviewsRatings({
   interviewer,
   reviewsState,
-  summaryState,
 }: {
   interviewer: Interviewer
   reviewsState: AsyncState<PublicCandidateReview[]>
-  summaryState: AsyncState<PublicReviewSummary | null>
 }) {
-  const summary = summaryState.status === 'success' ? summaryState.data : null
-  const rating = summary?.rating ?? interviewer.rating
-  const reviewCount = summary?.reviewCount ?? interviewer.reviewCount
-  const breakdown = summary?.breakdown
+  const rating = interviewer.rating
+  const reviewCount = interviewer.reviewCount
 
   return (
     <div className="space-y-6">
@@ -222,29 +196,7 @@ function ReviewsRatings({
         </div>
       </div>
 
-      {breakdown ? (
-        <Card className="p-5">
-          <h3 className="text-sm font-semibold text-navy-950">Rating breakdown</h3>
-          <div className="mt-4 space-y-3">
-            {breakdownLabels.map(([key, label]) => (
-              <div key={key}>
-                <div className="mb-1 flex justify-between text-sm">
-                  <span className="text-slate-700">{label}</span>
-                  <span className="font-semibold text-navy-950">{breakdown[key]}</span>
-                </div>
-                <div className="h-2 rounded-full bg-slate-100">
-                  <div
-                    className="h-2 rounded-full bg-amber-400"
-                    style={{ width: `${(breakdown[key] / 5) * 100}%` }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        </Card>
-      ) : null}
-
-      {reviewsState.status === 'loading' || summaryState.status === 'loading' ? (
+      {reviewsState.status === 'loading' ? (
         <Skeleton className="h-40" />
       ) : null}
       {reviewsState.status === 'error' ? <ErrorState body={reviewsState.error} /> : null}
@@ -360,60 +312,16 @@ function ServicesTab({ interviewer }: { interviewer: Interviewer }) {
 }
 
 function AvailabilityTab({ interviewer }: { interviewer: Interviewer }) {
-  const live = isUuid(interviewer.id)
-  const next = live ? null : getNextSlot(interviewer)
-  const calendar = useAsync(
-    () =>
-      live
-        ? Promise.resolve(null)
-        : getAvailability(interviewer.id, interviewer.services[0]?.id, interviewer.availability.timezone),
-    [interviewer.id, live],
-  )
-  const tz = interviewer.availability.timezone
+  const tz = interviewer.timezone || interviewer.availability.timezone
 
   return (
     <div className="space-y-6">
-      {live ? (
-        <p className="text-sm text-slate-600">
-          Live bookable times are shown in the existing booking flow. Timezone {tz}.
-        </p>
-      ) : (
-        <p className="text-sm text-slate-600">
-          Timezone {tz}. Next available:{' '}
-          {next ? formatDateTimeInZone(next.start, tz) : 'None in the next four weeks'}.
-        </p>
-      )}
-      {live ? (
-        <Link to={`/candidate/interviewers/${interviewer.id}/book`}>
-          <Button>Book this interviewer</Button>
-        </Link>
-      ) : null}
-      <div>
-        <h3 className="text-sm font-semibold text-navy-950">Typical hours</h3>
-        <ul className="mt-2 space-y-1 text-sm text-slate-700">
-          {interviewer.availability.recurring.map((rule) => (
-            <li key={`${rule.day}-${rule.startTime}`}>
-              {rule.day}: {rule.startTime} – {rule.endTime}
-            </li>
-          ))}
-        </ul>
-      </div>
-      {calendar.status === 'loading' ? <Skeleton className="h-24" /> : null}
-      {calendar.status === 'success' && calendar.data ? (
-        <div>
-          <h3 className="text-sm font-semibold text-navy-950">Upcoming bookable times</h3>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            {calendar.data.days
-              .flatMap((day) => day.slots)
-              .slice(0, 8)
-              .map((slot) => (
-                <div key={slot.id} className="rounded-lg border border-slate-200 px-4 py-3 text-sm">
-                  {formatDateTimeInZone(slot.start, tz)} · {slot.durationMin} min
-                </div>
-              ))}
-          </div>
-        </div>
-      ) : null}
+      <p className="text-sm text-slate-600">
+        Live bookable times come from secure server slots in the booking flow. Interviewer timezone: {tz}.
+      </p>
+      <Link to={`/candidate/interviewers/${interviewer.id}/book`}>
+        <Button>Book this interviewer</Button>
+      </Link>
     </div>
   )
 }

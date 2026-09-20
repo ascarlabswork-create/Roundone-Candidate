@@ -113,7 +113,25 @@ function PracticeHub() {
             <Button variant="outline" onClick={() => navigate('/candidate/practice/history')}>
               View Progress
             </Button>
+            <Button variant="outline" onClick={() => navigate('/candidate/preparation')}>
+              AI Preparation
+            </Button>
           </div>
+        </div>
+      </Card>
+      <Card className="mt-4 p-5 sm:p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Interview preparation</p>
+            <h2 className="mt-1 font-semibold text-navy-950">Suggested topics from your profile</h2>
+            <p className="mt-2 max-w-xl text-sm text-slate-600">
+              Get practice recommendations based on your role and skills. Suggestions only — your profile is not changed
+              automatically.
+            </p>
+          </div>
+          <Button variant="outline" onClick={() => navigate('/candidate/preparation')}>
+            Prepare for Interview
+          </Button>
         </div>
       </Card>
       <h2 className="mt-10 text-lg font-semibold text-navy-950">Timed drills</h2>

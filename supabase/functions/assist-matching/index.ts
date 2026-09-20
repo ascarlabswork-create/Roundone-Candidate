@@ -381,6 +381,132 @@ async function handlePracticeFeedback(
   });
 }
 
+const PREPARE_PRIORITIES = ["high", "medium", "low"];
+const PREPARE_BANNED =
+  /\b(guaranteed|job-ready|hiring probability|employability|will get (you )?hired|definitely be asked|resume is ready|recruiter score)\b/i;
+
+function groundPrepareTopic(value: string, skills: string[], interviewType: string, role: string) {
+  const canonical = matchVocab(value, skills);
+  if (canonical) return canonical;
+  const lowered = value.trim().toLowerCase();
+  if (lowered && lowered === interviewType.trim().toLowerCase()) return interviewType;
+  if (lowered && lowered === role.trim().toLowerCase()) return role;
+  // Allow short grounded phrases that clearly reference supplied skills/role/type substrings.
+  const pool = [...skills, interviewType, role].filter(Boolean);
+  const hit = pool.find((item) => lowered.includes(item.toLowerCase()) || item.toLowerCase().includes(lowered));
+  return hit ? value.trim().slice(0, 60) : (skills[0] || interviewType || role);
+}
+
+async function handlePrepare(
+  body: Record<string, unknown>,
+  apiKey: string,
+  model: string,
+  baseUrl: string,
+) {
+  const inputRow = asRecord(body.input) ?? asRecord(body.context) ?? {};
+  const input = {
+    targetRole: readString(inputRow.targetRole ?? inputRow.target_role, 80),
+    experienceLevel: readString(inputRow.experienceLevel ?? inputRow.experience_level ?? inputRow.candidate_level, 40),
+    skills: readStringList(inputRow.skills, 12, 40),
+    interviewType: readString(inputRow.interviewType ?? inputRow.interview_type, 60),
+    resumeText: readString(inputRow.resumeText ?? inputRow.resume_text, 8000),
+  };
+  if (!input.targetRole && input.skills.length === 0 && !input.resumeText) {
+    return json(400, { error: "invalid_body" });
+  }
+
+  const system = [
+    "You create RoundOne AI interview preparation suggestions for a candidate.",
+    "This is preparation guidance only, not a hiring decision, resume score, or official interviewer feedback.",
+    "Use only the supplied target role, experience level, skills, interview type, and optional resume/background text.",
+    "Do not invent employers, projects, degrees, or technologies that are not supported by the input.",
+    "Do not claim guaranteed interview questions, job readiness, employability, or hiring probability.",
+    "Return JSON only: { profile_summary, priority_topics: [{ topic, reason, priority }], interview_focus_areas: string[], practice_recommendations: [{ topic, question_count, difficulty }] }.",
+    "priority must be high, medium, or low. difficulty must be beginner, intermediate, or advanced.",
+    "question_count must be 3, 5, or 8. Keep arrays short (at most 6 items). Topics should be practiceable.",
+  ].join(" ");
+
+  const completed = await completeJson(apiKey, model, baseUrl, system, { input }, 12000, 0.2);
+  if (completed instanceof Response) return completed;
+
+  const profileSummary = readString(completed.profile_summary ?? completed.profileSummary, 320);
+  if (profileSummary.length < 20 || PREPARE_BANNED.test(profileSummary)) {
+    console.log(JSON.stringify({ event: "prepare_invalid_summary" }));
+    return json(502, { error: "malformed_json" });
+  }
+
+  const priorityTopics = [];
+  const rawTopics = Array.isArray(completed.priority_topics)
+    ? completed.priority_topics
+    : Array.isArray(completed.priorityTopics)
+    ? completed.priorityTopics
+    : [];
+  for (const item of rawTopics) {
+    const row = asRecord(item);
+    if (!row) continue;
+    const topicRaw = readString(row.topic, 60);
+    const reason = readString(row.reason, 180);
+    const priority = readString(row.priority, 16).toLowerCase();
+    if (topicRaw.length < 2 || reason.length < 8 || PREPARE_BANNED.test(reason)) continue;
+    if (!PREPARE_PRIORITIES.includes(priority)) continue;
+    const topic = groundPrepareTopic(topicRaw, input.skills, input.interviewType, input.targetRole);
+    if (!topic) continue;
+    if (priorityTopics.some((existing) => existing.topic.toLowerCase() === topic.toLowerCase())) continue;
+    priorityTopics.push({ topic, reason, priority });
+    if (priorityTopics.length >= 6) break;
+  }
+
+  const focusAreas = readStringList(
+    completed.interview_focus_areas ?? completed.interviewFocusAreas,
+    6,
+    60,
+  )
+    .map((item) => groundPrepareTopic(item, input.skills, input.interviewType, input.targetRole))
+    .filter((item, index, arr) => item && arr.findIndex((x) => x.toLowerCase() === item.toLowerCase()) === index)
+    .slice(0, 6);
+
+  const practiceRecommendations = [];
+  const rawPractice = Array.isArray(completed.practice_recommendations)
+    ? completed.practice_recommendations
+    : Array.isArray(completed.practiceRecommendations)
+    ? completed.practiceRecommendations
+    : [];
+  for (const item of rawPractice) {
+    const row = asRecord(item);
+    if (!row) continue;
+    const topic = groundPrepareTopic(
+      readString(row.topic, 60),
+      input.skills,
+      input.interviewType,
+      input.targetRole,
+    );
+    const difficulty = readString(row.difficulty, 20).toLowerCase();
+    const questionCount = clampInt(row.question_count ?? row.questionCount, 3, 8, 5);
+    if (!topic || !PRACTICE_DIFFICULTIES.includes(difficulty)) continue;
+    if (![3, 5, 8].includes(questionCount)) continue;
+    if (practiceRecommendations.some((existing) => existing.topic.toLowerCase() === topic.toLowerCase())) continue;
+    practiceRecommendations.push({
+      topic,
+      question_count: questionCount,
+      difficulty,
+    });
+    if (practiceRecommendations.length >= 6) break;
+  }
+
+  if (priorityTopics.length === 0 && focusAreas.length === 0 && practiceRecommendations.length === 0) {
+    console.log(JSON.stringify({ event: "prepare_empty" }));
+    return json(502, { error: "malformed_json" });
+  }
+
+  console.log(JSON.stringify({ event: "prepare_ok" }));
+  return json(200, {
+    profile_summary: profileSummary,
+    priority_topics: priorityTopics,
+    interview_focus_areas: focusAreas,
+    practice_recommendations: practiceRecommendations,
+  });
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return json(405, { error: "method_not_allowed" });
@@ -411,6 +537,9 @@ Deno.serve(async (req) => {
   }
   if (readString(body.mode, 32) === "practice_feedback") {
     return await handlePracticeFeedback(body, apiKey, model, baseUrl);
+  }
+  if (readString(body.mode, 32) === "prepare") {
+    return await handlePrepare(body, apiKey, model, baseUrl);
   }
 
   const prefsRow = asRecord(body.preferences) ?? {};
