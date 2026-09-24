@@ -1,3 +1,5 @@
+import { readJson, writeJson } from '../lib/storage.ts'
+
 export const PRACTICE_AI_FUNCTION = 'assist-matching'
 export const PRACTICE_QUESTION_TIMEOUT_MS = 12_000
 export const PRACTICE_FEEDBACK_TIMEOUT_MS = 8_000
@@ -61,6 +63,137 @@ export const INTERVIEWER_PERSONAS: InterviewerPersona[] = [
 
 export function getInterviewerPersona(id?: string): InterviewerPersona {
   return INTERVIEWER_PERSONAS.find((p) => p.id === id) ?? INTERVIEWER_PERSONAS[0]
+}
+
+export const INTERVIEW_FOCUS_DIMENSIONS = [
+  'production incident triage and root-cause analysis',
+  'high-concurrency synchronization and race conditions',
+  'memory profiling, garbage collection, and resource leak diagnosis',
+  'cache invalidation, thundering herd prevention, and consistency',
+  'distributed systems latency, timeouts, and graceful degradation',
+  'database indexing, query execution plans, and lock contention',
+  'API backwards compatibility, idempotency, and versioning',
+  'state synchronization, immutability, and side-effect isolation',
+  'security vulnerabilities, injection defense, and authorization boundaries',
+  'horizontal scaling bottlenecks, sharding, and partitioning',
+  'asynchronous task processing, backpressure, and dead-letter queues',
+  'observability instrumentation, structured logging, and distributed tracing',
+  'architectural boundaries, loose coupling, and dependency inversion',
+  'testing strategy, integration test isolation, and flaky test mitigation',
+  'refactoring tightly coupled legacy code under production constraints',
+  'event-driven architecture, event ordering, and at-least-once delivery',
+  'browser rendering bottlenecks, layout thrashing, and event loop behavior',
+  'zero-downtime data migration and schema rollbacks',
+  'resilient third-party API integration, circuit breakers, and rate-limiting',
+  'cost vs performance trade-offs under high request throughput',
+  'error handling patterns, panic recovery, and defensive programming',
+  'handling traffic spikes, throttling, and load shedding mechanisms',
+] as const
+
+export function pickRandomFocusDimension(excludeDimensions: string[] = []): string {
+  const excludeLower = new Set(excludeDimensions.map((d) => d.toLowerCase()))
+  const available = INTERVIEW_FOCUS_DIMENSIONS.filter((d) => !excludeLower.has(d.toLowerCase()))
+  const pool = available.length > 0 ? available : INTERVIEW_FOCUS_DIMENSIONS
+  const index = Math.floor(Math.random() * pool.length)
+  return pool[index]
+}
+
+const STOP_WORDS = new Set([
+  'what',
+  'which',
+  'when',
+  'where',
+  'would',
+  'could',
+  'should',
+  'about',
+  'explain',
+  'describe',
+  'difference',
+  'between',
+  'using',
+  'your',
+  'with',
+  'does',
+  'have',
+  'from',
+  'into',
+  'that',
+  'this',
+  'these',
+  'those',
+  'their',
+  'there',
+  'please',
+  'tell',
+  'more',
+  'some',
+  'such',
+  'than',
+  'then',
+])
+
+function normalizeWordToken(word: string): string {
+  return word.toLowerCase().replace(/(ing|ed|es|s)$/, '')
+}
+
+export function tokenizeQuestion(text: string): Set<string> {
+  const words = text
+    .toLowerCase()
+    .replace(/[^\w\s]/g, ' ')
+    .split(/\s+/)
+    .map(normalizeWordToken)
+    .filter((w) => w.length >= 3 && !STOP_WORDS.has(w))
+  return new Set(words)
+}
+
+export function isQuestionRepetition(candidateQuestion: string, existingQuestion: string): boolean {
+  const cNorm = candidateQuestion.trim().toLowerCase()
+  const eNorm = existingQuestion.trim().toLowerCase()
+  if (cNorm === eNorm) return true
+
+  const tokens1 = tokenizeQuestion(cNorm)
+  const tokens2 = tokenizeQuestion(eNorm)
+  if (tokens1.size === 0 || tokens2.size === 0) return false
+
+  let intersection = 0
+  for (const t of tokens1) {
+    if (tokens2.has(t)) intersection++
+  }
+  const union = new Set([...tokens1, ...tokens2]).size
+  const jaccard = union > 0 ? intersection / union : 0
+  return jaccard >= 0.65
+}
+
+const RECENT_QUESTIONS_KEY = 'roundone.practice.recent-questions'
+const MAX_RECENT_QUESTIONS = 60
+
+export function getRecentAskedQuestions(): string[] {
+  const list = readJson<string[]>(RECENT_QUESTIONS_KEY, [])
+  return Array.isArray(list) ? list.filter((q) => typeof q === 'string' && q.trim().length >= 15) : []
+}
+
+export function recordAskedQuestion(questionText: string) {
+  if (!questionText || questionText.trim().length < 15) return
+  const current = getRecentAskedQuestions()
+  const trimmed = questionText.trim()
+  const updated = [
+    trimmed,
+    ...current.filter((q) => !isQuestionRepetition(trimmed, q)),
+  ].slice(0, MAX_RECENT_QUESTIONS)
+  writeJson(RECENT_QUESTIONS_KEY, updated)
+}
+
+export function recordAskedQuestions(questionTexts: string[]) {
+  if (!Array.isArray(questionTexts) || questionTexts.length === 0) return
+  let current = getRecentAskedQuestions()
+  for (const q of questionTexts) {
+    if (typeof q === 'string' && q.trim().length >= 15) {
+      const trimmed = q.trim()
+      current = [trimmed, ...current.filter((item) => !isQuestionRepetition(trimmed, item))]
+    }
+  }
+  writeJson(RECENT_QUESTIONS_KEY, current.slice(0, MAX_RECENT_QUESTIONS))
 }
 
 export type PracticeSetup = {
@@ -153,7 +286,11 @@ function parseOnePracticeQuestion(
   if (!parsed) return null
   const question = readTrimmed(parsed.question, 600)
   if (question.length < 20 || PRACTICE_BANNED_CLAIM.test(question)) return null
-  if (banQuestions.has(question.toLowerCase())) return null
+  const qLower = question.toLowerCase().trim()
+  if (banQuestions.has(qLower)) return null
+  for (const banned of banQuestions) {
+    if (isQuestionRepetition(question, banned)) return null
+  }
   const questionTypeRaw = readTrimmed(parsed.question_type ?? parsed.questionType, 40).toLowerCase()
   const difficultyRaw = readTrimmed(parsed.difficulty, 20).toLowerCase()
   const expectedFocus = uniqueStrings(parsed.expected_focus ?? parsed.expectedFocus, 5, 80, 4)

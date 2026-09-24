@@ -224,6 +224,73 @@ const PRACTICE_DIFFICULTIES = ["beginner", "intermediate", "advanced"];
 const PRACTICE_BANNED =
   /\b(ready for the job|you will get hired|hiring decision|guaranteed|employability|interview success probability|real (google|amazon|meta|microsoft|netflix) interview|official interviewer feedback|percentile)\b/i;
 
+const STOP_WORDS_DENO = new Set([
+  "what",
+  "which",
+  "when",
+  "where",
+  "would",
+  "could",
+  "should",
+  "about",
+  "explain",
+  "describe",
+  "difference",
+  "between",
+  "using",
+  "your",
+  "with",
+  "does",
+  "have",
+  "from",
+  "into",
+  "that",
+  "this",
+  "these",
+  "those",
+  "their",
+  "there",
+  "please",
+  "tell",
+  "more",
+  "some",
+  "such",
+  "than",
+  "then",
+]);
+
+function normalizeWordTokenDeno(word: string): string {
+  return word.toLowerCase().replace(/(ing|ed|es|s)$/, "");
+}
+
+function tokenizeQuestionDeno(text: string): Set<string> {
+  const words = text
+    .toLowerCase()
+    .replace(/[^\w\s]/g, " ")
+    .split(/\s+/)
+    .map(normalizeWordTokenDeno)
+    .filter((w) => w.length >= 3 && !STOP_WORDS_DENO.has(w));
+  return new Set(words);
+}
+
+function isQuestionRepetitionDeno(candidateQuestion: string, existingQuestion: string): boolean {
+  const cNorm = candidateQuestion.trim().toLowerCase();
+  const eNorm = existingQuestion.trim().toLowerCase();
+  if (cNorm === eNorm) return true;
+
+  const tokens1 = tokenizeQuestionDeno(cNorm);
+  const tokens2 = tokenizeQuestionDeno(eNorm);
+  if (tokens1.size === 0 || tokens2.size === 0) return false;
+
+  let intersection = 0;
+  for (const t of tokens1) {
+    if (tokens2.has(t)) intersection++;
+  }
+  const union = new Set([...tokens1, ...tokens2]).size;
+  const jaccard = union > 0 ? intersection / union : 0;
+  return jaccard >= 0.65;
+}
+
 function clampInt(value: unknown, min: number, max: number, fallback: number) {
   const n = typeof value === "number" && Number.isFinite(value) ? Math.round(value) : fallback;
   return Math.min(max, Math.max(min, n));
@@ -266,10 +333,20 @@ async function handlePracticeQuestions(
   };
   if (!setup.targetRole || !setup.interviewType) return json(400, { error: "invalid_body" });
 
+  const excludeQuestions = readStringList(
+    body.exclude_questions ?? body.excludeQuestions ?? body.recent_questions ?? body.recentQuestions,
+    50,
+    400,
+  );
+
   const system = [
     "You generate RoundOne AI practice interview questions.",
     "This is practice only, not a real booked interview or official interviewer feedback.",
     "Use only the provided role, interview type, skills, and difficulty.",
+    "CRITICAL: Questions must be completely FRESH, UNIQUE, and DIVERSE. Never repeat questions or ask trivial variations.",
+    excludeQuestions.length > 0
+      ? `Avoid these previously asked questions: ${JSON.stringify(excludeQuestions.slice(0, 30))}.`
+      : "",
     "Do not invent candidate experience, interviewer identity, company affiliation, or real company interview questions.",
     "Do not claim these are real company questions.",
     "Return JSON only: { questions: [{ question, question_type, topic, difficulty, expected_focus }] }.",
@@ -277,25 +354,37 @@ async function handlePracticeQuestions(
     "topic must be one of the provided skills, or the interview type.",
     "difficulty must match the requested difficulty.",
     "expected_focus is 2 to 5 short rubric bullets.",
-    "Each question must be distinct and answerable in text.",
-  ].join(" ");
+    "Each question must explore a distinct architectural or problem-solving facet.",
+  ].filter(Boolean).join(" ");
 
-  const completed = await completeJson(apiKey, model, baseUrl, system, { setup }, 11000, 0.4);
+  const completed = await completeJson(apiKey, model, baseUrl, system, { setup, exclude_questions: excludeQuestions.slice(0, 30) }, 11000, 0.75);
   if (completed instanceof Response) return completed;
 
   const fallbackType = defaultQuestionType(setup.interviewType);
   const raw = Array.isArray(completed.questions) ? completed.questions : [];
   const questions = [];
+  const seen = new Set<string>();
   for (const item of raw) {
     const row = asRecord(item);
     if (!row) continue;
     const question = readString(row.question, 600);
     if (question.length < 20 || PRACTICE_BANNED.test(question)) continue;
-    if (questions.some((existing) => existing.question.toLowerCase() === question.toLowerCase())) continue;
+    const qLower = question.toLowerCase().trim();
+    if (seen.has(qLower)) continue;
+    let duplicate = false;
+    for (const past of excludeQuestions) {
+      if (isQuestionRepetitionDeno(question, past)) {
+        duplicate = true;
+        break;
+      }
+    }
+    if (duplicate) continue;
+
     const questionType = readString(row.question_type ?? row.questionType, 40).toLowerCase();
     const difficulty = readString(row.difficulty, 20).toLowerCase();
     const focus = parseFocus(row.expected_focus ?? row.expectedFocus);
     if (focus.length < 2) continue;
+    seen.add(qLower);
     questions.push({
       question_id: `pq-${questions.length + 1}`,
       question,
@@ -393,10 +482,23 @@ async function handlePracticeNextQuestion(
   };
 
   const interviewerName = readString(body.interviewerName ?? body.interviewer_name ?? setupRow.interviewerName ?? setupRow.interviewer_name, 40) || "John";
+  const excludeQuestions = readStringList(
+    body.exclude_questions ?? body.excludeQuestions ?? body.recent_questions ?? body.recentQuestions,
+    50,
+    600,
+  );
+  const focusDimension = readString(body.focus_dimension ?? body.focusDimension, 120);
+  const sessionSeed = readString(body.session_seed ?? body.sessionSeed, 60);
 
   const system = [
     `You are ${interviewerName}, an expert RoundOne AI interviewer conducting a realistic, structured, voice-based interview.`,
     "This is practice only, not a real booked interview or official interviewer feedback.",
+    "CRITICAL REQUIREMENT: Every interview session MUST feature completely DIFFERENT, FRESH, and NON-REPETITIVE questions.",
+    "NEVER repeat questions the candidate was already asked in past sessions or earlier in this session.",
+    excludeQuestions.length > 0
+      ? `The candidate has already been asked these specific questions in previous or current sessions. You MUST NOT repeat any of them, nor ask similar variations of them: ${JSON.stringify(excludeQuestions.slice(0, 30))}.`
+      : "",
+    focusDimension ? `Explore a practical technical challenge around: ${focusDimension}.` : "",
     "Generate exactly one next question for question_number.",
     "Be context-aware: build upon the candidate's prior spoken answers and background.",
     "If the candidate provided an answer in prior_turns, ask a natural, relevant follow-up that explores depth, trade-offs, or real-world problem solving.",
@@ -410,7 +512,7 @@ async function handlePracticeNextQuestion(
     "question_type must be technical, behavioral, system_design, or product.",
     "difficulty must match the requested difficulty.",
     "expected_focus is 2 to 5 short rubric bullets.",
-  ].join(" ");
+  ].filter(Boolean).join(" ");
 
   const completed = await completeJson(
     apiKey,
@@ -423,9 +525,12 @@ async function handlePracticeNextQuestion(
       prior_turns: priorTurns,
       candidate_context: candidateContext,
       adaptive_state: adaptiveState,
+      exclude_questions: excludeQuestions.slice(0, 30),
+      focus_dimension: focusDimension,
+      session_seed: sessionSeed,
     },
     11000,
-    0.4,
+    0.75,
   );
   if (completed instanceof Response) return completed;
 
@@ -437,11 +542,24 @@ async function handlePracticeNextQuestion(
     return json(502, { error: "malformed_json" });
   }
   const question = readString(row.question, 600);
-  const priorTexts = new Set(priorTurns.map((item) => item.question.toLowerCase()));
-  if (question.length < 20 || PRACTICE_BANNED.test(question) || priorTexts.has(question.toLowerCase())) {
-    console.log(JSON.stringify({ event: "practice_next_question_invalid" }));
+  const bannedList = [
+    ...priorTurns.map((item) => item.question.toLowerCase().trim()),
+    ...excludeQuestions.map((item) => item.toLowerCase().trim()),
+  ];
+  const bannedSet = new Set(bannedList);
+  const qLower = question.toLowerCase().trim();
+  if (question.length < 20 || PRACTICE_BANNED.test(question) || bannedSet.has(qLower)) {
+    console.log(JSON.stringify({ event: "practice_next_question_duplicate_or_invalid" }));
     return json(502, { error: "malformed_json" });
   }
+
+  for (const banned of bannedList) {
+    if (isQuestionRepetitionDeno(question, banned)) {
+      console.log(JSON.stringify({ event: "practice_next_question_token_duplicate" }));
+      return json(502, { error: "malformed_json" });
+    }
+  }
+
   const questionType = readString(row.question_type ?? row.questionType, 40).toLowerCase();
   const difficulty = readString(row.difficulty, 20).toLowerCase();
   const focus = parseFocus(row.expected_focus ?? row.expectedFocus);

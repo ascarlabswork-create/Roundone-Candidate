@@ -170,6 +170,27 @@ export async function listPracticeSessions(): Promise<PracticeSessionSummary[]> 
   return sessions
 }
 
+export async function fetchRecentPracticeQuestionTexts(limit = 60): Promise<string[]> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return []
+    const sessions = await listPracticeSessions()
+    if (sessions.length === 0) return []
+    const sessionIds = sessions.slice(0, 10).map((s) => s.id)
+    const { data, error } = await supabase
+      .from(PRACTICE_QUESTIONS_TABLE)
+      .select('question_text')
+      .in('practice_session_id', sessionIds)
+      .limit(limit)
+    if (error || !Array.isArray(data)) return []
+    return data
+      .map((r) => (typeof r.question_text === 'string' ? r.question_text.trim() : ''))
+      .filter((q) => q.length >= 15)
+  } catch {
+    return []
+  }
+}
+
 export async function getPracticeSessionDetail(sessionId: string): Promise<PracticeSessionDetail | null> {
   await requireAuthenticatedUser()
   if (!isUuid(sessionId)) {

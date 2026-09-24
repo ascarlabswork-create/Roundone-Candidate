@@ -7,6 +7,7 @@ import {
   parsePracticeFeedback,
   parsePracticeNextQuestion,
   parsePracticeQuestions,
+  pickRandomFocusDimension,
   type PracticeAiFeedback,
   type PracticeAiQuestion,
   type PracticePriorTurn,
@@ -97,12 +98,17 @@ export async function requestSpeechAudio(text: string, voice?: string): Promise<
   }
 }
 
-export async function requestPracticeQuestions(setup: PracticeSetup): Promise<PracticeAiQuestion[] | null> {
+export async function requestPracticeQuestions(
+  setup: PracticeSetup,
+  excludeQuestions?: string[],
+): Promise<PracticeAiQuestion[] | null> {
   try {
     const invoke = supabase.functions.invoke(PRACTICE_AI_FUNCTION, {
       body: {
         mode: 'practice_questions',
         setup: setupBody(setup),
+        exclude_questions: (excludeQuestions ?? []).slice(0, 40),
+        session_seed: `${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       },
     })
     const { data, error } = await withTimeout(invoke, PRACTICE_QUESTION_TIMEOUT_MS)
@@ -126,8 +132,18 @@ export async function requestNextPracticeQuestion(
     state?: AdaptiveState
     structured?: StructuredInterviewContext
     interviewerName?: string
+    excludeQuestions?: string[]
+    focusDimension?: string
+    sessionSeed?: string
   },
 ): Promise<PracticeAiQuestion | null> {
+  const banList = [
+    ...priorTurns.map((turn) => turn.question),
+    ...(context?.excludeQuestions ?? []),
+  ]
+  const focusDimension = context?.focusDimension || pickRandomFocusDimension()
+  const sessionSeed = context?.sessionSeed || `${Date.now()}-${Math.random().toString(36).substring(2, 7)}`
+
   try {
     const invoke = supabase.functions.invoke(PRACTICE_AI_FUNCTION, {
       body: {
@@ -144,6 +160,9 @@ export async function requestNextPracticeQuestion(
         })),
         candidate_context: context?.candidate ?? context?.structured?.candidate,
         adaptive_state: context?.state ?? context?.structured?.state,
+        exclude_questions: banList.slice(0, 40),
+        focus_dimension: focusDimension,
+        session_seed: sessionSeed,
       },
     })
     const { data, error } = await withTimeout(invoke, PRACTICE_QUESTION_TIMEOUT_MS)
@@ -151,12 +170,49 @@ export async function requestNextPracticeQuestion(
       console.error('practice next question failed')
       return null
     }
-    return parsePracticeNextQuestion(
+
+    let question = parsePracticeNextQuestion(
       data,
       setup,
       questionNumber,
-      priorTurns.map((turn) => turn.question),
+      banList,
     )
+
+    // If duplicate check rejected it, retry once with an alternate scenario focus and fresh seed
+    if (!question) {
+      const alternateDimension = pickRandomFocusDimension([focusDimension])
+      const retryInvoke = supabase.functions.invoke(PRACTICE_AI_FUNCTION, {
+        body: {
+          mode: 'practice_next_question',
+          setup: setupBody(setup),
+          interviewerName: context?.interviewerName || 'John',
+          question_number: questionNumber,
+          prior_turns: priorTurns.map((turn) => ({
+            question: turn.question.slice(0, 600),
+            topic: turn.topic.slice(0, 40),
+            answer: turn.answer ? turn.answer.slice(0, 1000) : undefined,
+            score: turn.score,
+            missing_points: turn.missingPoints.slice(0, 5),
+          })),
+          candidate_context: context?.candidate ?? context?.structured?.candidate,
+          adaptive_state: context?.state ?? context?.structured?.state,
+          exclude_questions: banList.slice(0, 40),
+          focus_dimension: alternateDimension,
+          session_seed: `${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
+        },
+      })
+      const { data: retryData, error: retryError } = await withTimeout(retryInvoke, PRACTICE_QUESTION_TIMEOUT_MS)
+      if (!retryError && retryData && !failedResult(retryData)) {
+        question = parsePracticeNextQuestion(
+          retryData,
+          setup,
+          questionNumber,
+          banList,
+        )
+      }
+    }
+
+    return question
   } catch (error) {
     console.error('practice next question unavailable', error instanceof Error ? error.message : 'error')
     return null
