@@ -13,6 +13,7 @@ export type SavedPracticeSession = {
   currentAnswer: string
   savedSessionId: string | null
   startedAt: string | null
+  voiceTranscript?: string
 }
 
 const STORAGE_KEY = 'roundone.practice.ai-mock'

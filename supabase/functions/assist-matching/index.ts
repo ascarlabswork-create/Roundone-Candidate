@@ -322,9 +322,13 @@ async function handlePracticeNextQuestion(
   model: string,
   baseUrl: string,
 ) {
-  const setupRow = asRecord(body.setup) ?? {};
+  const contextRow = asRecord(body.context) ?? {};
+  const setupRow = asRecord(body.setup) ?? asRecord(contextRow.interview) ?? {};
+  const candidateRow = asRecord(contextRow.candidate) ?? {};
+  const stateRow = asRecord(contextRow.state) ?? {};
+
   const setup = {
-    targetRole: readString(setupRow.targetRole ?? setupRow.target_role, 80),
+    targetRole: readString(setupRow.targetRole ?? setupRow.target_role, 80) || readString(candidateRow.role, 80),
     interviewType: readString(setupRow.interviewType ?? setupRow.interview_type, 60),
     skills: readStringList(setupRow.skills, 6, 40),
     difficulty: PRACTICE_DIFFICULTIES.includes(readString(setupRow.difficulty, 20))
@@ -334,36 +338,72 @@ async function handlePracticeNextQuestion(
   };
   if (!setup.targetRole || !setup.interviewType) return json(400, { error: "invalid_body" });
 
-  const questionNumber = clampInt(body.question_number ?? body.questionNumber, 1, setup.questionCount, 1);
+  const questionNumber = clampInt(
+    body.question_number ?? body.questionNumber ?? stateRow.current_question ?? stateRow.currentQuestion,
+    1,
+    setup.questionCount,
+    1,
+  );
   const priorRaw = Array.isArray(body.prior_turns)
     ? body.prior_turns
     : Array.isArray(body.priorTurns)
     ? body.priorTurns
+    : Array.isArray(contextRow.turns)
+    ? contextRow.turns
     : [];
   const priorTurns = [];
   for (const item of priorRaw) {
     const row = asRecord(item);
     if (!row) continue;
-    const question = readString(row.question, 600);
+    const qRow = asRecord(row.question);
+    const question = readString(qRow?.question ?? row.question, 600);
     if (question.length < 12) continue;
+    const fbRow = asRecord(row.feedback);
+    const answer = readString(row.answer, 4000);
     priorTurns.push({
       question,
-      topic: readString(row.topic, 40),
-      score: clampInt(row.score, 1, 10, 0) || null,
-      missing_points: readStringList(row.missing_points ?? row.missingPoints, 5, 140),
+      answer: answer.length > 0 ? answer.slice(0, 1000) : undefined,
+      topic: readString(qRow?.topic ?? row.topic, 40),
+      score: clampInt(fbRow?.score ?? row.score, 1, 10, 0) || null,
+      missing_points: readStringList(
+        fbRow?.missing_points ?? fbRow?.missingPoints ?? row.missing_points ?? row.missingPoints,
+        5,
+        140,
+      ),
     });
     if (priorTurns.length >= 8) break;
   }
 
+  const candidateContext = {
+    role: readString(candidateRow.role ?? setup.targetRole, 80),
+    level: readString(candidateRow.level, 40),
+    skills: readStringList(candidateRow.skills ?? setup.skills, 8, 40),
+    projects: readStringList(candidateRow.projects, 3, 140),
+  };
+
+  const adaptiveState = {
+    current_question: questionNumber,
+    tested_topics: readStringList(stateRow.tested_topics ?? stateRow.testedTopics, 8, 40),
+    untested_topics: readStringList(stateRow.untested_topics ?? stateRow.untestedTopics, 8, 40),
+    strengths: readStringList(stateRow.strengths, 6, 120),
+    weaknesses: readStringList(stateRow.weaknesses, 6, 120),
+    difficulty: PRACTICE_DIFFICULTIES.includes(readString(stateRow.difficulty, 20))
+      ? readString(stateRow.difficulty, 20)
+      : setup.difficulty,
+  };
+
   const system = [
-    "You generate the next RoundOne AI practice interview question.",
+    "You are John, an expert RoundOne AI interviewer conducting a realistic, structured, voice-based interview.",
     "This is practice only, not a real booked interview or official interviewer feedback.",
-    "Generate exactly one question for the given question_number.",
-    "Use only the provided role, interview type, skills, and difficulty.",
-    "Ground topic to one of the provided skills, or the interview type.",
-    "Do not invent candidate experience, interviewer identity, company affiliation, or real company interview questions.",
-    "Do not claim hiring outcomes or that these are real company questions.",
-    "Do not repeat prior question text. Adapt difficulty or focus using prior scores and missing_points when present.",
+    "Generate exactly one next question for question_number.",
+    "Be context-aware: build upon the candidate's prior spoken answers and background.",
+    "If the candidate provided an answer in prior_turns, ask a natural, relevant follow-up that explores depth, trade-offs, or real-world problem solving.",
+    "Do NOT invent candidate experience, projects, interviewer identity, company affiliation, or real company interview questions.",
+    "If the candidate struggled on a previous question, ask a clarifying or fundamental question; if they answered strongly, probe deeper or explore architectural trade-offs.",
+    "Do not make extreme difficulty swings.",
+    "Do not repeat any prior question text. Ground topic strictly to one of the provided skills or interview type.",
+    "Do not claim hiring outcomes or that these are official company interview questions.",
+    "Keep the question concise and professional as an interviewer would speak it aloud (1-3 sentences max).",
     "Return JSON only: { question, question_type, topic, difficulty, expected_focus }.",
     "question_type must be technical, behavioral, system_design, or product.",
     "difficulty must match the requested difficulty.",
@@ -375,7 +415,13 @@ async function handlePracticeNextQuestion(
     model,
     baseUrl,
     system,
-    { setup, question_number: questionNumber, prior_turns: priorTurns },
+    {
+      setup,
+      question_number: questionNumber,
+      prior_turns: priorTurns,
+      candidate_context: candidateContext,
+      adaptive_state: adaptiveState,
+    },
     11000,
     0.4,
   );
@@ -438,14 +484,16 @@ async function handlePracticeFeedback(
   }
 
   const system = [
-    "You give RoundOne AI practice feedback on one written answer.",
+    "You are an expert interviewer evaluating one spoken or written candidate answer in a RoundOne AI practice interview.",
     "This is practice feedback only, not official interviewer feedback, a hiring decision, or a candidate ranking.",
     "Score 1-10 against expected_focus only:",
     "1-3 little coverage, 4-6 partial coverage, 7-8 solid with gaps, 9-10 thorough coverage.",
     "Do not mention hiring, job readiness, employability, percentiles, or guaranteed outcomes.",
     "Do not invent interviewer identity or company evaluations.",
-    "Return JSON only: { score, strengths, improvements, missing_points, summary }.",
-    "score is an integer 1-10. Arrays have at most 5 short strings. summary is one or two sentences.",
+    "Return JSON only: { score, strengths, improvements, missing_points, summary, technical_observations, communication_observations }.",
+    "score is an integer 1-10.",
+    "strengths, improvements, missing_points, technical_observations, communication_observations are arrays with at most 5 short strings.",
+    "summary is one or two sentences.",
   ].join(" ");
 
   const completed = await completeJson(
@@ -473,6 +521,16 @@ async function handlePracticeFeedback(
     5,
     140,
   ).filter((item) => !PRACTICE_BANNED.test(item));
+  const technicalObservations = readStringList(
+    completed.technical_observations ?? completed.technicalObservations,
+    4,
+    140,
+  ).filter((item) => !PRACTICE_BANNED.test(item));
+  const communicationObservations = readStringList(
+    completed.communication_observations ?? completed.communicationObservations,
+    4,
+    140,
+  ).filter((item) => !PRACTICE_BANNED.test(item));
 
   console.log(JSON.stringify({ event: "practice_feedback_ok" }));
   return json(200, {
@@ -481,7 +539,140 @@ async function handlePracticeFeedback(
     improvements,
     missing_points: missingPoints,
     summary,
+    technical_observations: technicalObservations,
+    communication_observations: communicationObservations,
   });
+}
+
+async function handleRealtimeSession(
+  body: Record<string, unknown>,
+  apiKey: string,
+  baseUrl: string,
+) {
+  const setupRow = asRecord(body.setup) ?? {};
+  const role = readString(setupRow.targetRole ?? setupRow.target_role, 80) || "Software Engineer";
+  const type = readString(setupRow.interviewType ?? setupRow.interview_type, 60) || "Technical";
+  const voice = readString(body.voice, 20) || "echo";
+
+  const instructions = [
+    `You are John, an experienced, professional AI interviewer at RoundOne conducting a ${type} interview for a ${role} position.`,
+    "Speak in a clear, natural, professional, and concise interviewer tone (1-3 sentences max).",
+    "Listen attentively to the candidate's spoken responses.",
+    "Do not lecture, preach, or give long speeches.",
+    "Do not mention hiring decisions, job guarantees, or real company claims.",
+  ].join(" ");
+
+  const sessionPayload = {
+    session: {
+      type: "realtime",
+      model: "gpt-4o-realtime-preview",
+      voice,
+      instructions,
+      modalities: ["audio", "text"],
+      input_audio_transcription: {
+        model: "whisper-1",
+      },
+      turn_detection: {
+        type: "server_vad",
+        threshold: 0.5,
+        prefix_padding_ms: 300,
+        silence_duration_ms: 800,
+        create_response: false,
+      },
+    },
+  };
+
+  try {
+    let resp = await fetch(`${baseUrl}/realtime/client_secrets`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(sessionPayload),
+    });
+
+    if (!resp.ok && resp.status === 404) {
+      resp = await fetch(`${baseUrl}/realtime/sessions`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(sessionPayload.session),
+      });
+    }
+
+    if (!resp.ok) {
+      const errText = await resp.text();
+      console.log(JSON.stringify({ event: "realtime_session_error", status: resp.status, text: errText.slice(0, 180) }));
+      return json(resp.status >= 500 ? 502 : resp.status, {
+        error: "provider_error",
+        details: "Realtime session unavailable",
+      });
+    }
+
+    const data = await resp.json();
+    const clientSecret = data.value ?? data.client_secret?.value ?? data.client_secret;
+    if (!clientSecret) {
+      return json(502, { error: "malformed_json" });
+    }
+
+    return json(200, {
+      client_secret: clientSecret,
+      expires_at: data.expires_at ?? null,
+    });
+  } catch (err) {
+    console.log(JSON.stringify({ event: "realtime_session_exception", error: err instanceof Error ? err.message : String(err) }));
+    return json(502, { error: "realtime_failed" });
+  }
+}
+
+async function handleTts(
+  body: Record<string, unknown>,
+  apiKey: string,
+  baseUrl: string,
+) {
+  const text = readString(body.text, 600);
+  const voice = readString(body.voice, 20) || "echo";
+  if (!text) return json(400, { error: "invalid_body" });
+
+  try {
+    const resp = await fetch(`${baseUrl}/audio/speech`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "tts-1",
+        voice,
+        input: text,
+        response_format: "mp3",
+      }),
+    });
+
+    if (!resp.ok) {
+      console.log(JSON.stringify({ event: "tts_provider_error", status: resp.status }));
+      return json(502, { error: "provider_error" });
+    }
+
+    const buffer = await resp.arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+    let binary = "";
+    for (let i = 0; i < bytes.byteLength; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    const base64 = btoa(binary);
+
+    return json(200, {
+      audio_base64: base64,
+      format: "mp3",
+    });
+  } catch (err) {
+    console.log(JSON.stringify({ event: "tts_exception", error: err instanceof Error ? err.message : String(err) }));
+    return json(502, { error: "tts_failed" });
+  }
 }
 
 const PREPARE_PRIORITIES = ["high", "medium", "low"];
@@ -632,6 +823,12 @@ Deno.serve(async (req) => {
     return json(400, { error: "invalid_body" });
   }
 
+  if (readString(body.mode, 32) === "realtime_session") {
+    return await handleRealtimeSession(body, apiKey, baseUrl);
+  }
+  if (readString(body.mode, 32) === "tts") {
+    return await handleTts(body, apiKey, baseUrl);
+  }
   if (readString(body.mode, 32) === "normalize") {
     return await handleNormalize(body, apiKey, model, baseUrl);
   }

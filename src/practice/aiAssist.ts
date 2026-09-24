@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase.ts'
+import type { CandidateContext, AdaptiveState, StructuredInterviewContext } from './contextEngine.ts'
 import {
   PRACTICE_AI_FUNCTION,
   PRACTICE_FEEDBACK_TIMEOUT_MS,
@@ -35,7 +36,9 @@ function failedResult(data: unknown) {
     'error' in data &&
     !('questions' in data) &&
     !('question' in data) &&
-    !('score' in data)
+    !('score' in data) &&
+    !('client_secret' in data) &&
+    !('audio_base64' in data)
   )
 }
 
@@ -46,6 +49,44 @@ function setupBody(setup: PracticeSetup) {
     skills: setup.skills.map((skill) => skill.trim()).filter(Boolean).slice(0, 6),
     difficulty: setup.difficulty,
     questionCount: setup.questionCount,
+  }
+}
+
+export async function requestRealtimeSession(setup: PracticeSetup): Promise<string | null> {
+  try {
+    const invoke = supabase.functions.invoke(PRACTICE_AI_FUNCTION, {
+      body: {
+        mode: 'realtime_session',
+        setup: setupBody(setup),
+      },
+    })
+    const { data, error } = await withTimeout(invoke, 8_000)
+    if (error || data == null || failedResult(data)) {
+      return null
+    }
+    const secret = (data as Record<string, unknown>).client_secret
+    return typeof secret === 'string' && secret ? secret : null
+  } catch {
+    return null
+  }
+}
+
+export async function requestSpeechAudio(text: string): Promise<string | null> {
+  try {
+    const invoke = supabase.functions.invoke(PRACTICE_AI_FUNCTION, {
+      body: {
+        mode: 'tts',
+        text: text.trim().slice(0, 600),
+      },
+    })
+    const { data, error } = await withTimeout(invoke, 10_000)
+    if (error || data == null || failedResult(data)) {
+      return null
+    }
+    const base64 = (data as Record<string, unknown>).audio_base64
+    return typeof base64 === 'string' && base64 ? base64 : null
+  } catch {
+    return null
   }
 }
 
@@ -72,7 +113,12 @@ export async function requestPracticeQuestions(setup: PracticeSetup): Promise<Pr
 export async function requestNextPracticeQuestion(
   setup: PracticeSetup,
   questionNumber: number,
-  priorTurns: PracticePriorTurn[],
+  priorTurns: (PracticePriorTurn & { answer?: string })[],
+  context?: {
+    candidate?: CandidateContext
+    state?: AdaptiveState
+    structured?: StructuredInterviewContext
+  },
 ): Promise<PracticeAiQuestion | null> {
   try {
     const invoke = supabase.functions.invoke(PRACTICE_AI_FUNCTION, {
@@ -83,9 +129,12 @@ export async function requestNextPracticeQuestion(
         prior_turns: priorTurns.map((turn) => ({
           question: turn.question.slice(0, 600),
           topic: turn.topic.slice(0, 40),
+          answer: turn.answer ? turn.answer.slice(0, 1000) : undefined,
           score: turn.score,
           missing_points: turn.missingPoints.slice(0, 5),
         })),
+        candidate_context: context?.candidate ?? context?.structured?.candidate,
+        adaptive_state: context?.state ?? context?.structured?.state,
       },
     })
     const { data, error } = await withTimeout(invoke, PRACTICE_QUESTION_TIMEOUT_MS)
