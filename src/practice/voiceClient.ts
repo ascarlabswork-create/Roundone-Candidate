@@ -28,12 +28,14 @@ export class VoiceClient {
   private state: VoiceState = 'idle'
   private callbacks: VoiceClientCallbacks
   private isMuted = false
+  private aiSpeaking = false
   private recognition: any = null
+  private recognitionRunning = false
   private isUsingFallback = false
+  private sessionActive = false
 
   // Accumulated speech transcript for current turn
   private accumulatedTranscript = ''
-  private fallbackBaseTranscript = ''
 
   // Silence auto-submit timer (5 seconds of sustained silence)
   private autoSubmitSeconds = 5
@@ -58,7 +60,11 @@ export class VoiceClient {
 
   public setAccumulatedTranscript(text: string) {
     this.accumulatedTranscript = text
-    this.fallbackBaseTranscript = text
+    // A manual edit means the candidate is in control: stop any pending
+    // auto-submit countdown so edits/deletions are never auto-sent, and drop
+    // any pending speech buffer so old/removed words never re-appear.
+    this.cancelSilenceTimer()
+    this.flushRecognitionBuffer()
   }
 
   public getAccumulatedTranscript(): string {
@@ -67,8 +73,19 @@ export class VoiceClient {
 
   public resetTurnTranscript() {
     this.accumulatedTranscript = ''
-    this.fallbackBaseTranscript = ''
     this.cancelSilenceTimer()
+    this.flushRecognitionBuffer()
+  }
+
+  // Restart the recognizer so its internal results buffer is cleared. Without
+  // this, previously finalized words linger in event.results and can be
+  // re-emitted after the candidate has cleared/edited the textbox.
+  private flushRecognitionBuffer() {
+    if (!this.isUsingFallback || !this.recognition) return
+    this.stopRecognition()
+    if (this.sessionActive && !this.aiSpeaking && !this.isMuted) {
+      this.startRecognition()
+    }
   }
 
   public cancelSilenceTimer() {
@@ -85,6 +102,8 @@ export class VoiceClient {
 
   private startSilenceTimer() {
     this.cancelSilenceTimer()
+    // Never count down while the interviewer is speaking.
+    if (this.aiSpeaking) return
     const cleanText = this.accumulatedTranscript.trim()
     if (cleanText.length < 8) return
 
@@ -116,6 +135,8 @@ export class VoiceClient {
   }
 
   public appendTranscriptChunk(chunk: string) {
+    // Half-duplex: ignore anything captured while the AI interviewer speaks.
+    if (this.aiSpeaking) return
     const clean = chunk.trim()
     if (!clean) return
 
@@ -154,6 +175,8 @@ export class VoiceClient {
       this.callbacks.onError('Microphone device unavailable or not found.')
       return false
     }
+
+    this.sessionActive = true
 
     try {
       const secret = await requestRealtimeSession(setup, voice, interviewerName)
@@ -232,24 +255,26 @@ export class VoiceClient {
       const type = event.type as string
 
       if (type === 'output_audio_buffer.started' || type === 'response.audio.started') {
+        // AI interviewer started talking -> take the floor (half-duplex).
+        this.beginAiSpeaking()
         this.setState('speaking')
-        this.cancelSilenceTimer()
       } else if (type === 'output_audio_buffer.stopped' || type === 'response.audio.done') {
-        this.setState('listening')
+        // AI interviewer finished -> hand the floor back to the candidate.
+        this.endAiSpeaking()
       } else if (type === 'input_audio_buffer.speech_started') {
-        // Candidate is actively speaking -> cancel any auto-submit countdown
+        // Candidate is actively speaking -> cancel any auto-submit countdown.
         this.cancelSilenceTimer()
-        // Barge-in: candidate started speaking while AI was talking
-        if (this.state === 'speaking') {
-          this.interruptAiSpeech()
+        if (!this.aiSpeaking) {
+          this.setState('listening')
         }
-        this.setState('listening')
       } else if (type === 'input_audio_buffer.speech_stopped') {
-        // Candidate paused -> start the 5-second silence auto-submit countdown
-        this.startSilenceTimer()
+        // Candidate paused -> start the 5-second silence auto-submit countdown.
+        if (!this.aiSpeaking) {
+          this.startSilenceTimer()
+        }
       } else if (type === 'conversation.item.input_audio_transcription.completed') {
         const transcript = event.transcript?.trim()
-        if (transcript) {
+        if (transcript && !this.aiSpeaking) {
           // Append the transcript chunk so prior sentences are preserved!
           this.appendTranscriptChunk(transcript)
           this.startSilenceTimer()
@@ -277,38 +302,42 @@ export class VoiceClient {
         recognition.lang = 'en-US'
 
         recognition.onresult = (event: any) => {
-          this.cancelSilenceTimer()
+          // Half-duplex: while the interviewer is speaking the mic may still
+          // pick up the AI's own voice through the speakers. Discard it so the
+          // candidate transcript never fills with the interviewer's words.
+          if (this.aiSpeaking || this.isMuted) return
 
-          let finalAccum = ''
+          // Only process results that are NEW in this event (from resultIndex
+          // forward). This is the key fix: we no longer rebuild the transcript
+          // from every result in the session, so cleared/edited text stays
+          // cleared and words are never duplicated ("yellow yellow yellow").
+          let newFinal = ''
           let interim = ''
-
-          for (let i = 0; i < event.results.length; ++i) {
+          for (let i = event.resultIndex; i < event.results.length; ++i) {
             const part = event.results[i][0].transcript
             if (event.results[i].isFinal) {
-              finalAccum += part + ' '
+              newFinal += part + ' '
             } else {
               interim += part
             }
           }
 
-          const base = this.fallbackBaseTranscript ? this.fallbackBaseTranscript + ' ' : ''
-          const currentFinal = (base + finalAccum).trim()
-          const combined = (currentFinal + (interim ? ' ' + interim : '')).trim()
+          if (newFinal.trim()) {
+            this.accumulatedTranscript = this.accumulatedTranscript
+              ? `${this.accumulatedTranscript} ${newFinal.trim()}`.trim()
+              : newFinal.trim()
+          }
 
-          if (combined) {
-            this.accumulatedTranscript = combined
-            this.callbacks.onCandidateTranscript(combined, Boolean(!interim && finalAccum))
+          const display = `${this.accumulatedTranscript}${
+            interim.trim() ? ` ${interim.trim()}` : ''
+          }`.trim()
 
-            // Barge-in: candidate starts speaking during TTS
-            if (this.state === 'speaking') {
-              this.interruptAiSpeech()
-            }
-
-            if (this.state !== 'speaking' && this.state !== 'evaluating') {
+          if (display) {
+            this.callbacks.onCandidateTranscript(display, Boolean(newFinal.trim() && !interim.trim()))
+            if (this.state !== 'evaluating') {
               this.setState('listening')
             }
-
-            // Start silence timer
+            // Reset the silence countdown on every fresh speech event.
             this.startSilenceTimer()
           }
         }
@@ -318,19 +347,22 @@ export class VoiceClient {
         }
 
         recognition.onend = () => {
-          this.fallbackBaseTranscript = this.accumulatedTranscript
-          // Restart recognition if session still active
-          if (this.state !== 'idle' && this.state !== 'error' && this.isUsingFallback) {
-            try {
-              recognition.start()
-            } catch {
-              // Ignore if already running
-            }
+          this.recognitionRunning = false
+          // Restart only while actively listening: not while the AI is
+          // speaking, not while muted, and not after the session closed.
+          if (
+            this.sessionActive &&
+            !this.aiSpeaking &&
+            !this.isMuted &&
+            this.isUsingFallback &&
+            this.state !== 'error'
+          ) {
+            this.startRecognition()
           }
         }
 
         this.recognition = recognition
-        recognition.start()
+        this.startRecognition()
       } catch {
         // SpeechRecognition start error
       }
@@ -340,8 +372,83 @@ export class VoiceClient {
     return true
   }
 
+  private startRecognition() {
+    if (!this.recognition || this.recognitionRunning) return
+    try {
+      this.recognition.start()
+      this.recognitionRunning = true
+    } catch {
+      // Already started; ignore.
+    }
+  }
+
+  private stopRecognition() {
+    if (!this.recognition) return
+    try {
+      this.recognition.stop()
+    } catch {
+      // Ignore
+    }
+    this.recognitionRunning = false
+  }
+
+  // Interviewer takes the floor: stop capturing the candidate entirely.
+  private beginAiSpeaking() {
+    this.aiSpeaking = true
+    this.cancelSilenceTimer()
+    this.stopRecognition()
+    if (this.micStream) {
+      this.micStream.getAudioTracks().forEach((track) => {
+        track.enabled = false
+      })
+    }
+  }
+
+  // Interviewer yields the floor: resume listening to the candidate (unless
+  // the candidate manually muted their mic).
+  private endAiSpeaking() {
+    this.aiSpeaking = false
+    if (this.state !== 'evaluating') {
+      this.setState('listening')
+    }
+    if (this.sessionActive && !this.isMuted) {
+      if (this.micStream) {
+        this.micStream.getAudioTracks().forEach((track) => {
+          track.enabled = true
+        })
+      }
+      if (this.isUsingFallback) {
+        this.startRecognition()
+      }
+    }
+  }
+
+  private stopAudioPlayback() {
+    if (this.audioEl) {
+      this.audioEl.pause()
+      this.audioEl.currentTime = 0
+    }
+    if (this.ttsAudio) {
+      this.ttsAudio.pause()
+      this.ttsAudio = null
+    }
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel()
+    }
+    if (this.dataChannel && this.dataChannel.readyState === 'open') {
+      try {
+        this.dataChannel.send(JSON.stringify({ type: 'response.cancel' }))
+      } catch {
+        // Ignore
+      }
+    }
+  }
+
   async speakQuestion(questionText: string, voice?: string): Promise<void> {
-    this.interruptAiSpeech()
+    // Take the floor for the interviewer: stop the candidate mic + STT so the
+    // AI's own audio is never captured, then start speaking.
+    this.stopAudioPlayback()
+    this.beginAiSpeaking()
     this.setState('speaking')
     const activeVoice = voice || this.currentVoice || 'echo'
 
@@ -384,12 +491,12 @@ export class VoiceClient {
 
         audio.onended = () => {
           this.ttsAudio = null
-          this.setState('listening')
+          this.endAiSpeaking()
         }
 
         audio.onerror = () => {
           this.ttsAudio = null
-          this.setState('listening')
+          this.endAiSpeaking()
         }
 
         await audio.play()
@@ -412,40 +519,24 @@ export class VoiceClient {
       }
 
       utterance.onend = () => {
-        this.setState('listening')
+        this.endAiSpeaking()
       }
       utterance.onerror = () => {
-        this.setState('listening')
+        this.endAiSpeaking()
       }
       window.speechSynthesis.speak(utterance)
       return
     }
 
-    this.setState('listening')
+    this.endAiSpeaking()
   }
 
   interruptAiSpeech() {
-    if (this.audioEl) {
-      this.audioEl.pause()
-      this.audioEl.currentTime = 0
-    }
-    if (this.ttsAudio) {
-      this.ttsAudio.pause()
-      this.ttsAudio = null
-    }
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel()
-    }
-
-    if (this.dataChannel && this.dataChannel.readyState === 'open') {
-      try {
-        this.dataChannel.send(JSON.stringify({ type: 'response.cancel' }))
-      } catch {
-        // Ignore
-      }
-    }
-
-    if (this.state === 'speaking') {
+    this.stopAudioPlayback()
+    // Hand the floor back to the candidate immediately.
+    if (this.aiSpeaking) {
+      this.endAiSpeaking()
+    } else if (this.state === 'speaking') {
       this.setState('listening')
     }
   }
@@ -454,8 +545,16 @@ export class VoiceClient {
     this.isMuted = mute
     if (this.micStream) {
       this.micStream.getAudioTracks().forEach((track) => {
-        track.enabled = !mute
+        // Stay disabled while the AI is speaking regardless of manual state.
+        track.enabled = !mute && !this.aiSpeaking
       })
+    }
+    if (this.isUsingFallback) {
+      if (mute) {
+        this.stopRecognition()
+      } else if (!this.aiSpeaking) {
+        this.startRecognition()
+      }
     }
   }
 
@@ -464,10 +563,13 @@ export class VoiceClient {
   }
 
   close() {
-    this.interruptAiSpeech()
+    this.sessionActive = false
+    this.aiSpeaking = false
+    this.stopAudioPlayback()
     this.cancelSilenceTimer()
 
     if (this.recognition) {
+      this.recognitionRunning = false
       try {
         this.recognition.stop()
       } catch {

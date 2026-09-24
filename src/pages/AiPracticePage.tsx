@@ -929,7 +929,13 @@ export function AiPracticePage() {
                 <div>
                   <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Microphone</p>
                   <p className="text-xs font-semibold text-navy-900">
-                    {micMuted ? 'Muted (Audio paused)' : 'Active (Listening for answer)'}
+                    {voiceState === 'speaking'
+                      ? 'Paused — interviewer is speaking'
+                      : voiceState === 'evaluating'
+                        ? 'Paused — evaluating your answer'
+                        : micMuted
+                          ? 'Muted (Audio paused)'
+                          : 'Active (Listening for answer)'}
                   </p>
                 </div>
               </div>
