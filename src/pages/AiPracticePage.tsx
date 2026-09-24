@@ -23,7 +23,11 @@ import {
   estimatedInterviewMinutes,
   formatPracticeDuration,
   getInterviewerPersona,
+  getRecentAskedQuestions,
   isPracticeDifficulty,
+  pickRandomFocusDimension,
+  recordAskedQuestion,
+  recordAskedQuestions,
   uniqueThemes,
   type PracticeAiQuestion,
   type PracticeDifficulty,
@@ -44,7 +48,12 @@ import {
 } from '../practice/session.ts'
 import { VoiceClient, type VoiceState } from '../practice/voiceClient.ts'
 import { getCandidatePreferencesIfPresent, getCandidateSkills } from '../services/candidateProfile.ts'
-import { failPracticeSession, savePracticeTurn, startPracticeSession } from '../services/practiceProgress.ts'
+import {
+  failPracticeSession,
+  fetchRecentPracticeQuestionTexts,
+  savePracticeTurn,
+  startPracticeSession,
+} from '../services/practiceProgress.ts'
 import { useSession } from '../state/session.tsx'
 
 const UNAVAILABLE = 'AI interview is temporarily unavailable. Please try again.'
@@ -135,6 +144,13 @@ export function AiPracticePage() {
     if (saved.savedSessionId && saved.phase === 'question' && saved.questions.length > 0) {
       setResumePrompt(true)
     }
+
+    // Prefetch past question history into local avoidance memory
+    void fetchRecentPracticeQuestionTexts().then((serverQuestions) => {
+      if (serverQuestions.length > 0) {
+        recordAskedQuestions(serverQuestions)
+      }
+    })
   }, [])
 
   useEffect(() => {
@@ -256,9 +272,16 @@ export function AiPracticePage() {
       sessionId = await startPracticeSession(session.setup)
       const candContext = getCandidateContext()
       const persona = getInterviewerPersona(session.setup.interviewerId)
+      const recent = getRecentAskedQuestions()
+      const focusDim = pickRandomFocusDimension()
+      const seed = `${Date.now()}-${Math.random().toString(36).substring(2, 7)}`
+
       const first = await requestNextPracticeQuestion(session.setup, 1, [], {
         candidate: candContext,
         interviewerName: persona.name,
+        excludeQuestions: recent,
+        focusDimension: focusDim,
+        sessionSeed: seed,
       })
 
       if (!first) {
@@ -266,6 +289,8 @@ export function AiPracticePage() {
         setError(UNAVAILABLE)
         return
       }
+
+      recordAskedQuestion(first.question)
 
       const startedAt = new Date().toISOString()
       setSession({
@@ -293,6 +318,9 @@ export function AiPracticePage() {
 
   async function resumeSession() {
     setResumePrompt(false)
+    if (session.questions.length > 0) {
+      recordAskedQuestions(session.questions.map((q) => q.question))
+    }
     const currentQ = session.questions[session.index]
     if (currentQ) {
       await setupVoiceClient(currentQ)
@@ -403,6 +431,13 @@ export function AiPracticePage() {
         missingPoints: t.feedback?.missingPoints ?? [],
       }))
 
+      const recent = [
+        ...curSession.questions.map((q) => q.question),
+        ...getRecentAskedQuestions(),
+      ]
+      const focusDim = pickRandomFocusDimension(curSession.questions.map((q) => q.topic))
+      const seed = `${Date.now()}-${Math.random().toString(36).substring(2, 7)}`
+
       const nextQuestion = await requestNextPracticeQuestion(
         curSession.setup,
         nextIndex + 1,
@@ -411,6 +446,9 @@ export function AiPracticePage() {
           candidate: candContext,
           structured,
           interviewerName: persona.name,
+          excludeQuestions: recent,
+          focusDimension: focusDim,
+          sessionSeed: seed,
         },
       )
 
@@ -420,6 +458,8 @@ export function AiPracticePage() {
         setError(UNAVAILABLE)
         return
       }
+
+      recordAskedQuestion(nextQuestion.question)
 
       const nextQuestions = [...curSession.questions, nextQuestion]
       voiceClientRef.current?.resetTurnTranscript()
@@ -889,7 +929,13 @@ export function AiPracticePage() {
                 <div>
                   <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Microphone</p>
                   <p className="text-xs font-semibold text-navy-900">
-                    {micMuted ? 'Muted (Audio paused)' : 'Active (Listening for answer)'}
+                    {voiceState === 'speaking'
+                      ? 'Paused — interviewer is speaking'
+                      : voiceState === 'evaluating'
+                        ? 'Paused — evaluating your answer'
+                        : micMuted
+                          ? 'Muted (Audio paused)'
+                          : 'Active (Listening for answer)'}
                   </p>
                 </div>
               </div>
