@@ -12,13 +12,15 @@ import {
   TextInput,
 } from '../components/ui/primitives.tsx'
 import { INTERVIEW_TYPES, SKILLS, TARGET_ROLES } from '../data/catalogs.ts'
-import { requestPracticeFeedback, requestPracticeQuestions } from '../practice/aiAssist.ts'
+import { requestNextPracticeQuestion, requestPracticeFeedback } from '../practice/aiAssist.ts'
 import {
   PRACTICE_ANSWER_MAX,
   PRACTICE_DIFFICULTIES,
   PRACTICE_QUESTION_COUNTS,
   averagePracticeScore,
   difficultyFromCandidateLevel,
+  estimatedInterviewMinutes,
+  formatPracticeDuration,
   isPracticeDifficulty,
   uniqueThemes,
   type PracticeDifficulty,
@@ -33,26 +35,26 @@ import {
   type SavedPracticeSession,
 } from '../practice/session.ts'
 import { getCandidatePreferencesIfPresent, getCandidateSkills } from '../services/candidateProfile.ts'
-import { saveCompletedPracticeSession } from '../services/practiceProgress.ts'
+import { failPracticeSession, savePracticeTurn, startPracticeSession } from '../services/practiceProgress.ts'
 import { useSession } from '../state/session.tsx'
 
-const UNAVAILABLE = 'AI practice is temporarily unavailable. Please try again.'
-
-let saveInFlight: { fingerprint: string; promise: Promise<string> } | null = null
-
-function practiceSaveFingerprint(session: SavedPracticeSession) {
-  return JSON.stringify({
-    role: session.setup.targetRole,
-    type: session.setup.interviewType,
-    questions: session.questions.map((item) => item.question),
-    answers: session.turns.map((item) => [item.question.id, item.answer, item.feedback?.score]),
-  })
-}
+const UNAVAILABLE = 'AI interview is temporarily unavailable. Please try again.'
 
 function difficultyLabel(value: PracticeDifficulty) {
   if (value === 'beginner') return 'Beginner'
   if (value === 'advanced') return 'Advanced'
   return 'Intermediate'
+}
+
+function priorTurnsForAi(session: SavedPracticeSession) {
+  return session.turns
+    .filter((turn) => turn.feedback)
+    .map((turn) => ({
+      question: turn.question.question,
+      topic: turn.question.topic,
+      score: turn.feedback?.score ?? null,
+      missingPoints: turn.feedback?.missingPoints ?? [],
+    }))
 }
 
 export function AiPracticePage() {
@@ -64,8 +66,6 @@ export function AiPracticePage() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [persistError, setPersistError] = useState<string | null>(null)
-  const [persisting, setPersisting] = useState(false)
-  const [persistNonce, setPersistNonce] = useState(0)
   const [prefilled, setPrefilled] = useState(false)
   const submittingRef = useRef(false)
   const sessionRef = useRef(session)
@@ -100,41 +100,6 @@ export function AiPracticePage() {
     setPrefilled(again)
     setSearchParams({}, { replace: true })
   }, [searchParams, setSearchParams])
-
-  useEffect(() => {
-    if (session.phase !== 'complete' || session.savedSessionId || session.questions.length === 0) return
-    const snapshot = sessionRef.current
-    const fingerprint = practiceSaveFingerprint(snapshot)
-    if (!saveInFlight || saveInFlight.fingerprint !== fingerprint) {
-      saveInFlight = { fingerprint, promise: saveCompletedPracticeSession(snapshot) }
-    }
-    const pending = saveInFlight.promise
-    let cancelled = false
-    setPersisting(true)
-    setPersistError(null)
-    void pending
-      .then((id) => {
-        const stored = readPracticeSession()
-        if (stored.phase === 'complete' && !stored.savedSessionId) {
-          writePracticeSession({ ...stored, savedSessionId: id })
-        }
-        if (cancelled) return
-        setSession((current) =>
-          current.phase === 'complete' && !current.savedSessionId ? { ...current, savedSessionId: id } : current,
-        )
-      })
-      .catch((caught: unknown) => {
-        if (saveInFlight?.fingerprint === fingerprint) saveInFlight = null
-        if (cancelled) return
-        setPersistError(caught instanceof Error ? caught.message : 'Unable to save this practice session. Please try again.')
-      })
-      .finally(() => {
-        if (!cancelled) setPersisting(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [session.phase, session.savedSessionId, session.questions.length, persistNonce])
 
   useEffect(() => {
     if (prefilled || session.phase !== 'setup' || !account) return
@@ -180,29 +145,57 @@ export function AiPracticePage() {
     setSkillDraft('')
   }
 
-  async function startPractice(event: FormEvent) {
+  function goToIntro(event: FormEvent) {
     event.preventDefault()
-    if (busy || submittingRef.current) return
-    submittingRef.current = true
-    setBusy(true)
+    if (!canStart) return
     setError(null)
-    const questions = await requestPracticeQuestions(session.setup)
-    submittingRef.current = false
-    setBusy(false)
-    if (!questions) {
-      setError(UNAVAILABLE)
-      return
-    }
     setSession({
-      version: 1,
-      phase: 'question',
-      setup: session.setup,
-      questions,
+      ...session,
+      phase: 'intro',
+      questions: [],
       index: 0,
       turns: [],
       currentAnswer: '',
       savedSessionId: null,
+      startedAt: null,
     })
+  }
+
+  async function startInterview() {
+    if (busy || submittingRef.current) return
+    submittingRef.current = true
+    setBusy(true)
+    setError(null)
+    setPersistError(null)
+
+    let sessionId: string | null = null
+    try {
+      sessionId = await startPracticeSession(session.setup)
+      const first = await requestNextPracticeQuestion(session.setup, 1, [])
+      if (!first) {
+        if (sessionId) await failPracticeSession(sessionId)
+        setError(UNAVAILABLE)
+        return
+      }
+      const startedAt = new Date().toISOString()
+      setSession({
+        version: 1,
+        phase: 'question',
+        setup: session.setup,
+        questions: [first],
+        index: 0,
+        turns: [],
+        currentAnswer: '',
+        savedSessionId: sessionId,
+        startedAt,
+      })
+    } catch (caught: unknown) {
+      if (sessionId) await failPracticeSession(sessionId)
+      setError(caught instanceof Error ? caught.message : UNAVAILABLE)
+    } finally {
+      submittingRef.current = false
+      setBusy(false)
+    }
   }
 
   async function submitAnswer() {
@@ -213,35 +206,87 @@ export function AiPracticePage() {
     submittingRef.current = true
     setBusy(true)
     setError(null)
+    setPersistError(null)
     const feedback = await requestPracticeFeedback(question, answer)
-    submittingRef.current = false
-    setBusy(false)
     if (!feedback) {
+      submittingRef.current = false
+      setBusy(false)
       setError(UNAVAILABLE)
       return
     }
     const turn = { question, answer, feedback }
     const turns = [...session.turns.filter((item) => item.question.id !== question.id), turn]
+    if (session.savedSessionId) {
+      try {
+        await savePracticeTurn(session.savedSessionId, session.index, turn)
+      } catch (caught: unknown) {
+        submittingRef.current = false
+        setBusy(false)
+        setPersistError(caught instanceof Error ? caught.message : 'Unable to save this practice answer. Please try again.')
+        setSession({ ...session, phase: 'feedback', turns, currentAnswer: answer })
+        return
+      }
+    }
+    submittingRef.current = false
+    setBusy(false)
     setSession({ ...session, phase: 'feedback', turns, currentAnswer: answer })
   }
 
-  function goNext() {
+  async function goNext() {
+    if (busy || submittingRef.current) return
     const nextIndex = session.index + 1
-    if (nextIndex >= session.questions.length) {
+    if (nextIndex >= session.setup.questionCount) {
       setSession({ ...session, phase: 'complete', currentAnswer: '' })
       return
     }
-    const existing = session.turns.find((item) => item.question.id === session.questions[nextIndex]?.id)
+
+    const existingQuestion = session.questions[nextIndex]
+    const existingTurn = existingQuestion
+      ? session.turns.find((item) => item.question.id === existingQuestion.id)
+      : null
+    if (existingQuestion && existingTurn?.feedback) {
+      setSession({
+        ...session,
+        phase: 'feedback',
+        index: nextIndex,
+        currentAnswer: existingTurn.answer,
+      })
+      return
+    }
+    if (existingQuestion) {
+      setSession({
+        ...session,
+        phase: 'question',
+        index: nextIndex,
+        currentAnswer: existingTurn?.answer ?? '',
+      })
+      return
+    }
+
+    submittingRef.current = true
+    setBusy(true)
+    setError(null)
+    const nextQuestion = await requestNextPracticeQuestion(
+      session.setup,
+      nextIndex + 1,
+      priorTurnsForAi(session),
+    )
+    submittingRef.current = false
+    setBusy(false)
+    if (!nextQuestion) {
+      setError(UNAVAILABLE)
+      return
+    }
     setSession({
       ...session,
-      phase: existing?.feedback ? 'feedback' : 'question',
+      phase: 'question',
       index: nextIndex,
-      currentAnswer: existing?.answer ?? '',
+      questions: [...session.questions, nextQuestion],
+      currentAnswer: '',
     })
   }
 
   function restartSetup() {
-    saveInFlight = null
     clearPracticeSession()
     setSession(emptyPracticeSession())
     setError(null)
@@ -253,6 +298,8 @@ export function AiPracticePage() {
   const currentTurn = question ? session.turns.find((item) => item.question.id === question.id) : null
   const canStart =
     Boolean(session.setup.targetRole.trim() && session.setup.interviewType.trim()) && session.setup.skills.length > 0
+  const totalQuestions = session.setup.questionCount
+  const progressDenom = Math.max(totalQuestions, 1)
 
   if (session.phase === 'complete') {
     const scored = session.turns.filter((turn) => turn.feedback)
@@ -260,58 +307,105 @@ export function AiPracticePage() {
     const strengths = uniqueThemes(session.turns, 'strengths')
     const improvements = uniqueThemes(session.turns, 'improvements')
     const review = uniqueThemes(session.turns, 'missingPoints')
+    const duration = formatPracticeDuration(session.startedAt)
     return (
       <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
         <PageHeader
-          title="Practice complete"
-          subtitle="This is practice feedback from your answers in this session. It is not official interviewer feedback or a hiring result."
+          title="AI Practice Score"
+          subtitle="Deterministic summary from your answers in this session. This is not official interviewer feedback or a hiring result."
         />
         <Card className="mt-8 p-5 sm:p-6">
-          <dl className="grid gap-4 sm:grid-cols-2">
+          <dl className="grid gap-4 sm:grid-cols-3">
             <div>
               <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Questions</dt>
               <dd className="mt-1 text-2xl font-semibold text-navy-950">
-                {scored.length} of {session.questions.length}
+                {scored.length} of {totalQuestions}
               </dd>
             </div>
             <div>
-              <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Average practice score</dt>
+              <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Average score</dt>
               <dd className="mt-1 text-2xl font-semibold text-navy-950">
                 {average == null ? '—' : `${average}/10`}
               </dd>
+            </div>
+            <div>
+              <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Duration</dt>
+              <dd className="mt-1 text-2xl font-semibold text-navy-950">{duration ?? '—'}</dd>
             </div>
           </dl>
           <SummaryList title="Strengths" items={strengths} />
           <SummaryList title="Areas to improve" items={improvements} />
           <SummaryList title="Topics to review" items={review} />
-          {persisting ? <p className="mt-4 text-sm text-slate-600">Saving this practice session…</p> : null}
-          {persistError ? (
-            <div className="mt-4">
-              <p className="text-sm text-red-700">{persistError}</p>
-              <button
-                type="button"
-                className="mt-2 text-sm font-medium text-blue-700"
-                onClick={() => setPersistNonce((value) => value + 1)}
-              >
-                Try saving again
-              </button>
-            </div>
-          ) : null}
+          {persistError ? <p className="mt-4 text-sm text-red-700">{persistError}</p> : null}
           <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+            <Button onClick={restartSetup}>Practice Again</Button>
+            <Link to="/candidate/practice/history">
+              <Button variant="outline">View Progress</Button>
+            </Link>
             {session.savedSessionId ? (
               <Link to={`/candidate/practice/history/${session.savedSessionId}`}>
                 <Button variant="outline">View saved results</Button>
               </Link>
             ) : null}
-            <Link to="/candidate/practice/history">
-              <Button variant="outline">Practice progress</Button>
-            </Link>
-            <Button onClick={restartSetup}>New practice</Button>
-            <Button variant="outline" onClick={() => navigate('/candidate/find')}>
-              Book a human interviewer
+            <Button variant="ghost" onClick={() => navigate('/')}>
+              Dashboard
             </Button>
-            <Button variant="ghost" onClick={() => navigate('/candidate/practice')}>
-              Back to practice
+          </div>
+        </Card>
+      </div>
+    )
+  }
+
+  if (session.phase === 'intro') {
+    const minutes = estimatedInterviewMinutes(session.setup.questionCount)
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
+        <button type="button" className="text-sm font-medium text-blue-700" onClick={() => setSession({ ...session, phase: 'setup' })}>
+          ← Back to setup
+        </button>
+        <PageHeader
+          title="AI Interview"
+          subtitle="Answer naturally as you would in a real interview."
+        />
+        <Card className="mt-8 space-y-4 p-5 sm:p-6">
+          <dl className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Role</dt>
+              <dd className="mt-1 text-sm font-medium text-navy-950">{session.setup.targetRole}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Interview type</dt>
+              <dd className="mt-1 text-sm font-medium text-navy-950">{session.setup.interviewType}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Difficulty</dt>
+              <dd className="mt-1 text-sm font-medium text-navy-950">{difficultyLabel(session.setup.difficulty)}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Questions</dt>
+              <dd className="mt-1 text-sm font-medium text-navy-950">
+                {session.setup.questionCount} · about {minutes} min
+              </dd>
+            </div>
+          </dl>
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Topics</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {session.setup.skills.map((skill) => (
+                <Badge key={skill}>{skill}</Badge>
+              ))}
+            </div>
+          </div>
+          <p className="text-sm leading-6 text-slate-600">
+            You will get one question at a time. After each answer, you will see AI practice feedback, then the next question adapts from your prior responses.
+          </p>
+          {error ? <p className="text-sm text-red-700">{error}</p> : null}
+          <div className="flex flex-col gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:justify-end">
+            <Button variant="outline" onClick={() => setSession({ ...session, phase: 'setup' })} disabled={busy}>
+              Edit setup
+            </Button>
+            <Button onClick={() => void startInterview()} disabled={busy}>
+              {busy ? 'Starting interview…' : 'Start Interview'}
             </Button>
           </div>
         </Card>
@@ -324,29 +418,33 @@ export function AiPracticePage() {
       <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <button type="button" className="text-sm font-medium text-blue-700" onClick={restartSetup}>
-            ← Exit practice
+            ← Exit interview
           </button>
           <span className="text-sm text-slate-600">
-            Question {session.index + 1} of {session.questions.length}
+            Question {session.index + 1} of {totalQuestions}
           </span>
         </div>
         <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-slate-200">
           <div
             className="h-full rounded-full bg-navy-900 transition-[width]"
             style={{
-              width: `${((session.index + (session.phase === 'feedback' ? 1 : 0)) / session.questions.length) * 100}%`,
+              width: `${((session.index + (session.phase === 'feedback' ? 1 : 0)) / progressDenom) * 100}%`,
             }}
           />
         </div>
         <Card className="mt-6 p-5 sm:p-6">
           <div className="flex flex-wrap gap-2">
-            <Badge tone="blue">{session.setup.interviewType}</Badge>
+            <Badge tone="blue">AI Interviewer</Badge>
             <Badge>{question.topic}</Badge>
             <Badge tone="slate">{difficultyLabel(question.difficulty)}</Badge>
           </div>
-          <p className="mt-2 text-xs font-medium uppercase tracking-wide text-slate-500">Practice question</p>
+          <p className="mt-2 text-xs font-medium uppercase tracking-wide text-slate-500">Interview question</p>
           <h1 className="mt-1 text-xl font-semibold text-navy-950">{question.question}</h1>
-          <p className="mt-3 text-sm text-slate-600">Expected focus: {question.expectedFocus.join(' · ')}</p>
+          {session.phase === 'feedback' ? (
+            <p className="mt-3 text-sm text-slate-600">Expected focus: {question.expectedFocus.join(' · ')}</p>
+          ) : (
+            <p className="mt-3 text-sm text-slate-600">Answer naturally as you would in a real interview.</p>
+          )}
 
           <div className="mt-5">
             <FieldLabel htmlFor="mock-answer">Your answer</FieldLabel>
@@ -356,7 +454,7 @@ export function AiPracticePage() {
               disabled={busy || session.phase === 'feedback'}
               onChange={(event) => setSession({ ...session, currentAnswer: event.target.value.slice(0, PRACTICE_ANSWER_MAX) })}
               className="min-h-48 sm:min-h-56"
-              placeholder="Write your answer in text. This stays in this practice session."
+              placeholder="Write your answer in text."
             />
             <p className="mt-1 text-xs text-slate-500">
               {session.currentAnswer.trim().length}/{PRACTICE_ANSWER_MAX}
@@ -365,7 +463,7 @@ export function AiPracticePage() {
 
           {session.phase === 'feedback' && currentTurn?.feedback ? (
             <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4">
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Practice feedback</p>
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">AI Practice Feedback</p>
               <p className="mt-1 text-lg font-semibold text-navy-950">Practice score: {currentTurn.feedback.score}/10</p>
               <p className="mt-2 text-sm leading-6 text-slate-700">{currentTurn.feedback.summary}</p>
               <SummaryList title="Strengths" items={currentTurn.feedback.strengths} compact />
@@ -378,19 +476,24 @@ export function AiPracticePage() {
           ) : null}
 
           {error ? <p className="mt-4 text-sm text-red-700">{error}</p> : null}
+          {persistError ? <p className="mt-4 text-sm text-red-700">{persistError}</p> : null}
 
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
             {session.phase === 'question' ? (
               <Button onClick={() => void submitAnswer()} disabled={busy || session.currentAnswer.trim().length < 8}>
-                {busy ? 'Scoring…' : 'Submit answer'}
+                {busy ? 'Evaluating…' : 'Submit Answer'}
               </Button>
             ) : (
-              <Button onClick={goNext}>
-                {session.index >= session.questions.length - 1 ? 'See summary' : 'Next question'}
+              <Button onClick={() => void goNext()} disabled={busy}>
+                {busy
+                  ? 'Preparing next question…'
+                  : session.index >= totalQuestions - 1
+                    ? 'Finish'
+                    : 'Next Question'}
               </Button>
             )}
             <Button variant="outline" onClick={restartSetup} disabled={busy}>
-              Return to setup
+              Exit interview
             </Button>
           </div>
         </Card>
@@ -404,10 +507,10 @@ export function AiPracticePage() {
         ← All practice
       </button>
       <PageHeader
-        title="Practice interview"
-        subtitle="Generate practice questions and get practice feedback. This is not a booked interview and does not change official interviewer records."
+        title="AI Interview setup"
+        subtitle="Choose your role, type, topics, and difficulty. You will see an introduction before the interview starts."
       />
-      <form className="mt-8 space-y-5 rounded-xl border border-slate-200 bg-white p-5 sm:p-8" onSubmit={(event) => void startPractice(event)}>
+      <form className="mt-8 space-y-5 rounded-xl border border-slate-200 bg-white p-5 sm:p-8" onSubmit={goToIntro}>
         <div className="grid gap-5 sm:grid-cols-2">
           <div>
             <FieldLabel htmlFor="practice-role">Role</FieldLabel>
@@ -466,7 +569,7 @@ export function AiPracticePage() {
             >
               {PRACTICE_QUESTION_COUNTS.map((count) => (
                 <option key={count} value={count}>
-                  {count}
+                  {count} · ~{estimatedInterviewMinutes(count)} min
                 </option>
               ))}
             </SelectInput>
@@ -521,8 +624,8 @@ export function AiPracticePage() {
           <Link to="/candidate/practice">
             <Button variant="outline">Cancel</Button>
           </Link>
-          <Button type="submit" disabled={!canStart || busy}>
-            {busy ? 'Preparing questions…' : 'Start practice'}
+          <Button type="submit" disabled={!canStart}>
+            Start AI Interview
           </Button>
         </div>
       </form>

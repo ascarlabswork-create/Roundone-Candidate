@@ -12,6 +12,9 @@ export const PRACTICE_SESSIONS_TABLE = 'practice_sessions'
 export const PRACTICE_QUESTIONS_TABLE = 'practice_questions'
 export const PRACTICE_ANSWERS_TABLE = 'practice_answers'
 export const SAVE_PRACTICE_SESSION_RPC = 'save_completed_practice_session'
+export const START_PRACTICE_SESSION_RPC = 'start_practice_session'
+export const SAVE_PRACTICE_TURN_RPC = 'save_practice_turn'
+export const FAIL_PRACTICE_SESSION_RPC = 'fail_practice_session'
 export const GET_PRACTICE_PROGRESS_RPC = 'get_practice_progress'
 
 export type PracticeErrorCode = 'unauthenticated' | 'not_found' | 'network' | 'rpc' | 'validation'
@@ -267,6 +270,39 @@ export function parsePracticeProgress(value: unknown): PracticeProgressSummary |
     trend,
     strengths: readStringArray(row.strengths, 6, 140),
     topicsToReview: readStringArray(row.topics_to_review ?? row.topicsToReview, 6, 140),
+  }
+}
+
+export function buildStartPracticePayload(setup: SavedPracticeSession['setup']) {
+  return {
+    target_role: setup.targetRole.trim().slice(0, 80),
+    interview_type: setup.interviewType.trim().slice(0, 60),
+    difficulty: setup.difficulty,
+    topics: setup.skills.map((skill) => skill.trim()).filter(Boolean).slice(0, 6),
+    question_count: setup.questionCount,
+  }
+}
+
+export function buildPracticeTurnPayload(
+  sortIndex: number,
+  turn: NonNullable<SavedPracticeSession['turns'][number]>,
+) {
+  if (!turn.feedback) {
+    throw new PracticeError('validation', 'This practice turn has no feedback to save.')
+  }
+  return {
+    sort_index: sortIndex,
+    question: turn.question.question,
+    question_type: turn.question.questionType,
+    topic: turn.question.topic,
+    difficulty: turn.question.difficulty,
+    expected_focus: turn.question.expectedFocus,
+    answer_text: turn.answer,
+    score: turn.feedback.score,
+    strengths: turn.feedback.strengths,
+    improvements: turn.feedback.improvements,
+    missing_points: turn.feedback.missingPoints,
+    summary: turn.feedback.summary,
   }
 }
 

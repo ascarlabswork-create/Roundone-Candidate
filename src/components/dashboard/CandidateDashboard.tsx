@@ -132,7 +132,9 @@ function PracticeDashboardCard({ userId }: { userId: string | undefined }) {
         </div>
         <div className="flex flex-col gap-2 sm:items-end">
           <Link to="/candidate/practice/history">
-            <Button size="sm">View Progress</Button>
+            <Button size="sm" variant="outline">
+              View Progress
+            </Button>
           </Link>
           {state.status === 'success' && state.data.latest ? (
             <Link to={`/candidate/practice/history/${state.data.latest.id}`}>
@@ -140,14 +142,24 @@ function PracticeDashboardCard({ userId }: { userId: string | undefined }) {
                 View Practice
               </Button>
             </Link>
-          ) : (
-            <Link to="/candidate/practice/mock">
-              <Button size="sm" variant="outline">
-                Practice Interview
-              </Button>
-            </Link>
-          )}
+          ) : null}
         </div>
+      </div>
+    </Card>
+  )
+}
+
+function PracticeWithAiCard() {
+  return (
+    <Card className="p-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="font-semibold text-navy-950">Practice with AI</h2>
+          <p className="mt-2 text-sm text-slate-600">Start an interview instantly with AI.</p>
+        </div>
+        <Link to="/candidate/practice/mock?fresh=1">
+          <Button size="sm">Start AI Interview</Button>
+        </Link>
       </div>
     </Card>
   )
@@ -223,6 +235,7 @@ export function CandidateDashboard() {
               <Metric label="Reviews submitted" value={state.data.counts.reviewsSubmitted} />
             </div>
 
+            <PracticeWithAiCard />
             <PracticeDashboardCard userId={account?.userId} />
 
             <Card className="p-5">
@@ -271,11 +284,6 @@ export function CandidateDashboard() {
                 <div className="mt-4 flex flex-wrap gap-2">
                   <Link to="/candidate/find">
                     <Button size="sm">Find an Interviewer</Button>
-                  </Link>
-                  <Link to="/candidate/practice/mock">
-                    <Button size="sm" variant="outline">
-                      Practice Interview
-                    </Button>
                   </Link>
                   <Link to="/candidate/interviews">
                     <Button size="sm" variant="outline">

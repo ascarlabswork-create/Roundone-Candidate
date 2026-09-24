@@ -316,6 +316,109 @@ async function handlePracticeQuestions(
   return json(200, { questions });
 }
 
+async function handlePracticeNextQuestion(
+  body: Record<string, unknown>,
+  apiKey: string,
+  model: string,
+  baseUrl: string,
+) {
+  const setupRow = asRecord(body.setup) ?? {};
+  const setup = {
+    targetRole: readString(setupRow.targetRole ?? setupRow.target_role, 80),
+    interviewType: readString(setupRow.interviewType ?? setupRow.interview_type, 60),
+    skills: readStringList(setupRow.skills, 6, 40),
+    difficulty: PRACTICE_DIFFICULTIES.includes(readString(setupRow.difficulty, 20))
+      ? readString(setupRow.difficulty, 20)
+      : "intermediate",
+    questionCount: clampInt(setupRow.questionCount ?? setupRow.question_count, 3, 8, 5),
+  };
+  if (!setup.targetRole || !setup.interviewType) return json(400, { error: "invalid_body" });
+
+  const questionNumber = clampInt(body.question_number ?? body.questionNumber, 1, setup.questionCount, 1);
+  const priorRaw = Array.isArray(body.prior_turns)
+    ? body.prior_turns
+    : Array.isArray(body.priorTurns)
+    ? body.priorTurns
+    : [];
+  const priorTurns = [];
+  for (const item of priorRaw) {
+    const row = asRecord(item);
+    if (!row) continue;
+    const question = readString(row.question, 600);
+    if (question.length < 12) continue;
+    priorTurns.push({
+      question,
+      topic: readString(row.topic, 40),
+      score: clampInt(row.score, 1, 10, 0) || null,
+      missing_points: readStringList(row.missing_points ?? row.missingPoints, 5, 140),
+    });
+    if (priorTurns.length >= 8) break;
+  }
+
+  const system = [
+    "You generate the next RoundOne AI practice interview question.",
+    "This is practice only, not a real booked interview or official interviewer feedback.",
+    "Generate exactly one question for the given question_number.",
+    "Use only the provided role, interview type, skills, and difficulty.",
+    "Ground topic to one of the provided skills, or the interview type.",
+    "Do not invent candidate experience, interviewer identity, company affiliation, or real company interview questions.",
+    "Do not claim hiring outcomes or that these are real company questions.",
+    "Do not repeat prior question text. Adapt difficulty or focus using prior scores and missing_points when present.",
+    "Return JSON only: { question, question_type, topic, difficulty, expected_focus }.",
+    "question_type must be technical, behavioral, system_design, or product.",
+    "difficulty must match the requested difficulty.",
+    "expected_focus is 2 to 5 short rubric bullets.",
+  ].join(" ");
+
+  const completed = await completeJson(
+    apiKey,
+    model,
+    baseUrl,
+    system,
+    { setup, question_number: questionNumber, prior_turns: priorTurns },
+    11000,
+    0.4,
+  );
+  if (completed instanceof Response) return completed;
+
+  const fallbackType = defaultQuestionType(setup.interviewType);
+  const fromWrapped = asRecord(completed.question);
+  const row = fromWrapped ?? asRecord(completed);
+  if (!row) {
+    console.log(JSON.stringify({ event: "practice_next_question_empty" }));
+    return json(502, { error: "malformed_json" });
+  }
+  const question = readString(row.question, 600);
+  const priorTexts = new Set(priorTurns.map((item) => item.question.toLowerCase()));
+  if (question.length < 20 || PRACTICE_BANNED.test(question) || priorTexts.has(question.toLowerCase())) {
+    console.log(JSON.stringify({ event: "practice_next_question_invalid" }));
+    return json(502, { error: "malformed_json" });
+  }
+  const questionType = readString(row.question_type ?? row.questionType, 40).toLowerCase();
+  const difficulty = readString(row.difficulty, 20).toLowerCase();
+  const focus = parseFocus(row.expected_focus ?? row.expectedFocus);
+  if (focus.length < 2) {
+    console.log(JSON.stringify({ event: "practice_next_question_focus" }));
+    return json(502, { error: "malformed_json" });
+  }
+
+  console.log(JSON.stringify({
+    event: "practice_next_question_ok",
+    question_number: questionNumber,
+    prior_count: priorTurns.length,
+  }));
+  return json(200, {
+    question: {
+      question_id: `pq-${questionNumber}`,
+      question,
+      question_type: PRACTICE_QUESTION_TYPES.includes(questionType) ? questionType : fallbackType,
+      topic: groundTopic(readString(row.topic, 40), setup.skills, setup.interviewType),
+      difficulty: PRACTICE_DIFFICULTIES.includes(difficulty) ? difficulty : setup.difficulty,
+      expected_focus: focus.slice(0, 5),
+    },
+  });
+}
+
 async function handlePracticeFeedback(
   body: Record<string, unknown>,
   apiKey: string,
@@ -534,6 +637,9 @@ Deno.serve(async (req) => {
   }
   if (readString(body.mode, 32) === "practice_questions") {
     return await handlePracticeQuestions(body, apiKey, model, baseUrl);
+  }
+  if (readString(body.mode, 32) === "practice_next_question") {
+    return await handlePracticeNextQuestion(body, apiKey, model, baseUrl);
   }
   if (readString(body.mode, 32) === "practice_feedback") {
     return await handlePracticeFeedback(body, apiKey, model, baseUrl);

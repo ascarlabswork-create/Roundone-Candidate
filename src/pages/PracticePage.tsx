@@ -109,7 +109,7 @@ function PracticeHub() {
             </p>
           </div>
           <div className="flex flex-col gap-2 sm:items-end">
-            <Button onClick={() => navigate('/candidate/practice/mock')}>Practice Interview</Button>
+            <Button onClick={() => navigate('/candidate/practice/mock?fresh=1')}>Start AI Interview</Button>
             <Button variant="outline" onClick={() => navigate('/candidate/practice/history')}>
               View Progress
             </Button>

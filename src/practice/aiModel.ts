@@ -83,6 +83,42 @@ export function difficultyFromCandidateLevel(level: string): PracticeDifficulty 
   return 'intermediate'
 }
 
+export type PracticePriorTurn = {
+  question: string
+  topic: string
+  score: number | null
+  missingPoints: string[]
+}
+
+function parseOnePracticeQuestion(
+  value: unknown,
+  setup: PracticeSetup,
+  idHint: string,
+  banQuestions: Set<string> = new Set(),
+): PracticeAiQuestion | null {
+  const parsed = asRecord(value)
+  if (!parsed) return null
+  const question = readTrimmed(parsed.question, 600)
+  if (question.length < 20 || PRACTICE_BANNED_CLAIM.test(question)) return null
+  if (banQuestions.has(question.toLowerCase())) return null
+  const questionTypeRaw = readTrimmed(parsed.question_type ?? parsed.questionType, 40).toLowerCase()
+  const difficultyRaw = readTrimmed(parsed.difficulty, 20).toLowerCase()
+  const expectedFocus = uniqueStrings(parsed.expected_focus ?? parsed.expectedFocus, 5, 80, 4)
+  if (expectedFocus.length < 2) return null
+  const topic = readTrimmed(parsed.topic, 40)
+  const groundedTopic =
+    setup.skills.find((skill) => skill.toLowerCase() === topic.toLowerCase()) ??
+    (topic.toLowerCase() === setup.interviewType.toLowerCase() ? setup.interviewType : setup.skills[0] || setup.interviewType)
+  return {
+    id: idHint,
+    question,
+    questionType: isPracticeQuestionType(questionTypeRaw) ? questionTypeRaw : 'technical',
+    topic: groundedTopic,
+    difficulty: isPracticeDifficulty(difficultyRaw) ? difficultyRaw : setup.difficulty,
+    expectedFocus,
+  }
+}
+
 export function parsePracticeQuestions(
   value: unknown,
   setup: PracticeSetup,
@@ -91,31 +127,49 @@ export function parsePracticeQuestions(
   if (!row) return null
   const raw = Array.isArray(row.questions) ? row.questions : []
   const questions: PracticeAiQuestion[] = []
+  const seen = new Set<string>()
   for (const item of raw) {
-    const parsed = asRecord(item)
+    const parsed = parseOnePracticeQuestion(item, setup, `pq-${questions.length + 1}`, seen)
     if (!parsed) continue
-    const question = readTrimmed(parsed.question, 600)
-    if (question.length < 20 || PRACTICE_BANNED_CLAIM.test(question)) continue
-    if (questions.some((existing) => existing.question.toLowerCase() === question.toLowerCase())) continue
-    const questionTypeRaw = readTrimmed(parsed.question_type ?? parsed.questionType, 40).toLowerCase()
-    const difficultyRaw = readTrimmed(parsed.difficulty, 20).toLowerCase()
-    const expectedFocus = uniqueStrings(parsed.expected_focus ?? parsed.expectedFocus, 5, 80, 4)
-    if (expectedFocus.length < 2) continue
-    const topic = readTrimmed(parsed.topic, 40)
-    const groundedTopic =
-      setup.skills.find((skill) => skill.toLowerCase() === topic.toLowerCase()) ??
-      (topic.toLowerCase() === setup.interviewType.toLowerCase() ? setup.interviewType : setup.skills[0] || setup.interviewType)
-    questions.push({
-      id: `pq-${questions.length + 1}`,
-      question,
-      questionType: isPracticeQuestionType(questionTypeRaw) ? questionTypeRaw : 'technical',
-      topic: groundedTopic,
-      difficulty: isPracticeDifficulty(difficultyRaw) ? difficultyRaw : setup.difficulty,
-      expectedFocus,
-    })
+    seen.add(parsed.question.toLowerCase())
+    questions.push(parsed)
     if (questions.length >= setup.questionCount) break
   }
   return questions.length > 0 ? questions : null
+}
+
+export function parsePracticeNextQuestion(
+  value: unknown,
+  setup: PracticeSetup,
+  questionNumber: number,
+  priorQuestions: string[] = [],
+): PracticeAiQuestion | null {
+  const row = asRecord(value)
+  if (!row) return null
+  const ban = new Set(priorQuestions.map((item) => item.toLowerCase()))
+  const wrapped = asRecord(row.question)
+  if (wrapped) {
+    return parseOnePracticeQuestion(wrapped, setup, `pq-${questionNumber}`, ban)
+  }
+  if (Array.isArray(row.questions) && row.questions[0]) {
+    return parseOnePracticeQuestion(row.questions[0], setup, `pq-${questionNumber}`, ban)
+  }
+  return parseOnePracticeQuestion(row, setup, `pq-${questionNumber}`, ban)
+}
+
+export function estimatedInterviewMinutes(questionCount: number) {
+  return Math.max(1, questionCount) * 4
+}
+
+export function formatPracticeDuration(startedAt: string | null, endedAt = new Date()) {
+  if (!startedAt) return null
+  const start = new Date(startedAt)
+  if (Number.isNaN(start.getTime())) return null
+  const minutes = Math.max(1, Math.round((endedAt.getTime() - start.getTime()) / 60_000))
+  if (minutes < 60) return `${minutes} min`
+  const hours = Math.floor(minutes / 60)
+  const rem = minutes % 60
+  return rem === 0 ? `${hours} hr` : `${hours} hr ${rem} min`
 }
 
 export function parsePracticeFeedback(value: unknown): PracticeAiFeedback | null {

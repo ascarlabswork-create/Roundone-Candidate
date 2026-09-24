@@ -2,6 +2,7 @@ import { asRecord, readString } from '../lib/rows.ts'
 import { supabase } from '../lib/supabase.ts'
 import { isUuid } from '../lib/uuid.ts'
 import {
+  FAIL_PRACTICE_SESSION_RPC,
   GET_PRACTICE_PROGRESS_RPC,
   PRACTICE_ANSWERS_TABLE,
   PRACTICE_HISTORY_LIMIT,
@@ -9,7 +10,11 @@ import {
   PRACTICE_SESSIONS_TABLE,
   PracticeError,
   SAVE_PRACTICE_SESSION_RPC,
+  SAVE_PRACTICE_TURN_RPC,
+  START_PRACTICE_SESSION_RPC,
   buildCompletedPracticePayload,
+  buildPracticeTurnPayload,
+  buildStartPracticePayload,
   mapPracticeError,
   parsePracticeProgress,
   parsePracticeQuestionResult,
@@ -18,6 +23,7 @@ import {
   type PracticeSessionDetail,
   type PracticeSessionSummary,
 } from '../practice/progressModel.ts'
+import type { PracticeSetup, PracticeTurn } from '../practice/aiModel.ts'
 import type { SavedPracticeSession } from '../practice/session.ts'
 
 export {
@@ -75,6 +81,53 @@ async function requireAuthenticatedUser() {
     throw new PracticeError('unauthenticated', 'Please sign in to view your AI practice progress.')
   }
   return data.user
+}
+
+export async function startPracticeSession(setup: PracticeSetup): Promise<string> {
+  await requireAuthenticatedUser()
+  const { data, error } = await supabase.rpc(START_PRACTICE_SESSION_RPC, {
+    p_payload: buildStartPracticePayload(setup),
+  })
+  if (error) {
+    throw mapPracticeError(error, 'Unable to start this AI interview. Please try again.')
+  }
+  if (typeof data !== 'string' || !isUuid(data)) {
+    throw new PracticeError('rpc', 'Unable to start this AI interview. Please try again.')
+  }
+  return data
+}
+
+export async function savePracticeTurn(
+  sessionId: string,
+  sortIndex: number,
+  turn: PracticeTurn,
+): Promise<{ completed: boolean; questionsAnswered: number }> {
+  await requireAuthenticatedUser()
+  if (!isUuid(sessionId)) {
+    throw new PracticeError('not_found', "You don't have access to this practice session.")
+  }
+  const { data, error } = await supabase.rpc(SAVE_PRACTICE_TURN_RPC, {
+    p_session_id: sessionId,
+    p_payload: buildPracticeTurnPayload(sortIndex, turn),
+  })
+  if (error) {
+    throw mapPracticeError(error, 'Unable to save this practice answer. Please try again.')
+  }
+  const row = asRecord(data)
+  return {
+    completed: Boolean(row?.completed),
+    questionsAnswered: typeof row?.questions_answered === 'number' ? row.questions_answered : sortIndex + 1,
+  }
+}
+
+export async function failPracticeSession(sessionId: string): Promise<void> {
+  if (!isUuid(sessionId)) return
+  try {
+    await requireAuthenticatedUser()
+    await supabase.rpc(FAIL_PRACTICE_SESSION_RPC, { p_session_id: sessionId })
+  } catch {
+    // Best-effort; failed AI generation must not mark completed.
+  }
 }
 
 export async function saveCompletedPracticeSession(session: SavedPracticeSession): Promise<string> {
