@@ -16,6 +16,7 @@ export type VoiceClientCallbacks = {
   onAiSpeakingProgress?: (transcriptDelta: string) => void
   onError: (error: string) => void
   onTurnComplete?: (finalCandidateText: string) => void
+  onAutoSubmitCountdown?: (secondsRemaining: number | null) => void
 }
 
 export class VoiceClient {
@@ -29,8 +30,18 @@ export class VoiceClient {
   private isMuted = false
   private recognition: any = null
   private isUsingFallback = false
-  private currentTranscript = ''
-  private speechTimeout: number | null = null
+
+  // Accumulated speech transcript for current turn
+  private accumulatedTranscript = ''
+  private fallbackBaseTranscript = ''
+
+  // Silence auto-submit timer (5 seconds of sustained silence)
+  private autoSubmitSeconds = 5
+  private silenceCountdownTimer: number | null = null
+  private countdownInterval: number | null = null
+
+  // Active voice for TTS
+  private currentVoice = 'echo'
 
   constructor(callbacks: VoiceClientCallbacks) {
     this.callbacks = callbacks
@@ -45,8 +56,84 @@ export class VoiceClient {
     this.callbacks.onStateChange(state)
   }
 
-  async start(setup: PracticeSetup): Promise<boolean> {
+  public setAccumulatedTranscript(text: string) {
+    this.accumulatedTranscript = text
+    this.fallbackBaseTranscript = text
+  }
+
+  public getAccumulatedTranscript(): string {
+    return this.accumulatedTranscript
+  }
+
+  public resetTurnTranscript() {
+    this.accumulatedTranscript = ''
+    this.fallbackBaseTranscript = ''
+    this.cancelSilenceTimer()
+  }
+
+  public cancelSilenceTimer() {
+    if (this.silenceCountdownTimer) {
+      window.clearTimeout(this.silenceCountdownTimer)
+      this.silenceCountdownTimer = null
+    }
+    if (this.countdownInterval) {
+      window.clearInterval(this.countdownInterval)
+      this.countdownInterval = null
+    }
+    this.callbacks.onAutoSubmitCountdown?.(null)
+  }
+
+  private startSilenceTimer() {
+    this.cancelSilenceTimer()
+    const cleanText = this.accumulatedTranscript.trim()
+    if (cleanText.length < 8) return
+
+    let remaining = this.autoSubmitSeconds
+    this.callbacks.onAutoSubmitCountdown?.(remaining)
+
+    this.countdownInterval = window.setInterval(() => {
+      remaining -= 1
+      if (remaining > 0) {
+        this.callbacks.onAutoSubmitCountdown?.(remaining)
+      } else {
+        if (this.countdownInterval) {
+          window.clearInterval(this.countdownInterval)
+          this.countdownInterval = null
+        }
+      }
+    }, 1000)
+
+    this.silenceCountdownTimer = window.setTimeout(() => {
+      this.cancelSilenceTimer()
+      const textToSubmit = this.accumulatedTranscript.trim()
+      if (textToSubmit.length >= 8 && this.state !== 'evaluating') {
+        this.setState('thinking')
+        if (this.callbacks.onTurnComplete) {
+          this.callbacks.onTurnComplete(textToSubmit)
+        }
+      }
+    }, this.autoSubmitSeconds * 1000)
+  }
+
+  public appendTranscriptChunk(chunk: string) {
+    const clean = chunk.trim()
+    if (!clean) return
+
+    if (this.accumulatedTranscript) {
+      // Prevent repeating exact chunk if re-emitted
+      if (!this.accumulatedTranscript.toLowerCase().endsWith(clean.toLowerCase())) {
+        this.accumulatedTranscript = `${this.accumulatedTranscript} ${clean}`.trim()
+      }
+    } else {
+      this.accumulatedTranscript = clean
+    }
+
+    this.callbacks.onCandidateTranscript(this.accumulatedTranscript, true)
+  }
+
+  async start(setup: PracticeSetup, voice = 'echo', interviewerName = 'John'): Promise<boolean> {
     this.setState('connecting')
+    this.currentVoice = voice
 
     try {
       this.micStream = await navigator.mediaDevices.getUserMedia({
@@ -69,7 +156,7 @@ export class VoiceClient {
     }
 
     try {
-      const secret = await requestRealtimeSession(setup)
+      const secret = await requestRealtimeSession(setup, voice, interviewerName)
       if (secret) {
         const connected = await this.initWebRtc(secret)
         if (connected) return true
@@ -146,24 +233,26 @@ export class VoiceClient {
 
       if (type === 'output_audio_buffer.started' || type === 'response.audio.started') {
         this.setState('speaking')
+        this.cancelSilenceTimer()
       } else if (type === 'output_audio_buffer.stopped' || type === 'response.audio.done') {
         this.setState('listening')
       } else if (type === 'input_audio_buffer.speech_started') {
+        // Candidate is actively speaking -> cancel any auto-submit countdown
+        this.cancelSilenceTimer()
         // Barge-in: candidate started speaking while AI was talking
         if (this.state === 'speaking') {
           this.interruptAiSpeech()
         }
         this.setState('listening')
       } else if (type === 'input_audio_buffer.speech_stopped') {
-        this.setState('thinking')
+        // Candidate paused -> start the 5-second silence auto-submit countdown
+        this.startSilenceTimer()
       } else if (type === 'conversation.item.input_audio_transcription.completed') {
         const transcript = event.transcript?.trim()
         if (transcript) {
-          this.currentTranscript = transcript
-          this.callbacks.onCandidateTranscript(transcript, true)
-          if (this.callbacks.onTurnComplete) {
-            this.callbacks.onTurnComplete(transcript)
-          }
+          // Append the transcript chunk so prior sentences are preserved!
+          this.appendTranscriptChunk(transcript)
+          this.startSilenceTimer()
         }
       } else if (type === 'response.audio_transcript.delta') {
         if (this.callbacks.onAiSpeakingProgress && event.delta) {
@@ -188,22 +277,27 @@ export class VoiceClient {
         recognition.lang = 'en-US'
 
         recognition.onresult = (event: any) => {
-          let interim = ''
-          let final = ''
+          this.cancelSilenceTimer()
 
-          for (let i = event.resultIndex; i < event.results.length; ++i) {
+          let finalAccum = ''
+          let interim = ''
+
+          for (let i = 0; i < event.results.length; ++i) {
             const part = event.results[i][0].transcript
             if (event.results[i].isFinal) {
-              final += part
+              finalAccum += part + ' '
             } else {
               interim += part
             }
           }
 
-          const combined = (final || interim).trim()
+          const base = this.fallbackBaseTranscript ? this.fallbackBaseTranscript + ' ' : ''
+          const currentFinal = (base + finalAccum).trim()
+          const combined = (currentFinal + (interim ? ' ' + interim : '')).trim()
+
           if (combined) {
-            this.currentTranscript = combined
-            this.callbacks.onCandidateTranscript(combined, Boolean(final))
+            this.accumulatedTranscript = combined
+            this.callbacks.onCandidateTranscript(combined, Boolean(!interim && finalAccum))
 
             // Barge-in: candidate starts speaking during TTS
             if (this.state === 'speaking') {
@@ -214,16 +308,8 @@ export class VoiceClient {
               this.setState('listening')
             }
 
-            // Reset silence timer for automatic turn end
-            if (this.speechTimeout) window.clearTimeout(this.speechTimeout)
-            this.speechTimeout = window.setTimeout(() => {
-              if (this.currentTranscript.length >= 6 && this.state === 'listening') {
-                this.setState('thinking')
-                if (this.callbacks.onTurnComplete) {
-                  this.callbacks.onTurnComplete(this.currentTranscript)
-                }
-              }
-            }, 1800)
+            // Start silence timer
+            this.startSilenceTimer()
           }
         }
 
@@ -232,6 +318,7 @@ export class VoiceClient {
         }
 
         recognition.onend = () => {
+          this.fallbackBaseTranscript = this.accumulatedTranscript
           // Restart recognition if session still active
           if (this.state !== 'idle' && this.state !== 'error' && this.isUsingFallback) {
             try {
@@ -253,11 +340,12 @@ export class VoiceClient {
     return true
   }
 
-  async speakQuestion(questionText: string): Promise<void> {
+  async speakQuestion(questionText: string, voice?: string): Promise<void> {
     this.interruptAiSpeech()
     this.setState('speaking')
+    const activeVoice = voice || this.currentVoice || 'echo'
 
-    // If WebRTC data channel is connected, we can send conversation item
+    // If WebRTC data channel is connected, we send conversation item
     if (this.dataChannel && this.dataChannel.readyState === 'open') {
       try {
         this.dataChannel.send(
@@ -286,9 +374,9 @@ export class VoiceClient {
       }
     }
 
-    // Server TTS fallback
+    // Server TTS fallback with chosen voice
     try {
-      const audioBase64 = await requestSpeechAudio(questionText)
+      const audioBase64 = await requestSpeechAudio(questionText, activeVoice)
       if (audioBase64) {
         const audioSrc = `data:audio/mp3;base64,${audioBase64}`
         const audio = new Audio(audioSrc)
@@ -317,6 +405,12 @@ export class VoiceClient {
       const utterance = new SpeechSynthesisUtterance(questionText)
       utterance.rate = 1.0
       utterance.pitch = 1.0
+
+      // Match female pitch/voice if shimmer or nova
+      if (activeVoice === 'shimmer' || activeVoice === 'nova') {
+        utterance.pitch = 1.15
+      }
+
       utterance.onend = () => {
         this.setState('listening')
       }
@@ -371,11 +465,7 @@ export class VoiceClient {
 
   close() {
     this.interruptAiSpeech()
-
-    if (this.speechTimeout) {
-      window.clearTimeout(this.speechTimeout)
-      this.speechTimeout = null
-    }
+    this.cancelSilenceTimer()
 
     if (this.recognition) {
       try {

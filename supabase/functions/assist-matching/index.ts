@@ -392,8 +392,10 @@ async function handlePracticeNextQuestion(
       : setup.difficulty,
   };
 
+  const interviewerName = readString(body.interviewerName ?? body.interviewer_name ?? setupRow.interviewerName ?? setupRow.interviewer_name, 40) || "John";
+
   const system = [
-    "You are John, an expert RoundOne AI interviewer conducting a realistic, structured, voice-based interview.",
+    `You are ${interviewerName}, an expert RoundOne AI interviewer conducting a realistic, structured, voice-based interview.`,
     "This is practice only, not a real booked interview or official interviewer feedback.",
     "Generate exactly one next question for question_number.",
     "Be context-aware: build upon the candidate's prior spoken answers and background.",
@@ -552,10 +554,11 @@ async function handleRealtimeSession(
   const setupRow = asRecord(body.setup) ?? {};
   const role = readString(setupRow.targetRole ?? setupRow.target_role, 80) || "Software Engineer";
   const type = readString(setupRow.interviewType ?? setupRow.interview_type, 60) || "Technical";
+  const interviewerName = readString(body.interviewerName ?? body.interviewer_name ?? setupRow.interviewerName ?? setupRow.interviewer_name, 40) || "John";
   const voice = readString(body.voice, 20) || "echo";
 
   const instructions = [
-    `You are John, an experienced, professional AI interviewer at RoundOne conducting a ${type} interview for a ${role} position.`,
+    `You are ${interviewerName}, an experienced, professional AI interviewer at RoundOne conducting a ${type} interview for a ${role} position.`,
     "Speak in a clear, natural, professional, and concise interviewer tone (1-3 sentences max).",
     "Listen attentively to the candidate's spoken responses.",
     "Do not lecture, preach, or give long speeches.",

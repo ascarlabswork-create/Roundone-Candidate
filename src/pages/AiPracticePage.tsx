@@ -17,10 +17,12 @@ import {
   PRACTICE_ANSWER_MAX,
   PRACTICE_DIFFICULTIES,
   PRACTICE_QUESTION_COUNTS,
+  INTERVIEWER_PERSONAS,
   averagePracticeScore,
   difficultyFromCandidateLevel,
   estimatedInterviewMinutes,
   formatPracticeDuration,
+  getInterviewerPersona,
   isPracticeDifficulty,
   uniqueThemes,
   type PracticeAiQuestion,
@@ -115,6 +117,7 @@ export function AiPracticePage() {
   const [micMuted, setMicMuted] = useState(false)
   const [confirmEndOpen, setConfirmEndOpen] = useState(false)
   const [resumePrompt, setResumePrompt] = useState(false)
+  const [autoSubmitCountdown, setAutoSubmitCountdown] = useState<number | null>(null)
 
   const submittingRef = useRef(false)
   const sessionRef = useRef(session)
@@ -252,8 +255,10 @@ export function AiPracticePage() {
     try {
       sessionId = await startPracticeSession(session.setup)
       const candContext = getCandidateContext()
+      const persona = getInterviewerPersona(session.setup.interviewerId)
       const first = await requestNextPracticeQuestion(session.setup, 1, [], {
         candidate: candContext,
+        interviewerName: persona.name,
       })
 
       if (!first) {
@@ -299,6 +304,8 @@ export function AiPracticePage() {
       voiceClientRef.current.close()
     }
 
+    const persona = getInterviewerPersona(sessionRef.current.setup.interviewerId)
+
     const client = new VoiceClient({
       onStateChange: (state) => {
         setVoiceState(state)
@@ -313,16 +320,20 @@ export function AiPracticePage() {
         setError(errMsg)
       },
       onTurnComplete: (transcript) => {
+        setAutoSubmitCountdown(null)
         if (transcript.trim().length >= 8 && !submittingRef.current) {
           void handleTurnAnswer(transcript.trim())
         }
       },
+      onAutoSubmitCountdown: (secondsRemaining) => {
+        setAutoSubmitCountdown(secondsRemaining)
+      },
     })
 
     voiceClientRef.current = client
-    const started = await client.start(sessionRef.current.setup)
+    const started = await client.start(sessionRef.current.setup, persona.voice, persona.name)
     if (started) {
-      await client.speakQuestion(initialQuestion.question)
+      await client.speakQuestion(initialQuestion.question, persona.voice)
     }
   }
 
@@ -331,6 +342,8 @@ export function AiPracticePage() {
     const question = curSession.questions[curSession.index]
     if (!question || busy || submittingRef.current || answerText.length < 8) return
 
+    setAutoSubmitCountdown(null)
+    voiceClientRef.current?.cancelSilenceTimer()
     submittingRef.current = true
     setBusy(true)
     setError(null)
@@ -380,6 +393,7 @@ export function AiPracticePage() {
       setVoiceState('thinking')
       const candContext = getCandidateContext()
       const structured = buildStructuredContext(candContext, curSession.setup, turns)
+      const persona = getInterviewerPersona(curSession.setup.interviewerId)
 
       const priorTurnsData = turns.map((t) => ({
         question: t.question.question,
@@ -396,6 +410,7 @@ export function AiPracticePage() {
         {
           candidate: candContext,
           structured,
+          interviewerName: persona.name,
         },
       )
 
@@ -407,6 +422,9 @@ export function AiPracticePage() {
       }
 
       const nextQuestions = [...curSession.questions, nextQuestion]
+      voiceClientRef.current?.resetTurnTranscript()
+      setAutoSubmitCountdown(null)
+
       setSession({
         ...curSession,
         phase: 'question',
@@ -421,7 +439,7 @@ export function AiPracticePage() {
 
       // AI speaks next question
       if (voiceClientRef.current) {
-        await voiceClientRef.current.speakQuestion(nextQuestion.question)
+        await voiceClientRef.current.speakQuestion(nextQuestion.question, persona.voice)
       }
     } catch (err: unknown) {
       submittingRef.current = false
@@ -429,6 +447,11 @@ export function AiPracticePage() {
       setVoiceState('listening')
       setError(err instanceof Error ? err.message : UNAVAILABLE)
     }
+  }
+
+  function handleKeepSpeaking() {
+    setAutoSubmitCountdown(null)
+    voiceClientRef.current?.cancelSilenceTimer()
   }
 
   function handleMuteToggle() {
@@ -442,7 +465,8 @@ export function AiPracticePage() {
   function handleReplayQuestion() {
     const q = session.questions[session.index]
     if (q && voiceClientRef.current) {
-      void voiceClientRef.current.speakQuestion(q.question)
+      const persona = getInterviewerPersona(session.setup.interviewerId)
+      void voiceClientRef.current.speakQuestion(q.question, persona.voice)
     }
   }
 
@@ -522,6 +546,8 @@ export function AiPracticePage() {
       ),
     ).slice(0, 5)
 
+    const interviewer = getInterviewerPersona(session.setup.interviewerId)
+
     return (
       <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
         <PageHeader
@@ -533,7 +559,7 @@ export function AiPracticePage() {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wider text-blue-800">
-                  RoundOne AI Practice Evaluation
+                  RoundOne AI Practice Evaluation · Conducted by {interviewer.name}
                 </p>
                 <h2 className="mt-1 text-2xl font-bold text-navy-950 sm:text-3xl">
                   AI Practice Score:{' '}
@@ -548,7 +574,13 @@ export function AiPracticePage() {
             </p>
           </div>
 
-          <dl className="mt-6 grid grid-cols-2 gap-4 border-b border-slate-100 pb-6 sm:grid-cols-4">
+          <dl className="mt-6 grid grid-cols-2 gap-4 border-b border-slate-100 pb-6 sm:grid-cols-5">
+            <div>
+              <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Interviewer</dt>
+              <dd className="mt-1 text-sm font-semibold text-navy-950">
+                {interviewer.name} <span className="text-xs font-normal text-slate-500">({interviewer.voice})</span>
+              </dd>
+            </div>
             <div>
               <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Role</dt>
               <dd className="mt-1 text-sm font-semibold text-navy-950">{session.setup.targetRole}</dd>
@@ -628,6 +660,7 @@ export function AiPracticePage() {
   // Phase: Intro
   if (session.phase === 'intro') {
     const minutes = estimatedInterviewMinutes(session.setup.questionCount)
+    const interviewer = getInterviewerPersona(session.setup.interviewerId)
     return (
       <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
         <button
@@ -642,6 +675,26 @@ export function AiPracticePage() {
           subtitle="Answer naturally as you would in a real interview."
         />
         <Card className="mt-8 space-y-4 p-5 sm:p-6">
+          {/* Selected Interviewer Banner */}
+          <div className="flex items-center gap-3.5 rounded-xl border border-blue-200 bg-blue-50/70 p-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-600 font-bold text-white shadow-sm">
+              {interviewer.name[0]}
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-semibold text-navy-950">{interviewer.name}</h3>
+                <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
+                  Voice: {interviewer.voice}
+                </span>
+                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+                  {interviewer.gender}
+                </span>
+              </div>
+              <p className="text-xs font-medium text-blue-700">{interviewer.title}</p>
+              <p className="mt-0.5 text-xs text-slate-600">{interviewer.style}</p>
+            </div>
+          </div>
+
           <dl className="grid gap-4 sm:grid-cols-2">
             <div>
               <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Role</dt>
@@ -672,11 +725,21 @@ export function AiPracticePage() {
           </div>
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
             <h3 className="text-sm font-semibold text-navy-950">Voice Interview Guidelines</h3>
-            <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-slate-600">
-              <li>Your interviewer John will speak each question aloud.</li>
+            <ul className="mt-2 list-disc space-y-1.5 pl-5 text-xs text-slate-600">
+              <li>
+                Your interviewer <strong>{interviewer.name}</strong> will speak each question aloud in their{' '}
+                <strong>{interviewer.voice}</strong> voice.
+              </li>
               <li>Speak your answer into the microphone naturally.</li>
-              <li>You can interrupt or speak at any time; your speech is transcribed live.</li>
-              <li>Microphone access will be requested upon clicking Start.</li>
+              <li>
+                <strong>Comfortable pacing:</strong> If you pause for 2–3 seconds to think, your words won't disappear and
+                it will not immediately auto-submit.
+              </li>
+              <li>
+                <strong>Auto-submit countdown:</strong> After extended silence, a 5-second countdown will appear with a
+                &ldquo;Keep Speaking&rdquo; button if you need more time.
+              </li>
+              <li>You can also type or edit your answer directly in the text area at any moment.</li>
             </ul>
           </div>
 
@@ -697,6 +760,8 @@ export function AiPracticePage() {
 
   // Phase: Question (Voice Interview Workspace)
   if (session.phase === 'question' && question) {
+    const interviewer = getInterviewerPersona(session.setup.interviewerId)
+
     return (
       <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
         {/* Header Bar */}
@@ -732,8 +797,16 @@ export function AiPracticePage() {
                 <VolumeIcon className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">AI Interviewer</p>
-                <h2 className="text-base font-semibold text-navy-950">John</h2>
+                <div className="flex items-center gap-2">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">AI Interviewer</p>
+                  <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
+                    Voice: {interviewer.voice}
+                  </span>
+                </div>
+                <h2 className="text-base font-semibold text-navy-950">
+                  {interviewer.name}{' '}
+                  <span className="text-xs font-normal text-slate-500">({interviewer.title})</span>
+                </h2>
               </div>
             </div>
 
@@ -844,19 +917,48 @@ export function AiPracticePage() {
                 id="live-answer-transcript"
                 value={session.currentAnswer}
                 disabled={busy || voiceState === 'evaluating'}
-                onChange={(e) =>
-                  setSession({
-                    ...session,
-                    currentAnswer: e.target.value.slice(0, PRACTICE_ANSWER_MAX),
-                  })
-                }
+                onChange={(e) => {
+                  const val = e.target.value.slice(0, PRACTICE_ANSWER_MAX)
+                  setSession((current) => ({
+                    ...current,
+                    currentAnswer: val,
+                  }))
+                  voiceClientRef.current?.setAccumulatedTranscript(val)
+                }}
                 placeholder="Speak your answer into the microphone. Your words will be transcribed here live."
                 className="mt-1 min-h-32 text-sm sm:min-h-36"
               />
               <p className="mt-1.5 text-xs text-slate-500">
-                You can speak naturally. Turn detection will automatically evaluate your answer when you pause, or you can
-                click Submit Answer below.
+                Speak naturally. Pausing for a few seconds to think won't erase your words. After extended silence, you'll see a countdown before auto-submitting.
               </p>
+
+              {/* Pause / Auto-submit Countdown Banner */}
+              {autoSubmitCountdown !== null && autoSubmitCountdown > 0 && (
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3.5 py-2.5 text-xs text-amber-900 shadow-sm">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-2.5 w-2.5 animate-pulse rounded-full bg-amber-500" />
+                    <span>
+                      Pause detected. Auto-submitting in <strong>{autoSubmitCountdown}s</strong>...
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleKeepSpeaking}
+                      className="rounded bg-white px-2.5 py-1 text-xs font-semibold text-amber-900 border border-amber-300 shadow-xs hover:bg-amber-100"
+                    >
+                      Keep Speaking (Wait)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleTurnAnswer(session.currentAnswer.trim())}
+                      className="rounded bg-navy-900 px-2.5 py-1 text-xs font-semibold text-white hover:bg-navy-800"
+                    >
+                      Submit Now
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -995,6 +1097,44 @@ export function AiPracticePage() {
                 </option>
               ))}
             </SelectInput>
+          </div>
+        </div>
+
+        {/* AI Interviewer Persona & Voice Selection */}
+        <div>
+          <FieldLabel>AI Interviewer & Voice</FieldLabel>
+          <p className="mb-3 text-xs text-slate-500">
+            Select your AI interviewer. Each interviewer has a distinct speaking voice and interview style.
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {INTERVIEWER_PERSONAS.map((persona) => {
+              const selected = (session.setup.interviewerId || 'john') === persona.id
+              return (
+                <button
+                  key={persona.id}
+                  type="button"
+                  onClick={() => updateSetup({ interviewerId: persona.id })}
+                  className={`flex flex-col rounded-xl border p-3.5 text-left transition-all ${
+                    selected
+                      ? 'border-blue-600 bg-blue-50/70 ring-2 ring-blue-600/20'
+                      : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold text-navy-950">{persona.name}</span>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                        selected ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'
+                      }`}
+                    >
+                      Voice: {persona.voice}
+                    </span>
+                  </div>
+                  <span className="mt-0.5 text-xs font-medium text-blue-700">{persona.title}</span>
+                  <p className="mt-1 text-xs text-slate-600 leading-normal">{persona.style}</p>
+                </button>
+              )
+            })}
           </div>
         </div>
 
