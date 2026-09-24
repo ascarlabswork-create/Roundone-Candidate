@@ -52,12 +52,18 @@ function setupBody(setup: PracticeSetup) {
   }
 }
 
-export async function requestRealtimeSession(setup: PracticeSetup): Promise<string | null> {
+export async function requestRealtimeSession(
+  setup: PracticeSetup,
+  voice?: string,
+  interviewerName?: string,
+): Promise<string | null> {
   try {
     const invoke = supabase.functions.invoke(PRACTICE_AI_FUNCTION, {
       body: {
         mode: 'realtime_session',
         setup: setupBody(setup),
+        voice: voice || 'echo',
+        interviewerName: interviewerName || 'John',
       },
     })
     const { data, error } = await withTimeout(invoke, 8_000)
@@ -71,12 +77,13 @@ export async function requestRealtimeSession(setup: PracticeSetup): Promise<stri
   }
 }
 
-export async function requestSpeechAudio(text: string): Promise<string | null> {
+export async function requestSpeechAudio(text: string, voice?: string): Promise<string | null> {
   try {
     const invoke = supabase.functions.invoke(PRACTICE_AI_FUNCTION, {
       body: {
         mode: 'tts',
         text: text.trim().slice(0, 600),
+        voice: voice || 'echo',
       },
     })
     const { data, error } = await withTimeout(invoke, 10_000)
@@ -118,6 +125,7 @@ export async function requestNextPracticeQuestion(
     candidate?: CandidateContext
     state?: AdaptiveState
     structured?: StructuredInterviewContext
+    interviewerName?: string
   },
 ): Promise<PracticeAiQuestion | null> {
   try {
@@ -125,6 +133,7 @@ export async function requestNextPracticeQuestion(
       body: {
         mode: 'practice_next_question',
         setup: setupBody(setup),
+        interviewerName: context?.interviewerName || 'John',
         question_number: questionNumber,
         prior_turns: priorTurns.map((turn) => ({
           question: turn.question.slice(0, 600),

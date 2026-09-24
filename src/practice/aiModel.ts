@@ -13,12 +13,63 @@ export type PracticeQuestionCount = (typeof PRACTICE_QUESTION_COUNTS)[number]
 export const PRACTICE_BANNED_CLAIM =
   /\b(ready for the job|you will get hired|hiring decision|guaranteed|employability|interview success probability|real (google|amazon|meta|microsoft|netflix) interview|official interviewer feedback|percentile)\b/i
 
+export type InterviewerVoice = 'echo' | 'shimmer' | 'alloy' | 'nova'
+
+export type InterviewerPersona = {
+  id: string
+  name: string
+  voice: InterviewerVoice
+  title: string
+  style: string
+  gender: string
+}
+
+export const INTERVIEWER_PERSONAS: InterviewerPersona[] = [
+  {
+    id: 'john',
+    name: 'John',
+    voice: 'echo',
+    title: 'Senior Engineering Lead',
+    style: 'Calm, technical, and structured',
+    gender: 'Male',
+  },
+  {
+    id: 'lily',
+    name: 'Lily',
+    voice: 'shimmer',
+    title: 'Principal Architect',
+    style: 'Warm, conversational, and exploratory',
+    gender: 'Female',
+  },
+  {
+    id: 'alex',
+    name: 'Alex',
+    voice: 'alloy',
+    title: 'Staff Engineer',
+    style: 'Direct, pragmatic, and fast-paced',
+    gender: 'Neutral',
+  },
+  {
+    id: 'sarah',
+    name: 'Sarah',
+    voice: 'nova',
+    title: 'Engineering Director',
+    style: 'Supportive, depth-focused, and behavioral',
+    gender: 'Female',
+  },
+]
+
+export function getInterviewerPersona(id?: string): InterviewerPersona {
+  return INTERVIEWER_PERSONAS.find((p) => p.id === id) ?? INTERVIEWER_PERSONAS[0]
+}
+
 export type PracticeSetup = {
   targetRole: string
   interviewType: string
   skills: string[]
   difficulty: PracticeDifficulty
   questionCount: PracticeQuestionCount
+  interviewerId?: string
 }
 
 export type PracticeAiQuestion = {

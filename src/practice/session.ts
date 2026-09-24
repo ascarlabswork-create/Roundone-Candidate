@@ -28,6 +28,7 @@ export function emptyPracticeSession(): SavedPracticeSession {
       skills: [],
       difficulty: 'intermediate',
       questionCount: 5,
+      interviewerId: 'john',
     },
     questions: [],
     index: 0,
@@ -47,6 +48,11 @@ export function readPracticeSession(): SavedPracticeSession {
   return {
     ...emptyPracticeSession(),
     ...saved,
+    setup: {
+      ...emptyPracticeSession().setup,
+      ...saved.setup,
+      interviewerId: saved.setup?.interviewerId || 'john',
+    },
     phase,
     savedSessionId: saved.savedSessionId ?? null,
     startedAt: saved.startedAt ?? null,
