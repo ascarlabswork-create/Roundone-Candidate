@@ -36,6 +36,8 @@ export type PracticeAiFeedback = {
   improvements: string[]
   missingPoints: string[]
   summary: string
+  technicalObservations?: string[]
+  communicationObservations?: string[]
 }
 
 export type PracticeTurn = {
@@ -185,6 +187,8 @@ export function parsePracticeFeedback(value: unknown): PracticeAiFeedback | null
     improvements: uniqueStrings(row.improvements, 5, 140, 4),
     missingPoints: uniqueStrings(row.missing_points ?? row.missingPoints, 5, 140, 4),
     summary,
+    technicalObservations: uniqueStrings(row.technical_observations ?? row.technicalObservations, 4, 140, 4),
+    communicationObservations: uniqueStrings(row.communication_observations ?? row.communicationObservations, 4, 140, 4),
   }
 }
 
