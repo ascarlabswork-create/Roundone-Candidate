@@ -48,6 +48,7 @@ import {
 } from '../practice/session.ts'
 import { VoiceClient, type VoiceState } from '../practice/voiceClient.ts'
 import { getCandidatePreferencesIfPresent, getCandidateSkills } from '../services/candidateProfile.ts'
+import { getResumeProjects } from '../services/resumeSkills.ts'
 import {
   failPracticeSession,
   fetchRecentPracticeQuestionTexts,
@@ -133,6 +134,8 @@ export function AiPracticePage() {
   sessionRef.current = session
 
   const voiceClientRef = useRef<VoiceClient | null>(null)
+  // Resume-identified projects (formatted) used to ground project questions.
+  const resumeProjectsRef = useRef<string[]>([])
 
   useEffect(() => {
     writePracticeSession(session)
@@ -213,6 +216,28 @@ export function AiPracticePage() {
     }
   }, [account, prefilled, session.phase, session.questions.length])
 
+  // Load resume-identified projects so the interviewer can ground project
+  // questions to real resume projects only (never invented ones).
+  useEffect(() => {
+    if (!account) return
+    let cancelled = false
+    void getResumeProjects()
+      .then((projects) => {
+        if (cancelled) return
+        resumeProjectsRef.current = projects.map((project) => {
+          const tech = project.technologies.length > 0 ? ` [${project.technologies.join(', ')}]` : ''
+          const desc = project.description ? ` — ${project.description}` : ''
+          return `${project.name}${desc}${tech}`.slice(0, 160)
+        })
+      })
+      .catch(() => {
+        /* no resume projects yet */
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [account])
+
   // Cleanup voice client when unmounting or leaving question phase
   useEffect(() => {
     return () => {
@@ -230,6 +255,7 @@ export function AiPracticePage() {
       skills: session.setup.skills,
       headline: account?.candidate.headline || undefined,
       bio: account?.candidate.bio || undefined,
+      projects: resumeProjectsRef.current.length > 0 ? resumeProjectsRef.current : undefined,
     }
   }
 

@@ -12,6 +12,8 @@ export type CandidateContext = {
   skills: string[]
   headline?: string
   bio?: string
+  /** Resume-identified projects, used to ground project questions. */
+  projects?: string[]
 }
 
 export type InterviewContext = {
@@ -169,6 +171,7 @@ export function buildStructuredContext(
       skills: candidate.skills.map((s) => s.trim().slice(0, 40)).filter(Boolean).slice(0, 8),
       headline: candidate.headline?.trim().slice(0, 120),
       bio: candidate.bio?.trim().slice(0, 300),
+      projects: (candidate.projects ?? []).map((p) => p.trim().slice(0, 160)).filter(Boolean).slice(0, 8),
     },
     interview: {
       type: setup.interviewType.trim().slice(0, 60),
