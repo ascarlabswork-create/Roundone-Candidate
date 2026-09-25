@@ -13,7 +13,6 @@ const navItems = [
   { to: '/candidate/interviewers', label: 'Find Interviewer' },
   { to: '/candidate/practice', label: 'AI Practice' },
   { to: '/candidate/preparation', label: 'AI Prep' },
-  { to: '/candidate/resume-skills', label: 'Resume Skills' },
   { to: '/candidate/interview-types', label: 'Interview Types' },
   { to: '/candidate/resources', label: 'Resources' },
 ]
@@ -58,9 +57,9 @@ export function Navbar() {
   return (
     <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-3 px-4 sm:px-6">
-        <div className="flex min-w-0 items-center gap-6">
+        <div className="flex min-w-0 flex-1 items-center gap-4 overflow-hidden lg:gap-6">
           <Logo />
-          <nav className="hidden items-center gap-0.5 lg:flex" aria-label="Primary">
+          <nav className="hidden min-w-0 items-center gap-0.5 overflow-x-auto lg:flex" aria-label="Primary">
             {navItems.map((item) => (
               <NavLink
                 key={item.to}
@@ -68,7 +67,7 @@ export function Navbar() {
                 end={item.to === '/'}
                 className={({ isActive }) =>
                   cn(
-                    'whitespace-nowrap rounded-lg px-2.5 py-2 text-sm font-medium transition-colors',
+                    'whitespace-nowrap rounded-lg px-2 py-2 text-sm font-medium transition-colors',
                     isActive ? 'bg-slate-100 text-navy-950' : 'text-slate-600 hover:bg-slate-50 hover:text-navy-900',
                   )
                 }
@@ -82,7 +81,7 @@ export function Navbar() {
         <div className="flex shrink-0 items-center gap-1 lg:gap-1.5">
           <Link
             to="/candidate/interviews"
-            className="hidden items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 lg:inline-flex"
+            className="hidden items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 lg:inline-flex"
             aria-label="My Interviews"
           >
             <CalendarCheck className="h-4 w-4" />

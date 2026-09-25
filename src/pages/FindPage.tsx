@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   CANDIDATE_LEVELS,
   COMPANIES,
@@ -181,7 +181,12 @@ export function FindPage() {
         </div>
 
         <div>
-          <FieldLabel htmlFor="skills">Skills / Technologies</FieldLabel>
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <FieldLabel htmlFor="skills">Skills / Technologies</FieldLabel>
+            <Link to="/candidate/resume-skills" className="text-xs font-medium text-blue-700 hover:text-blue-800">
+              Import from resume
+            </Link>
+          </div>
           <div className="flex gap-2">
             <TextInput
               id="skills"

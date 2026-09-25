@@ -263,6 +263,19 @@ export function CandidateProfilePage() {
         subtitle="These details are stored on your candidate account and are visible only to you until you share them in a booking."
       />
 
+      <Card className="mt-6 flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="font-semibold text-navy-950">Resume interview skills</h2>
+          <p className="mt-1 text-sm text-slate-600">
+            Upload your resume to build an interview skill set from what it actually says. Accepted skills feed AI
+            Practice and your matching preferences.
+          </p>
+        </div>
+        <Link to="/candidate/resume-skills" className="shrink-0">
+          <Button variant="outline">Upload / manage resume</Button>
+        </Link>
+      </Card>
+
       {isEmpty ? (
         <div className="mt-6">
           <EmptyState

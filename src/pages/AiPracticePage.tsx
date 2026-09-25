@@ -1099,8 +1099,20 @@ export function AiPracticePage() {
         title="AI Interview setup"
         subtitle="Choose your role, type, topics, and difficulty. You will see an introduction before the interview starts."
       />
+      <div className="mt-6 rounded-xl border border-blue-100 bg-blue-50/70 px-4 py-3 text-sm text-slate-700 sm:flex sm:items-center sm:justify-between sm:gap-4">
+        <p>
+          Want questions based on your resume?{' '}
+          <span className="text-slate-600">Upload it first so topics and projects stay grounded in your experience.</span>
+        </p>
+        <Link
+          to="/candidate/resume-skills"
+          className="mt-2 inline-block shrink-0 font-medium text-blue-700 hover:text-blue-800 sm:mt-0"
+        >
+          Build skills from resume →
+        </Link>
+      </div>
       <form
-        className="mt-8 space-y-5 rounded-xl border border-slate-200 bg-white p-5 sm:p-8"
+        className="mt-5 space-y-5 rounded-xl border border-slate-200 bg-white p-5 sm:p-8"
         onSubmit={goToIntro}
       >
         <div className="grid gap-5 sm:grid-cols-2">
