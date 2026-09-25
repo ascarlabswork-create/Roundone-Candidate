@@ -13,6 +13,7 @@ const navItems = [
   { to: '/candidate/interviewers', label: 'Find Interviewer' },
   { to: '/candidate/practice', label: 'AI Practice' },
   { to: '/candidate/preparation', label: 'AI Prep' },
+  { to: '/candidate/resume-skills', label: 'Resume Skills' },
   { to: '/candidate/interview-types', label: 'Interview Types' },
   { to: '/candidate/resources', label: 'Resources' },
 ]

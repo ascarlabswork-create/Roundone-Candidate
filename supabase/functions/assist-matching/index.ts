@@ -413,8 +413,16 @@ async function handlePracticeNextQuestion(
 ) {
   const contextRow = asRecord(body.context) ?? {};
   const setupRow = asRecord(body.setup) ?? asRecord(contextRow.interview) ?? {};
-  const candidateRow = asRecord(contextRow.candidate) ?? {};
-  const stateRow = asRecord(contextRow.state) ?? {};
+  const candidateRow =
+    asRecord(contextRow.candidate) ??
+    asRecord(body.candidate_context) ??
+    asRecord(body.candidateContext) ??
+    {};
+  const stateRow =
+    asRecord(contextRow.state) ??
+    asRecord(body.adaptive_state) ??
+    asRecord(body.adaptiveState) ??
+    {};
 
   const setup = {
     targetRole: readString(setupRow.targetRole ?? setupRow.target_role, 80) || readString(candidateRow.role, 80),
@@ -467,7 +475,7 @@ async function handlePracticeNextQuestion(
     role: readString(candidateRow.role ?? setup.targetRole, 80),
     level: readString(candidateRow.level, 40),
     skills: readStringList(candidateRow.skills ?? setup.skills, 8, 40),
-    projects: readStringList(candidateRow.projects, 3, 140),
+    projects: readStringList(candidateRow.projects, 8, 160),
   };
 
   const adaptiveState = {
@@ -502,6 +510,9 @@ async function handlePracticeNextQuestion(
     "Generate exactly one next question for question_number.",
     "Be context-aware: build upon the candidate's prior spoken answers and background.",
     "If the candidate provided an answer in prior_turns, ask a natural, relevant follow-up that explores depth, trade-offs, or real-world problem solving.",
+    candidateContext.projects.length > 0
+      ? `The candidate's resume lists these projects: ${JSON.stringify(candidateContext.projects)}. If you ask about a project, you may ONLY reference one of these exact resume projects. Never invent, rename, or assume any other project, company, achievement, or responsibility.`
+      : "Do not ask about a specific named project unless the candidate first mentions one, and never invent a project, company, or achievement.",
     "Do NOT invent candidate experience, projects, interviewer identity, company affiliation, or real company interview questions.",
     "If the candidate struggled on a previous question, ask a clarifying or fundamental question; if they answered strongly, probe deeper or explore architectural trade-offs.",
     "Do not make extreme difficulty swings.",
@@ -796,6 +807,237 @@ async function handleTts(
   }
 }
 
+const RESUME_EVIDENCE_TYPES = [
+  "skills_section",
+  "project",
+  "experience",
+  "certification",
+  "education",
+  "tools",
+  "summary",
+];
+
+const RESUME_BANNED =
+  /\b(guaranteed|job-ready|hiring probability|employability|will get (you )?hired|recruiter score|ats score)\b/i;
+
+function normalizeResumeHaystack(resumeText: string) {
+  const rawLower = ` ${resumeText.toLowerCase().replace(/\s+/g, " ")} `;
+  const alnumHaystack = rawLower.replace(/[^a-z0-9]+/g, "");
+  return { rawLower, alnumHaystack };
+}
+
+// Anchor guard against hallucination: a term is only accepted when it can be
+// found in the candidate's actual resume text (boundary-aware phrase match, or
+// an alphanumeric-collapsed match for tokens like "Node.js" -> "nodejs").
+function groundedInResume(
+  term: string,
+  rawLower: string,
+  alnumHaystack: string,
+) {
+  const lower = term.trim().toLowerCase();
+  if (lower.length < 2) return false;
+  const escaped = lower.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const boundary = new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`);
+  if (boundary.test(rawLower)) return true;
+  const alnumTerm = lower.replace(/[^a-z0-9]+/g, "");
+  if (alnumTerm.length >= 4 && alnumHaystack.includes(alnumTerm)) return true;
+  return false;
+}
+
+function readEvidenceType(value: unknown) {
+  const v = readString(value, 40).toLowerCase().replace(/\s+/g, "_");
+  return RESUME_EVIDENCE_TYPES.includes(v) ? v : "";
+}
+
+async function handleResumeSkillPlan(
+  body: Record<string, unknown>,
+  apiKey: string,
+  model: string,
+  baseUrl: string,
+) {
+  const resumeText = readString(body.resume_text ?? body.resumeText, 14000);
+  if (resumeText.trim().length < 60) {
+    return json(400, { error: "invalid_body" });
+  }
+
+  const { rawLower, alnumHaystack } = normalizeResumeHaystack(resumeText);
+  const grounded = (term: string) => groundedInResume(term, rawLower, alnumHaystack);
+
+  const system = [
+    "You are RoundOne's resume analysis engine. You read ONE candidate resume and extract ONLY facts that are explicitly present in it.",
+    "This produces an interview skill plan for the candidate to review. It is not a hiring decision or a resume score.",
+    "ABSOLUTE RULE: Never invent, assume, guess, or embellish. Do NOT add a skill, technology, tool, framework, language, project, company, role, responsibility, achievement, certification, or education item that is not actually written in the resume text.",
+    "If the resume does not clearly support something, leave it out. Do not pad the output with generic or commonly-expected interview skills.",
+    "Distinguish three separate categories precisely:",
+    "1) extracted_skills: skills/languages/frameworks/tools/platforms/domains that are DIRECTLY and literally written in the resume (e.g. a Skills section, a Tools list, or named explicitly).",
+    "2) inferred_skills: skills that are reasonably implied by an EXPLICIT project or experience description in the resume. Each MUST cite the exact project/experience text it was inferred from. Do not infer beyond what the description explicitly says.",
+    "3) interview_topics: interview focus areas DERIVED from the extracted and inferred skills above. Each topic must reference which of those skills it derives from. Do not introduce new technologies here.",
+    "Also extract projects (with the technologies each project explicitly mentions), work/internship experiences, and certifications - ONLY as written in the resume.",
+    "For every extracted_skill and inferred_skill, include evidence: evidence_type (one of skills_section, project, experience, certification, education, tools, summary) and evidence_detail (the exact resume section title, project name, experience entry, or certification it came from).",
+    "Do not claim hiring outcomes, employability, or ATS/recruiter scores.",
+    "Return JSON only with keys: profile_summary, extracted_skills, inferred_skills, interview_topics, projects, experiences, certifications.",
+    "extracted_skills: [{ skill, evidence_type, evidence_detail }].",
+    "inferred_skills: [{ skill, inferred_from, evidence_type, evidence_detail }] where inferred_from is the exact project/experience phrase.",
+    "interview_topics: [{ topic, derived_from: [skill,...], rationale }].",
+    "projects: [{ name, description, technologies: [] }].",
+    "experiences: [{ title, summary, technologies: [] }].",
+    "certifications: [ string ].",
+    "Keep each list concise (at most 20 skills, 12 topics, 10 projects). Skills must be short (<= 40 chars).",
+  ].join(" ");
+
+  const completed = await completeJson(
+    apiKey,
+    model,
+    baseUrl,
+    system,
+    { resume_text: resumeText },
+    16000,
+    0.15,
+  );
+  if (completed instanceof Response) return completed;
+
+  const profileSummary = readString(completed.profile_summary ?? completed.profileSummary, 400);
+
+  const seenSkill = new Set<string>();
+  const extractedSkills: Array<Record<string, string>> = [];
+  const rawExtracted = Array.isArray(completed.extracted_skills)
+    ? completed.extracted_skills
+    : Array.isArray(completed.extractedSkills)
+    ? completed.extractedSkills
+    : [];
+  for (const item of rawExtracted) {
+    const row = asRecord(item);
+    if (!row) continue;
+    const skill = readString(row.skill, 40);
+    if (skill.length < 2 || RESUME_BANNED.test(skill)) continue;
+    const key = skill.toLowerCase();
+    if (seenSkill.has(key)) continue;
+    // Directly-extracted skills MUST appear verbatim in the resume.
+    if (!grounded(skill)) continue;
+    const evidenceType = readEvidenceType(row.evidence_type ?? row.evidenceType) || "skills_section";
+    const evidenceDetail = readString(row.evidence_detail ?? row.evidenceDetail, 160);
+    seenSkill.add(key);
+    extractedSkills.push({ skill, evidence_type: evidenceType, evidence_detail: evidenceDetail });
+    if (extractedSkills.length >= 20) break;
+  }
+
+  const inferredSkills: Array<Record<string, string>> = [];
+  const rawInferred = Array.isArray(completed.inferred_skills)
+    ? completed.inferred_skills
+    : Array.isArray(completed.inferredSkills)
+    ? completed.inferredSkills
+    : [];
+  for (const item of rawInferred) {
+    const row = asRecord(item);
+    if (!row) continue;
+    const skill = readString(row.skill, 40);
+    if (skill.length < 2 || RESUME_BANNED.test(skill)) continue;
+    const key = skill.toLowerCase();
+    if (seenSkill.has(key)) continue;
+    const inferredFrom = readString(row.inferred_from ?? row.inferredFrom, 200);
+    const evidenceDetail = readString(row.evidence_detail ?? row.evidenceDetail, 160);
+    // An inferred skill must be anchored to real resume text (the project or
+    // experience it was inferred from must actually appear in the resume).
+    const anchor = inferredFrom || evidenceDetail;
+    if (!anchor || !grounded(anchor)) continue;
+    const evidenceType = readEvidenceType(row.evidence_type ?? row.evidenceType) || "project";
+    seenSkill.add(key);
+    inferredSkills.push({
+      skill,
+      inferred_from: inferredFrom,
+      evidence_type: evidenceType,
+      evidence_detail: evidenceDetail || inferredFrom,
+    });
+    if (inferredSkills.length >= 20) break;
+  }
+
+  const acceptedSkillKeys = new Set<string>([...seenSkill]);
+
+  const projects: Array<Record<string, unknown>> = [];
+  const rawProjects = Array.isArray(completed.projects) ? completed.projects : [];
+  for (const item of rawProjects) {
+    const row = asRecord(item);
+    if (!row) continue;
+    const name = readString(row.name ?? row.title, 120);
+    if (name.length < 2) continue;
+    // Only keep projects whose name is actually in the resume.
+    if (!grounded(name)) continue;
+    const description = readString(row.description ?? row.summary, 400);
+    const technologies = readStringList(row.technologies ?? row.tech ?? row.stack, 12, 40)
+      .filter((t) => grounded(t));
+    if (projects.some((p) => String(p.name).toLowerCase() === name.toLowerCase())) continue;
+    projects.push({ name, description, technologies });
+    if (projects.length >= 10) break;
+  }
+
+  const experiences: Array<Record<string, unknown>> = [];
+  const rawExperiences = Array.isArray(completed.experiences) ? completed.experiences : [];
+  for (const item of rawExperiences) {
+    const row = asRecord(item);
+    if (!row) continue;
+    const title = readString(row.title ?? row.role ?? row.organization ?? row.company, 160);
+    const summary = readString(row.summary ?? row.description, 400);
+    const anchor = title || summary.slice(0, 40);
+    if (!anchor || !grounded(anchor)) continue;
+    const technologies = readStringList(row.technologies ?? row.tech ?? row.stack, 12, 40)
+      .filter((t) => grounded(t));
+    experiences.push({ title, summary, technologies });
+    if (experiences.length >= 10) break;
+  }
+
+  const certifications = readStringList(completed.certifications, 12, 120)
+    .filter((cert) => !RESUME_BANNED.test(cert) && grounded(cert));
+
+  const interviewTopics: Array<Record<string, unknown>> = [];
+  const rawTopics = Array.isArray(completed.interview_topics)
+    ? completed.interview_topics
+    : Array.isArray(completed.interviewTopics)
+    ? completed.interviewTopics
+    : [];
+  for (const item of rawTopics) {
+    const row = asRecord(item);
+    if (!row) continue;
+    const topic = readString(row.topic, 60);
+    if (topic.length < 2 || RESUME_BANNED.test(topic)) continue;
+    const derivedFromRaw = readStringList(row.derived_from ?? row.derivedFrom, 6, 40);
+    // A topic is only valid if it derives from at least one accepted skill.
+    const derivedFrom = derivedFromRaw.filter((s) => acceptedSkillKeys.has(s.toLowerCase()));
+    if (derivedFrom.length === 0) continue;
+    const rationale = readString(row.rationale, 200);
+    if (interviewTopics.some((t) => String(t.topic).toLowerCase() === topic.toLowerCase())) continue;
+    interviewTopics.push({ topic, derived_from: derivedFrom, rationale });
+    if (interviewTopics.length >= 12) break;
+  }
+
+  if (
+    extractedSkills.length === 0 &&
+    inferredSkills.length === 0 &&
+    projects.length === 0 &&
+    experiences.length === 0
+  ) {
+    console.log(JSON.stringify({ event: "resume_skill_plan_empty" }));
+    return json(502, { error: "insufficient_resume_evidence" });
+  }
+
+  console.log(JSON.stringify({
+    event: "resume_skill_plan_ok",
+    extracted: extractedSkills.length,
+    inferred: inferredSkills.length,
+    topics: interviewTopics.length,
+    projects: projects.length,
+  }));
+
+  return json(200, {
+    profile_summary: RESUME_BANNED.test(profileSummary) ? "" : profileSummary,
+    extracted_skills: extractedSkills,
+    inferred_skills: inferredSkills,
+    interview_topics: interviewTopics,
+    projects,
+    experiences,
+    certifications,
+  });
+}
+
 const PREPARE_PRIORITIES = ["high", "medium", "low"];
 const PREPARE_BANNED =
   /\b(guaranteed|job-ready|hiring probability|employability|will get (you )?hired|definitely be asked|resume is ready|recruiter score)\b/i;
@@ -964,6 +1206,9 @@ Deno.serve(async (req) => {
   }
   if (readString(body.mode, 32) === "prepare") {
     return await handlePrepare(body, apiKey, model, baseUrl);
+  }
+  if (readString(body.mode, 32) === "resume_skill_plan") {
+    return await handleResumeSkillPlan(body, apiKey, model, baseUrl);
   }
 
   const prefsRow = asRecord(body.preferences) ?? {};
