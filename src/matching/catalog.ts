@@ -48,12 +48,18 @@ export function toMatchingInterviewer(
   services: PublicInterviewerService[],
 ): MatchingCatalogPerson | null {
   const mappedServices = services.map(toService)
-  if (mappedServices.length === 0) return null
+  // Skill matching does not require services; keep empty services for booking to handle later.
   const targetRoles = [...new Set(roles.map((role) => role.targetRole).filter(Boolean))]
   const candidateLevels = [...new Set(roles.map((role) => role.candidateLevel).filter(Boolean))] as CandidateLevel[]
   const interviewTypes = [...new Set(mappedServices.map((service) => service.interviewType))]
-  const listPrice = person.listPricePaise != null ? paiseToMajorUnits(person.listPricePaise) : mappedServices[0].price
-  const price = Math.min(listPrice, ...mappedServices.map((service) => service.price))
+  const listPrice =
+    person.listPricePaise != null
+      ? paiseToMajorUnits(person.listPricePaise)
+      : mappedServices[0]
+        ? mappedServices[0].price
+        : 0
+  const price =
+    mappedServices.length > 0 ? Math.min(listPrice, ...mappedServices.map((service) => service.price)) : listPrice
 
   return {
     id: person.id,

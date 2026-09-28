@@ -2,37 +2,24 @@ import { Link } from 'react-router-dom'
 import { recommendMatchedInterviewers } from '../matching/index.ts'
 import { InterviewerCard, InterviewerCardSkeleton } from '../components/interviewer/InterviewerCard.tsx'
 import { Button } from '../components/ui/Button.tsx'
-import { Badge, EmptyState, ErrorState, PageHeader } from '../components/ui/primitives.tsx'
-import { formatINR } from '../lib/format.ts'
-import { timeWindowLabel, preferredDateRangeLabel } from '../lib/dates.ts'
+import { EmptyState, ErrorState, PageHeader } from '../components/ui/primitives.tsx'
 import { useAsync } from '../lib/useAsync.ts'
-import { hasMeaningfulPreferences } from '../matching/index.ts'
 import { useMatching } from '../state/matching.tsx'
 
 export function MatchesPage() {
   const { preferences } = useMatching()
-  const ready = hasMeaningfulPreferences(preferences)
+  const ready = Boolean(preferences)
   const state = useAsync(
     () => (preferences ? recommendMatchedInterviewers(preferences) : Promise.resolve([])),
     [JSON.stringify(preferences)],
   )
 
-  const chips = preferences
-    ? [
-        preferences.targetCompany,
-        preferences.preferredDate
-          ? `${preferredDateRangeLabel(preferences.preferredDate, preferences.preferredDateEnd)}${preferences.preferredTime ? ` ${timeWindowLabel(preferences.preferredTime)}` : ''}`
-          : '',
-        preferences.budget ? formatINR(preferences.budget) : '',
-      ].filter(Boolean)
-    : []
-
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
       <PageHeader
         eyebrow="Recommended for you"
-        title="Best matches for your interview goal"
-        subtitle="Ranked by skill compatibility. Bookable availability is shown on each card and does not hide skill matches. Short explanations appear when matching assist is available."
+        title="Best matches for your skills"
+        subtitle="Ranked by skill overlap only. Availability, services, and other preferences are not used to hide matches."
         actions={
           <Link to="/candidate/find">
             <Button variant="outline">Edit goal</Button>
@@ -40,21 +27,11 @@ export function MatchesPage() {
         }
       />
 
-      {chips.length ? (
-        <div className="mt-6 flex flex-wrap gap-2">
-          {chips.map((chip) => (
-            <Badge key={chip} tone="navy">
-              {chip}
-            </Badge>
-          ))}
-        </div>
-      ) : null}
-
       {!ready ? (
         <div className="mt-8">
           <EmptyState
             title="Tell us what you are preparing for"
-            body="Matching needs your skills or a short goal so we can rank interviewers."
+            body="Add the skills you want to practice so we can rank interviewers by skill overlap."
             action={
               <Link to="/candidate/find">
                 <Button>Find My Interviewer</Button>
@@ -80,8 +57,8 @@ export function MatchesPage() {
       {ready && state.status === 'success' && state.data.length === 0 ? (
         <div className="mt-8">
           <EmptyState
-            title="No interviewers match yet"
-            body="We could not find listed interviewers for this goal. Try different skills or browse the directory."
+            title="No strong skill matches found yet."
+            body="We could not find listed interviewers who share your skills. Try different skills or browse everyone."
             action={
               <Link to="/candidate/interviewers">
                 <Button>Browse Interviewers</Button>
@@ -93,15 +70,12 @@ export function MatchesPage() {
 
       {ready && state.status === 'success' && state.data.length > 0 ? (
         <div className="mt-8 space-y-4">
-          {state.data.map(({ interviewer, match, ai, hasBookableSlot }) => (
+          {state.data.map(({ interviewer, match }) => (
             <InterviewerCard
               key={interviewer.id}
               interviewer={interviewer}
               matchScore={match.score}
-              reasons={match.reasons}
-              matchedFactors={ai?.matchedFactors}
-              matchExplanation={ai?.explanation}
-              hasBookableSlot={hasBookableSlot}
+              skillMatch={match.skillMatch}
               fromMatches
             />
           ))}

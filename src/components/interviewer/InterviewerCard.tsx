@@ -1,35 +1,76 @@
-import { Clock3, GitCompare } from 'lucide-react'
+import { GitCompare } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { formatDateTimeInZone } from '../../availability/index.ts'
-import { getNextSlot, isVerified } from '../../data/interviewers.ts'
+import { isVerified } from '../../data/interviewers.ts'
 import { formatCount, formatINR } from '../../lib/format.ts'
-import type { Interviewer, MatchReason } from '../../types.ts'
+import type { Interviewer, SkillMatchDetail } from '../../types.ts'
 import { Button } from '../ui/Button.tsx'
 import { Badge } from '../ui/primitives.tsx'
 import { Avatar, MatchScore, StarRating, VerifiedBadge } from '../ui/identity.tsx'
 
-export function MatchReasonList({ reasons }: { reasons: MatchReason[] }) {
+function formatSkillPercent(percent: number | null) {
+  if (percent == null) return '—'
+  return Number.isInteger(percent) ? String(percent) : percent.toFixed(1)
+}
+
+export function SkillMatchPanel({ skillMatch }: { skillMatch: SkillMatchDetail }) {
   return (
-    <ul className="space-y-1.5">
-      {reasons.map((reason) => (
-        <li
-          key={reason.key}
-          className={reason.matched ? 'text-sm text-emerald-700' : 'text-sm text-slate-400'}
-        >
-          {reason.matched ? '✓' : '○'} {reason.label}
-        </li>
-      ))}
-    </ul>
+    <div className="mt-4 space-y-3 rounded-lg bg-slate-50 p-3">
+      <p className="text-sm font-semibold text-navy-950">
+        Skill Match: {formatSkillPercent(skillMatch.percent)}%
+      </p>
+
+      {skillMatch.matchedSkills.length > 0 ? (
+        <div>
+          <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Matched Skills
+          </p>
+          <ul className="space-y-1">
+            {skillMatch.matchedSkills.map((skill) => (
+              <li key={`m-${skill}`} className="text-sm text-emerald-700">
+                🟢 {skill}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      {skillMatch.candidateMissingSkills.length > 0 ? (
+        <div>
+          <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Missing Candidate Skills
+          </p>
+          <ul className="space-y-1">
+            {skillMatch.candidateMissingSkills.map((skill) => (
+              <li key={`r-${skill}`} className="text-sm text-rose-700">
+                🔴 {skill}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      {skillMatch.interviewerExtraSkills.length > 0 ? (
+        <div>
+          <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Interviewer Extra Skills
+          </p>
+          <ul className="space-y-1">
+            {skillMatch.interviewerExtraSkills.map((skill) => (
+              <li key={`n-${skill}`} className="text-sm text-slate-600">
+                ⚪ {skill}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </div>
   )
 }
 
 export function InterviewerCard({
   interviewer,
   matchScore,
-  reasons,
-  matchedFactors,
-  matchExplanation,
-  hasBookableSlot,
+  skillMatch,
   selected,
   onToggleCompare,
   compareFull,
@@ -37,19 +78,12 @@ export function InterviewerCard({
 }: {
   interviewer: Interviewer
   matchScore?: number
-  reasons?: MatchReason[]
-  matchedFactors?: string[]
-  matchExplanation?: string
-  /** When set (Find → Matches), shows live bookable status without hiding the card. */
-  hasBookableSlot?: boolean
+  skillMatch?: SkillMatchDetail
   selected?: boolean
   onToggleCompare?: () => void
   compareFull?: boolean
   fromMatches?: boolean
 }) {
-  const hasLocalCalendar =
-    interviewer.availability.recurring.length > 0 || interviewer.availability.custom.length > 0
-  const next = hasLocalCalendar ? getNextSlot(interviewer) : null
   const profileTo = fromMatches
     ? `/candidate/interviewers/${interviewer.id}?from=matches`
     : `/candidate/interviewers/${interviewer.id}`
@@ -76,73 +110,41 @@ export function InterviewerCard({
                     Online
                   </span>
                 ) : null}
-                {hasBookableSlot === true ? (
-                  <Badge tone="green">Bookable now</Badge>
-                ) : hasBookableSlot === false ? (
-                  <Badge tone="slate">No open slots for your dates</Badge>
-                ) : null}
               </div>
               <p className="mt-0.5 text-sm text-slate-600">
-                {interviewer.currentRole} @ {interviewer.company}
+                {interviewer.currentRole}
+                {interviewer.company ? ` @ ${interviewer.company}` : ''}
               </p>
             </div>
             {typeof matchScore === 'number' ? <MatchScore score={matchScore} /> : null}
           </div>
-          <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-600">
-            <span>{interviewer.experienceYears}+ years experience</span>
-            <span>{formatCount(interviewer.completedInterviews)} interviews</span>
-            <span className="inline-flex items-center gap-1">
-              <StarRating value={interviewer.rating} />
-              {interviewer.rating}
-              <span className="text-slate-500">({formatCount(interviewer.reviewCount)} reviews)</span>
-            </span>
-          </p>
-        </div>
-      </div>
-
-      <div className="mt-4 flex flex-wrap gap-1.5">
-        {[...interviewer.skills, ...interviewer.technologies].slice(0, 6).map((skill) => (
-          <Badge key={skill}>{skill}</Badge>
-        ))}
-      </div>
-
-      {matchExplanation || (matchedFactors && matchedFactors.length > 0) ? (
-        <div className="mt-4 rounded-lg bg-slate-50 p-3">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Why this match?
-          </p>
-          {matchedFactors && matchedFactors.length > 0 ? (
-            <div className="mb-2 flex flex-wrap gap-1.5">
-              {matchedFactors.map((factor) => (
-                <Badge key={factor} tone="blue">
-                  {factor}
-                </Badge>
-              ))}
-            </div>
+          {!fromMatches ? (
+            <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-600">
+              <span>{interviewer.experienceYears}+ years experience</span>
+              <span>{formatCount(interviewer.completedInterviews)} interviews</span>
+              <span className="inline-flex items-center gap-1">
+                <StarRating value={interviewer.rating} />
+                {interviewer.rating}
+                <span className="text-slate-500">({formatCount(interviewer.reviewCount)} reviews)</span>
+              </span>
+            </p>
           ) : null}
-          {matchExplanation ? <p className="text-sm text-slate-700">{matchExplanation}</p> : null}
+        </div>
+      </div>
+
+      {!skillMatch ? (
+        <div className="mt-4 flex flex-wrap gap-1.5">
+          {interviewer.skills.slice(0, 6).map((skill) => (
+            <Badge key={skill}>{skill}</Badge>
+          ))}
         </div>
       ) : null}
 
-      {reasons ? (
-        <div className="mt-4 rounded-lg bg-slate-50 p-3">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Why this interviewer matches
-          </p>
-          <MatchReasonList reasons={reasons} />
-        </div>
-      ) : null}
+      {skillMatch ? <SkillMatchPanel skillMatch={skillMatch} /> : null}
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
         <div>
           <p className="text-lg font-semibold text-navy-950">{formatINR(interviewer.price)} / session</p>
-          <p className="mt-1 inline-flex items-center gap-1.5 text-sm text-slate-600">
-            <Clock3 className="h-4 w-4" />
-            Next available:{' '}
-            {next
-              ? formatDateTimeInZone(next.start, interviewer.availability.timezone)
-              : 'See booking for live bookable times'}
-          </p>
         </div>
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
           {onToggleCompare ? (

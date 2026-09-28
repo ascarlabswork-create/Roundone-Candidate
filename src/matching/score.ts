@@ -1,206 +1,54 @@
-import { generateBookableSlots } from '../availability/generateSlots.ts'
-import { isoDateInZone } from '../availability/timezone.ts'
-import { loadAllBookings } from '../data/bookings.ts'
-import { dateInPreferredRange, hoursForWindow, preferredRangeEnd } from '../lib/dates.ts'
-import { getNextSlot, isVerified, lowestServicePrice } from '../data/interviewers.ts'
-import type {
-  Interviewer,
-  MatchBreakdown,
-  MatchingPreferences,
-  MatchReason,
-  MatchResult,
-} from '../types.ts'
-import { MATCH_WEIGHTS } from './weights.ts'
+import { isVerified } from '../data/interviewers.ts'
+import type { Interviewer, MatchBreakdown, MatchingPreferences, MatchResult } from '../types.ts'
+import { compareSkillSets } from './skills.ts'
 
-function norm(value: string) {
-  return value.trim().toLowerCase()
+const EMPTY_BREAKDOWN: MatchBreakdown = {
+  targetRole: 0,
+  interviewType: 0,
+  skills: 0,
+  candidateLevel: 0,
+  availability: 0,
+  company: 0,
+  price: 0,
+  quality: 0,
+  language: 0,
 }
 
-function includesLoose(haystack: string, needle: string) {
-  const h = norm(haystack)
-  const n = norm(needle)
-  return h.includes(n) || n.includes(h)
-}
-
-const RELATED_ROLES: Record<string, string[]> = {
-  'software engineer': ['backend engineer', 'frontend engineer', 'full stack engineer', 'sde'],
-  'backend engineer': ['software engineer', 'full stack engineer'],
-  'frontend engineer': ['software engineer', 'full stack engineer'],
-  'full stack engineer': ['software engineer', 'frontend engineer', 'backend engineer'],
-  'ml engineer': ['software engineer', 'data scientist'],
-  'data scientist': ['ml engineer'],
-  'engineering manager': ['software engineer'],
-}
-
-function roleScore(interviewer: Interviewer, role: string) {
-  if (!role) return 0.5
-  if (interviewer.targetRoles.some((item) => norm(item) === norm(role))) return 1
-  if (includesLoose(interviewer.currentRole, role)) return 0.75
-  const related = RELATED_ROLES[norm(role)] ?? []
-  if (
-    related.some(
-      (item) =>
-        interviewer.targetRoles.some((roleName) => norm(roleName) === item) ||
-        includesLoose(interviewer.currentRole, item),
-    )
-  ) {
-    return 0.6
-  }
-  return 0
-}
-
-function interviewTypeScore(interviewer: Interviewer, interviewType: string) {
-  if (!interviewType) return 0.5
-  return interviewer.interviewTypes.some((item) => norm(item) === norm(interviewType)) ? 1 : 0
-}
-
-function skillsScore(interviewer: Interviewer, skills: string[]) {
-  if (!skills.length) return 0.5
-  const pool = [...interviewer.skills, ...interviewer.technologies].map(norm)
-  const hits = skills.filter((skill) => pool.some((item) => item === norm(skill) || item.includes(norm(skill))))
-  return hits.length / skills.length
-}
-
-function levelScore(interviewer: Interviewer, level: string) {
-  if (!level) return 0.5
-  return interviewer.candidateLevels.some((item) => norm(item) === norm(level)) ? 1 : 0
-}
-
-function availabilityScore(interviewer: Interviewer, prefs: MatchingPreferences) {
-  const hasLocalCalendar =
-    interviewer.availability.recurring.length > 0 || interviewer.availability.custom.length > 0
-  // Live matching catalog does not embed private calendars; Find/Matches already filter via list_bookable_slots.
-  if (!hasLocalCalendar) {
-    return prefs.preferredDate ? 0.75 : 0.65
-  }
-  const durationMin = Math.min(...interviewer.services.map((item) => item.durationMin))
-  const occupied = loadAllBookings()
-    .filter((item) => item.interviewerId === interviewer.id && item.status !== 'cancelled')
-    .map((item) => ({
-      start: item.start,
-      end: new Date(new Date(item.start).getTime() + item.durationMin * 60_000).toISOString(),
-    }))
-  const slots = generateBookableSlots({
-    interviewerId: interviewer.id,
-    availability: interviewer.availability,
-    durationMin,
-    occupied,
-  })
-  if (!slots.length) return 0
-  if (!prefs.preferredDate) return getNextSlot(interviewer) ? 0.6 : 0.15
-
-  const tz = interviewer.availability.timezone
-  const window = hoursForWindow(prefs.preferredTime)
-  const rangeEnd = preferredRangeEnd(prefs.preferredDate, prefs.preferredDateEnd)
-
-  const exact = slots.some((slot) => {
-    const date = isoDateInZone(new Date(slot.start), tz)
-    if (!dateInPreferredRange(date, prefs.preferredDate, prefs.preferredDateEnd)) return false
-    if (!window) return true
-    const hour = Number(
-      new Intl.DateTimeFormat('en-GB', {
-        timeZone: tz,
-        hour: 'numeric',
-        hourCycle: 'h23',
-      }).format(new Date(slot.start)),
-    )
-    return hour >= window.start && hour < window.end
-  })
-  if (exact) return 1
-
-  const same = slots.some((slot) =>
-    dateInPreferredRange(isoDateInZone(new Date(slot.start), tz), prefs.preferredDate, prefs.preferredDateEnd),
-  )
-  if (same) return 0.7
-
-  const nearby = slots.some((slot) => {
-    const start = new Date(`${prefs.preferredDate}T12:00:00Z`).getTime()
-    const end = new Date(`${rangeEnd}T12:00:00Z`).getTime()
-    const slotTime = new Date(slot.start).getTime()
-    const nearest = Math.min(Math.abs(slotTime - start), Math.abs(slotTime - end))
-    return nearest <= 2 * 24 * 60 * 60 * 1000
-  })
-  if (nearby) return 0.4
-
-  return 0.15
-}
-
-function companyScore(interviewer: Interviewer, company: string) {
-  if (!company) return 0.5
-  if (norm(interviewer.company) === norm(company)) return 1
-  if (interviewer.previousCompanies.some((item) => norm(item) === norm(company))) return 0.7
-  return 0.2
-}
-
-function priceScore(interviewer: Interviewer, budget: number) {
-  if (!budget) return 0.5
-  const price = lowestServicePrice(interviewer)
-  if (price <= budget) return 1
-  if (price <= budget * 1.2) return 0.5
-  return 0
-}
-
-function qualityScore(interviewer: Interviewer) {
-  const ratingPart = interviewer.rating / 5
-  const volumePart = Math.min(interviewer.completedInterviews / 400, 1)
-  const verificationCount =
-    Number(interviewer.verification.identity) +
-    Number(interviewer.verification.employment) +
-    Number(interviewer.verification.linkedin)
-  const verificationPart = verificationCount / 3
-  return ratingPart * 0.5 + volumePart * 0.3 + verificationPart * 0.2
-}
-
-function languageScore(interviewer: Interviewer, language: string) {
-  if (!language) return 1
-  return interviewer.languages.some((item) => norm(item) === norm(language)) ? 1 : 0
-}
-
-export function buildReasons(breakdown: MatchBreakdown): MatchReason[] {
-  return [
-    { key: 'skills', label: 'Relevant skills', matched: breakdown.skills >= 0.5 },
-    { key: 'company', label: 'Company/domain experience', matched: breakdown.company >= 0.7 },
-    { key: 'availability', label: 'Availability match', matched: breakdown.availability >= 0.7 },
-    { key: 'budget', label: 'Budget compatibility', matched: breakdown.price >= 1 },
-  ]
-}
-
+/**
+ * Skill-only interviewer score (Step 1).
+ * Uses interviewer.skills only — not services, role, availability, price, etc.
+ */
 export function scoreInterviewer(interviewer: Interviewer, prefs: MatchingPreferences): MatchResult {
+  // Interviewer stored skills only (never service names / technologies).
+  const skillMatch = compareSkillSets(prefs.skills, interviewer.skills)
   const breakdown: MatchBreakdown = {
-    targetRole: roleScore(interviewer, prefs.targetRole),
-    interviewType: interviewTypeScore(interviewer, prefs.interviewType),
-    skills: skillsScore(interviewer, prefs.skills),
-    candidateLevel: levelScore(interviewer, prefs.candidateLevel),
-    availability: availabilityScore(interviewer, prefs),
-    company: companyScore(interviewer, prefs.targetCompany),
-    price: priceScore(interviewer, prefs.budget),
-    quality: qualityScore(interviewer),
-    language: languageScore(interviewer, prefs.language),
+    ...EMPTY_BREAKDOWN,
+    skills: skillMatch.ratio,
   }
-
-  const weighted =
-    breakdown.targetRole * MATCH_WEIGHTS.targetRole +
-    breakdown.interviewType * MATCH_WEIGHTS.interviewType +
-    breakdown.skills * MATCH_WEIGHTS.skills +
-    breakdown.candidateLevel * MATCH_WEIGHTS.candidateLevel +
-    breakdown.availability * MATCH_WEIGHTS.availability +
-    breakdown.company * MATCH_WEIGHTS.company +
-    breakdown.price * MATCH_WEIGHTS.price +
-    breakdown.quality * MATCH_WEIGHTS.quality +
-    breakdown.language * MATCH_WEIGHTS.language
 
   return {
     interviewerId: interviewer.id,
-    score: Math.round(weighted * 100),
+    // Integer percent for MatchScore badge; detail.percent keeps one decimal for labels.
+    score: skillMatch.percent == null ? 0 : Math.round(skillMatch.percent),
     breakdown,
-    reasons: buildReasons(breakdown),
+    reasons: [
+      {
+        key: 'skills',
+        label: 'Skill overlap',
+        matched: skillMatch.matchedSkills.length > 0,
+      },
+    ],
+    skillMatch,
   }
 }
 
 export function rankInterviewers(interviewers: Interviewer[], prefs: MatchingPreferences) {
   return interviewers
     .map((person) => scoreInterviewer(person, prefs))
-    .sort((a, b) => b.score - a.score)
+    .sort((a, b) => {
+      if (b.skillMatch.ratio !== a.skillMatch.ratio) return b.skillMatch.ratio - a.skillMatch.ratio
+      return b.skillMatch.matchedSkills.length - a.skillMatch.matchedSkills.length
+    })
 }
 
 export function hasMeaningfulPreferences(prefs: MatchingPreferences | null) {
@@ -215,6 +63,11 @@ export function hasMeaningfulPreferences(prefs: MatchingPreferences | null) {
       prefs.budget ||
       Boolean(prefs.naturalLanguageQuery?.trim()),
   )
+}
+
+/** Find → Matches needs a non-empty skill set for skill-only ranking. */
+export function hasMatchingSkills(prefs: MatchingPreferences | null) {
+  return Boolean(prefs?.skills.some((skill) => skill.trim()))
 }
 
 export { isVerified }

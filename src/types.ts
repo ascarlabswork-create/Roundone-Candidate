@@ -195,11 +195,23 @@ export type MatchBreakdown = {
   language: number
 }
 
+/** Skill-only overlap used by Find → Matches (Step 1). */
+export type SkillMatchDetail = {
+  matchedSkills: string[]
+  candidateMissingSkills: string[]
+  interviewerExtraSkills: string[]
+  /** matched candidate skills / total candidate skills (0 when candidate has no skills). */
+  ratio: number
+  /** 0–100 for UI; null when the candidate has no skills (no pretended match). */
+  percent: number | null
+}
+
 export type MatchResult = {
   interviewerId: string
   score: number
   breakdown: MatchBreakdown
   reasons: MatchReason[]
+  skillMatch: SkillMatchDetail
 }
 
 export type InterviewerFilters = {
