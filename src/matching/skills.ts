@@ -1,22 +1,17 @@
 import type { SkillMatchDetail } from '../types.ts'
+import { canonicalizeSkill, normalizeSkill } from './skillCanonical.ts'
 
-/** Skill-only matching helpers. Exact overlap after trim + lowercase; no aliases. */
+export { normalizeSkill } from './skillCanonical.ts'
 
-export function normalizeSkill(value: string) {
-  return value.trim().toLowerCase()
-}
-
-/** Deduplicate case-insensitively, keeping first-seen display casing. */
+/** Deduplicate by canonical skill, keeping the canonical display label. */
 export function dedupeSkills(skills: string[]): string[] {
   const seen = new Set<string>()
   const out: string[] = []
   for (const raw of skills) {
-    const trimmed = raw.trim()
-    if (!trimmed) continue
-    const key = normalizeSkill(trimmed)
-    if (seen.has(key)) continue
-    seen.add(key)
-    out.push(trimmed)
+    const canonical = canonicalizeSkill(raw)
+    if (!canonical || seen.has(canonical.key)) continue
+    seen.add(canonical.key)
+    out.push(canonical.display)
   }
   return out
 }

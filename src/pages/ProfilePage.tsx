@@ -1,7 +1,7 @@
 import { Bookmark, MessageSquare } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
-import { SkillMatchPanel } from '../components/interviewer/InterviewerCard.tsx'
+import { SkillMatchPanel } from '../components/interviewer/SkillMatchCard.tsx'
 import { Button } from '../components/ui/Button.tsx'
 import { Badge, Card, EmptyState, ErrorState, Skeleton } from '../components/ui/primitives.tsx'
 import { Avatar, MatchScore, StarRating, VerifiedBadge } from '../components/ui/identity.tsx'

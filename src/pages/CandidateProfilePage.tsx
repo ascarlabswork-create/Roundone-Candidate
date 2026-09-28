@@ -273,7 +273,7 @@ export function CandidateProfilePage() {
         <div className="mt-6">
           <EmptyState
             title="Your profile is still empty"
-            body="Add a target role, level, skills, and preferences so we can use them in later matching."
+            body="Add skills and preferences so we can use them in later matching."
           />
         </div>
       ) : null}

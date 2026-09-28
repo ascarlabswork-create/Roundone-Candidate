@@ -2,75 +2,14 @@ import { GitCompare } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { isVerified } from '../../data/interviewers.ts'
 import { formatCount, formatINR } from '../../lib/format.ts'
-import type { Interviewer, SkillMatchDetail } from '../../types.ts'
+import type { Interviewer } from '../../types.ts'
 import { Button } from '../ui/Button.tsx'
 import { Badge } from '../ui/primitives.tsx'
 import { Avatar, MatchScore, StarRating, VerifiedBadge } from '../ui/identity.tsx'
 
-function formatSkillPercent(percent: number | null) {
-  if (percent == null) return '—'
-  return Number.isInteger(percent) ? String(percent) : percent.toFixed(1)
-}
-
-export function SkillMatchPanel({ skillMatch }: { skillMatch: SkillMatchDetail }) {
-  return (
-    <div className="mt-4 space-y-3 rounded-lg bg-slate-50 p-3">
-      <p className="text-sm font-semibold text-navy-950">
-        Skill Match: {formatSkillPercent(skillMatch.percent)}%
-      </p>
-
-      {skillMatch.matchedSkills.length > 0 ? (
-        <div>
-          <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Matched Skills
-          </p>
-          <ul className="space-y-1">
-            {skillMatch.matchedSkills.map((skill) => (
-              <li key={`m-${skill}`} className="text-sm text-emerald-700">
-                🟢 {skill}
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-
-      {skillMatch.candidateMissingSkills.length > 0 ? (
-        <div>
-          <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Missing Candidate Skills
-          </p>
-          <ul className="space-y-1">
-            {skillMatch.candidateMissingSkills.map((skill) => (
-              <li key={`r-${skill}`} className="text-sm text-rose-700">
-                🔴 {skill}
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-
-      {skillMatch.interviewerExtraSkills.length > 0 ? (
-        <div>
-          <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Interviewer Extra Skills
-          </p>
-          <ul className="space-y-1">
-            {skillMatch.interviewerExtraSkills.map((skill) => (
-              <li key={`n-${skill}`} className="text-sm text-slate-600">
-                ⚪ {skill}
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-    </div>
-  )
-}
-
 export function InterviewerCard({
   interviewer,
   matchScore,
-  skillMatch,
   selected,
   onToggleCompare,
   compareFull,
@@ -78,7 +17,6 @@ export function InterviewerCard({
 }: {
   interviewer: Interviewer
   matchScore?: number
-  skillMatch?: SkillMatchDetail
   selected?: boolean
   onToggleCompare?: () => void
   compareFull?: boolean
@@ -118,29 +56,23 @@ export function InterviewerCard({
             </div>
             {typeof matchScore === 'number' ? <MatchScore score={matchScore} /> : null}
           </div>
-          {!fromMatches ? (
-            <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-600">
-              <span>{interviewer.experienceYears}+ years experience</span>
-              <span>{formatCount(interviewer.completedInterviews)} interviews</span>
-              <span className="inline-flex items-center gap-1">
-                <StarRating value={interviewer.rating} />
-                {interviewer.rating}
-                <span className="text-slate-500">({formatCount(interviewer.reviewCount)} reviews)</span>
-              </span>
-            </p>
-          ) : null}
+          <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-600">
+            <span>{interviewer.experienceYears}+ years experience</span>
+            <span>{formatCount(interviewer.completedInterviews)} interviews</span>
+            <span className="inline-flex items-center gap-1">
+              <StarRating value={interviewer.rating} />
+              {interviewer.rating}
+              <span className="text-slate-500">({formatCount(interviewer.reviewCount)} reviews)</span>
+            </span>
+          </p>
         </div>
       </div>
 
-      {!skillMatch ? (
-        <div className="mt-4 flex flex-wrap gap-1.5">
-          {interviewer.skills.slice(0, 6).map((skill) => (
-            <Badge key={skill}>{skill}</Badge>
-          ))}
-        </div>
-      ) : null}
-
-      {skillMatch ? <SkillMatchPanel skillMatch={skillMatch} /> : null}
+      <div className="mt-4 flex flex-wrap gap-1.5">
+        {interviewer.skills.slice(0, 6).map((skill) => (
+          <Badge key={skill}>{skill}</Badge>
+        ))}
+      </div>
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
         <div>
