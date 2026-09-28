@@ -11,6 +11,7 @@ const emptyPreferences: MatchingPreferences = {
   targetCompany: '',
   skills: [],
   preferredDate: '',
+  preferredDateEnd: '',
   preferredTime: '',
   budget: 0,
   language: '',
@@ -18,7 +19,13 @@ const emptyPreferences: MatchingPreferences = {
 }
 
 function withoutBudgetAndLanguage(prefs: MatchingPreferences): MatchingPreferences {
-  return { ...prefs, budget: 0, language: '' }
+  return {
+    ...emptyPreferences,
+    ...prefs,
+    preferredDateEnd: prefs.preferredDateEnd ?? '',
+    budget: 0,
+    language: '',
+  }
 }
 
 type MatchingContextValue = {

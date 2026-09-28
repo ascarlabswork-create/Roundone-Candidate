@@ -1,4 +1,5 @@
 import { isoDateInZone } from '../availability/timezone.ts'
+import { dateInPreferredRange } from '../lib/dates.ts'
 import { getBookableSlots, getBookableWindow } from '../services/availability.ts'
 import type { MatchingPreferences } from '../types.ts'
 import type { MatchingCatalogPerson } from './catalog.ts'
@@ -6,8 +7,14 @@ import { pickServiceForAvailability } from './liveAvailabilityPick.ts'
 
 const AVAILABILITY_CHECK_CONCURRENCY = 6
 
-function slotMatchesPreferredDate(startsAtUtc: string, timezone: string, preferredDate: string) {
-  return isoDateInZone(new Date(startsAtUtc), timezone) === preferredDate
+function slotMatchesPreferredDate(
+  startsAtUtc: string,
+  timezone: string,
+  preferredDate: string,
+  preferredDateEnd?: string,
+) {
+  const date = isoDateInZone(new Date(startsAtUtc), timezone)
+  return dateInPreferredRange(date, preferredDate, preferredDateEnd)
 }
 
 async function hasLiveBookableSlot(person: MatchingCatalogPerson, prefs: MatchingPreferences) {
@@ -23,7 +30,9 @@ async function hasLiveBookableSlot(person: MatchingCatalogPerson, prefs: Matchin
     })
     if (slots.length === 0) return false
     if (!prefs.preferredDate) return true
-    return slots.some((slot) => slotMatchesPreferredDate(slot.startsAtUtc, person.timezone, prefs.preferredDate))
+    return slots.some((slot) =>
+      slotMatchesPreferredDate(slot.startsAtUtc, person.timezone, prefs.preferredDate, prefs.preferredDateEnd),
+    )
   } catch (error) {
     console.error('matching availability check failed', person.id, error)
     return false

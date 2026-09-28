@@ -18,6 +18,7 @@ export function runMatchingAiChecks() {
     targetCompany: '',
     skills: ['Python'],
     preferredDate: '',
+    preferredDateEnd: '',
     preferredTime: '',
     budget: 0,
     language: '',

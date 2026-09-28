@@ -67,9 +67,7 @@ export function FindPage() {
       initial.targetRole ||
         initial.candidateLevel ||
         initial.interviewType ||
-        initial.targetCompany ||
-        initial.preferredDate ||
-        initial.preferredTime,
+        initial.targetCompany,
     ),
   )
 
@@ -290,6 +288,73 @@ export function FindPage() {
           />
         </div>
 
+        <div className="grid gap-5 sm:grid-cols-2">
+          <div className="sm:col-span-2">
+            <FieldLabel htmlFor="date-from">Preferred Date</FieldLabel>
+            <div className="grid gap-3 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
+              <TextInput
+                id="date-from"
+                type="date"
+                value={form.preferredDate}
+                onChange={(event) => {
+                  const nextStart = event.target.value
+                  setForm((prev) => ({
+                    ...prev,
+                    preferredDate: nextStart,
+                    preferredDateEnd:
+                      prev.preferredDateEnd && nextStart && prev.preferredDateEnd < nextStart
+                        ? nextStart
+                        : prev.preferredDateEnd,
+                  }))
+                }}
+              />
+              <span className="hidden text-center text-sm text-slate-500 sm:block">to</span>
+              <div>
+                <label htmlFor="date-to" className="sr-only">
+                  Preferred date end
+                </label>
+                <TextInput
+                  id="date-to"
+                  type="date"
+                  min={form.preferredDate || undefined}
+                  value={form.preferredDateEnd || form.preferredDate}
+                  onChange={(event) => {
+                    const nextEnd = event.target.value
+                    setForm((prev) => ({
+                      ...prev,
+                      preferredDateEnd: nextEnd,
+                      preferredDate:
+                        prev.preferredDate && nextEnd && nextEnd < prev.preferredDate
+                          ? nextEnd
+                          : prev.preferredDate || nextEnd,
+                    }))
+                  }}
+                />
+              </div>
+            </div>
+            <p className="mt-1 text-xs text-slate-500">
+              Pick a range (for example 24–27). Leave empty for any day.
+            </p>
+          </div>
+          <div className="sm:col-span-2 sm:max-w-xs">
+            <FieldLabel htmlFor="time">Preferred Time</FieldLabel>
+            <SelectInput
+              id="time"
+              value={form.preferredTime}
+              onChange={(event) =>
+                setForm({ ...form, preferredTime: event.target.value as TimeWindow | '' })
+              }
+            >
+              <option value="">Any time</option>
+              {TIME_WINDOWS.map((window) => (
+                <option key={window.id} value={window.id}>
+                  {window.label}
+                </option>
+              ))}
+            </SelectInput>
+          </div>
+        </div>
+
         <div className="rounded-lg border border-slate-200">
           <button
             type="button"
@@ -300,7 +365,7 @@ export function FindPage() {
             <div>
               <p className="text-sm font-semibold text-navy-950">Optional details</p>
               <p className="text-xs text-slate-500">
-                Target role, level, interview type, company, and preferred time
+                Target role, level, interview type, and company
               </p>
             </div>
             <span className="text-sm font-medium text-blue-700">{optionalOpen ? 'Hide' : 'Show'}</span>
@@ -368,35 +433,6 @@ export function FindPage() {
                       <option key={company} value={company} />
                     ))}
                   </datalist>
-                </div>
-              </div>
-
-              <div className="grid gap-5 sm:grid-cols-2">
-                <div>
-                  <FieldLabel htmlFor="date">Preferred Date</FieldLabel>
-                  <TextInput
-                    id="date"
-                    type="date"
-                    value={form.preferredDate}
-                    onChange={(event) => setForm({ ...form, preferredDate: event.target.value })}
-                  />
-                </div>
-                <div>
-                  <FieldLabel htmlFor="time">Preferred Time</FieldLabel>
-                  <SelectInput
-                    id="time"
-                    value={form.preferredTime}
-                    onChange={(event) =>
-                      setForm({ ...form, preferredTime: event.target.value as TimeWindow | '' })
-                    }
-                  >
-                    <option value="">Any time</option>
-                    {TIME_WINDOWS.map((window) => (
-                      <option key={window.id} value={window.id}>
-                        {window.label}
-                      </option>
-                    ))}
-                  </SelectInput>
                 </div>
               </div>
             </div>

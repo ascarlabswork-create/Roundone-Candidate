@@ -1,7 +1,7 @@
 import { generateBookableSlots } from '../availability/generateSlots.ts'
 import { isoDateInZone } from '../availability/timezone.ts'
 import { loadAllBookings } from '../data/bookings.ts'
-import { hoursForWindow } from '../lib/dates.ts'
+import { dateInPreferredRange, hoursForWindow, preferredRangeEnd } from '../lib/dates.ts'
 import { getNextSlot, isVerified, lowestServicePrice } from '../data/interviewers.ts'
 import type {
   Interviewer,
@@ -91,10 +91,11 @@ function availabilityScore(interviewer: Interviewer, prefs: MatchingPreferences)
 
   const tz = interviewer.availability.timezone
   const window = hoursForWindow(prefs.preferredTime)
+  const rangeEnd = preferredRangeEnd(prefs.preferredDate, prefs.preferredDateEnd)
 
   const exact = slots.some((slot) => {
     const date = isoDateInZone(new Date(slot.start), tz)
-    if (date !== prefs.preferredDate) return false
+    if (!dateInPreferredRange(date, prefs.preferredDate, prefs.preferredDateEnd)) return false
     if (!window) return true
     const hour = Number(
       new Intl.DateTimeFormat('en-GB', {
@@ -107,13 +108,17 @@ function availabilityScore(interviewer: Interviewer, prefs: MatchingPreferences)
   })
   if (exact) return 1
 
-  const same = slots.some((slot) => isoDateInZone(new Date(slot.start), tz) === prefs.preferredDate)
+  const same = slots.some((slot) =>
+    dateInPreferredRange(isoDateInZone(new Date(slot.start), tz), prefs.preferredDate, prefs.preferredDateEnd),
+  )
   if (same) return 0.7
 
   const nearby = slots.some((slot) => {
-    const preferred = new Date(`${prefs.preferredDate}T12:00:00Z`)
-    const diff = Math.abs(new Date(slot.start).getTime() - preferred.getTime())
-    return diff <= 2 * 24 * 60 * 60 * 1000
+    const start = new Date(`${prefs.preferredDate}T12:00:00Z`).getTime()
+    const end = new Date(`${rangeEnd}T12:00:00Z`).getTime()
+    const slotTime = new Date(slot.start).getTime()
+    const nearest = Math.min(Math.abs(slotTime - start), Math.abs(slotTime - end))
+    return nearest <= 2 * 24 * 60 * 60 * 1000
   })
   if (nearby) return 0.4
 

@@ -51,6 +51,41 @@ export function weekdayName(isoDate: string) {
   return WEEKDAYS[date.getDay()]
 }
 
+/** Inclusive end of a preferred date range; falls back to the start date. */
+export function preferredRangeEnd(startDate: string, endDate?: string | null) {
+  if (!startDate) return ''
+  if (endDate && endDate >= startDate) return endDate
+  return startDate
+}
+
+export function dateInPreferredRange(isoDate: string, startDate: string, endDate?: string | null) {
+  if (!startDate) return true
+  const end = preferredRangeEnd(startDate, endDate)
+  return isoDate >= startDate && isoDate <= end
+}
+
+/** Compact label like "24–27 Sep" or a single weekday when start === end. */
+export function preferredDateRangeLabel(startDate: string, endDate?: string | null) {
+  if (!startDate) return ''
+  const end = preferredRangeEnd(startDate, endDate)
+  if (end === startDate) return weekdayName(startDate)
+
+  const [sy, sm, sd] = startDate.split('-').map(Number)
+  const [ey, em, ed] = end.split('-').map(Number)
+  const start = new Date(sy, (sm ?? 1) - 1, sd ?? 1)
+  const finish = new Date(ey, (em ?? 1) - 1, ed ?? 1)
+  const startDay = start.getDate()
+  const endDay = finish.getDate()
+  const sameMonth = start.getFullYear() === finish.getFullYear() && start.getMonth() === finish.getMonth()
+  if (sameMonth) {
+    const month = start.toLocaleDateString('en-IN', { month: 'short' })
+    return `${startDay}–${endDay} ${month}`
+  }
+  const startLabel = start.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+  const endLabel = finish.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+  return `${startLabel} – ${endLabel}`
+}
+
 export function timeWindowLabel(window: string) {
   if (window === 'morning') return 'morning'
   if (window === 'afternoon') return 'afternoon'
