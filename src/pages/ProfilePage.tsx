@@ -1,7 +1,7 @@
 import { Bookmark, MessageSquare } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
-import { MatchReasonList } from '../components/interviewer/InterviewerCard.tsx'
+import { SkillMatchPanel } from '../components/interviewer/InterviewerCard.tsx'
 import { Button } from '../components/ui/Button.tsx'
 import { Badge, Card, EmptyState, ErrorState, Skeleton } from '../components/ui/primitives.tsx'
 import { Avatar, MatchScore, StarRating, VerifiedBadge } from '../components/ui/identity.tsx'
@@ -132,9 +132,8 @@ export function ProfilePage() {
           </div>
         </div>
         {fromMatches && match ? (
-          <div className="mt-6 rounded-lg bg-violet-50 p-4">
-            <p className="mb-2 text-sm font-semibold text-violet-800">Why this interviewer matches</p>
-            <MatchReasonList reasons={match.reasons} />
+          <div className="mt-6">
+            <SkillMatchPanel skillMatch={match.skillMatch} />
           </div>
         ) : null}
       </Card>
