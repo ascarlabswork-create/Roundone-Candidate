@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { NormalizationSuggestions } from '../components/matching/NormalizationSuggestions.tsx'
+import { SavedJobTargets } from '../components/profile/SavedJobTargets.tsx'
 import { NotificationPreferencesCard } from '../components/notifications/NotificationPreferencesCard.tsx'
 import { Button } from '../components/ui/Button.tsx'
 import {
@@ -463,6 +464,8 @@ export function CandidateProfilePage() {
           </Button>
         </div>
       </form>
+
+      <SavedJobTargets />
 
       <NotificationPreferencesCard />
 

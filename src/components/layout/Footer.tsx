@@ -21,6 +21,11 @@ export function Footer() {
               </Link>
             </li>
             <li>
+              <Link to="/candidate/job-match" className="hover:text-navy-900">
+                Find for a job
+              </Link>
+            </li>
+            <li>
               <Link to="/candidate/interviewers" className="hover:text-navy-900">
                 Browse interviewers
               </Link>

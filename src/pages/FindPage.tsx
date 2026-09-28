@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   COMPANIES,
   SKILLS,
@@ -211,6 +211,11 @@ export function FindPage() {
       <PageHeader
         title="Tell us about your interview"
         subtitle="We’ll rank interviewers against this goal. You can still browse everyone afterwards."
+        actions={
+          <Link to="/candidate/job-match" className="text-sm font-medium text-blue-700">
+            Match interviewers to a job posting
+          </Link>
+        }
       />
 
       <form onSubmit={submit} className="mt-8 space-y-5 rounded-xl border border-slate-200 bg-white p-5 sm:p-8">
