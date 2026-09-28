@@ -14,7 +14,6 @@ const primaryNavItems = [
   { to: '/candidate/interviewers', label: 'Find Interviewer' },
   { to: '/candidate/practice', label: 'AI Practice' },
   { to: '/candidate/preparation', label: 'AI Prep' },
-  { to: '/candidate/interview-types', label: 'Interview Types' },
   { to: '/candidate/resources', label: 'Resources' },
 ]
 

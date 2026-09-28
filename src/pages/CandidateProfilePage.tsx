@@ -16,11 +16,8 @@ import {
   TextInput,
 } from '../components/ui/primitives.tsx'
 import {
-  CANDIDATE_LEVELS,
   COMPANIES,
-  INTERVIEW_TYPES,
   SKILLS,
-  TARGET_ROLES,
   TIME_WINDOWS,
   TIMEZONES,
 } from '../data/catalogs.ts'
@@ -148,9 +145,6 @@ export function CandidateProfilePage() {
   function applySuggestions(patch: NormalizationPatch) {
     setForm((prev) => ({
       ...prev,
-      targetRole: patch.targetRole ?? prev.targetRole,
-      candidateLevel: patch.candidateLevel ?? prev.candidateLevel,
-      interviewType: patch.interviewType ?? prev.interviewType,
       targetCompany: patch.targetCompany ?? prev.targetCompany,
       skills: patch.skills ?? prev.skills,
     }))
@@ -249,8 +243,7 @@ export function CandidateProfilePage() {
     )
   }
 
-  const isEmpty =
-    !form.targetRole && !form.candidateLevel && !form.targetCompany && form.skills.length === 0 && !form.headline
+  const isEmpty = !form.targetCompany && form.skills.length === 0 && !form.headline
 
   const timezoneOptions = (TIMEZONES as readonly string[]).includes(form.timezone)
     ? [...TIMEZONES]
@@ -337,40 +330,7 @@ export function CandidateProfilePage() {
         <Card className="p-6">
           <h2 className="font-semibold text-navy-950">Interview goals</h2>
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
-            <div>
-              <FieldLabel htmlFor="targetRole">Target role</FieldLabel>
-              <TextInput
-                id="targetRole"
-                list="profile-role-options"
-                placeholder="Select or type a role"
-                value={form.targetRole}
-                onChange={(event) => setForm({ ...form, targetRole: event.target.value })}
-                onBlur={() => {
-                  if (form.targetRole.trim().length >= 3) requestSuggestions()
-                }}
-              />
-              <datalist id="profile-role-options">
-                {TARGET_ROLES.map((role) => (
-                  <option key={role} value={role} />
-                ))}
-              </datalist>
-            </div>
-            <div>
-              <FieldLabel htmlFor="candidateLevel">Candidate level</FieldLabel>
-              <TextInput
-                id="candidateLevel"
-                list="profile-level-options"
-                placeholder="Select or type a level"
-                value={form.candidateLevel}
-                onChange={(event) => setForm({ ...form, candidateLevel: event.target.value })}
-              />
-              <datalist id="profile-level-options">
-                {CANDIDATE_LEVELS.map((level) => (
-                  <option key={level} value={level} />
-                ))}
-              </datalist>
-            </div>
-            <div>
+            <div className="sm:col-span-2">
               <FieldLabel htmlFor="targetCompany">Target company</FieldLabel>
               <TextInput
                 id="targetCompany"
@@ -382,24 +342,6 @@ export function CandidateProfilePage() {
               <datalist id="profile-company-options">
                 {COMPANIES.map((company) => (
                   <option key={company} value={company} />
-                ))}
-              </datalist>
-            </div>
-            <div>
-              <FieldLabel htmlFor="interviewType">Interview type</FieldLabel>
-              <TextInput
-                id="interviewType"
-                list="profile-type-options"
-                placeholder="Select or type a type"
-                value={form.interviewType}
-                onChange={(event) => setForm({ ...form, interviewType: event.target.value })}
-                onBlur={() => {
-                  if (form.interviewType.trim().length >= 3) requestSuggestions()
-                }}
-              />
-              <datalist id="profile-type-options">
-                {INTERVIEW_TYPES.map((type) => (
-                  <option key={type} value={type} />
                 ))}
               </datalist>
             </div>

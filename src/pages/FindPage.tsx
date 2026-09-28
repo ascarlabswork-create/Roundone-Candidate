@@ -1,11 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
-  CANDIDATE_LEVELS,
   COMPANIES,
-  INTERVIEW_TYPES,
   SKILLS,
-  TARGET_ROLES,
   TIME_WINDOWS,
 } from '../data/catalogs.ts'
 import { NormalizationSuggestions } from '../components/matching/NormalizationSuggestions.tsx'
@@ -68,9 +65,9 @@ export function FindPage() {
     () => ({
       ...emptyPreferences,
       ...preferences,
-      targetRole: params.get('role') || preferences?.targetRole || '',
-      interviewType: params.get('type') || preferences?.interviewType || '',
-      candidateLevel: params.get('level') || preferences?.candidateLevel || '',
+      targetRole: '',
+      interviewType: '',
+      candidateLevel: '',
       targetCompany: params.get('company') || preferences?.targetCompany || '',
       budget: 0,
       language: '',
@@ -86,13 +83,7 @@ export function FindPage() {
   const [resumeStatus, setResumeStatus] = useState<string | null>(null)
   const [resumeError, setResumeError] = useState<string | null>(null)
   const [optionalOpen, setOptionalOpen] = useState(() =>
-    Boolean(
-      initial.targetRole ||
-        initial.candidateLevel ||
-        initial.interviewType ||
-        initial.targetCompany ||
-        initial.naturalLanguageQuery?.trim(),
-    ),
+    Boolean(initial.targetCompany || initial.naturalLanguageQuery?.trim()),
   )
 
   function addSkill(skill: string) {
@@ -121,13 +112,10 @@ export function FindPage() {
   function applySuggestions(patch: NormalizationPatch) {
     setForm((prev) => ({
       ...prev,
-      targetRole: patch.targetRole ?? prev.targetRole,
-      candidateLevel: patch.candidateLevel ?? prev.candidateLevel,
-      interviewType: patch.interviewType ?? prev.interviewType,
       targetCompany: patch.targetCompany ?? prev.targetCompany,
       skills: patch.skills ?? prev.skills,
     }))
-    if (patch.targetRole || patch.candidateLevel || patch.interviewType || patch.targetCompany) {
+    if (patch.targetCompany) {
       setOptionalOpen(true)
     }
     setSkillDraft('')
@@ -191,7 +179,6 @@ export function FindPage() {
   useEffect(() => {
     const intent = initial.naturalLanguageQuery?.trim() ?? ''
     if (autoSuggested.current || intent.length < 12) return
-    if (initial.targetRole && initial.interviewType) return
     autoSuggested.current = true
     requestSuggestions(initial)
   }, [initial])
@@ -204,6 +191,9 @@ export function FindPage() {
     event.preventDefault()
     setPreferences({
       ...form,
+      targetRole: '',
+      interviewType: '',
+      candidateLevel: '',
       budget: 0,
       language: '',
     })
@@ -212,7 +202,7 @@ export function FindPage() {
 
   const canSubmit =
     form.skills.length > 0 ||
-    Boolean(form.targetRole || form.interviewType || form.candidateLevel || form.targetCompany) ||
+    Boolean(form.targetCompany) ||
     Boolean(form.naturalLanguageQuery && form.naturalLanguageQuery.trim().length >= 12) ||
     Boolean(resumeFileName)
 
@@ -385,9 +375,7 @@ export function FindPage() {
           >
             <div>
               <p className="text-sm font-semibold text-navy-950">Optional details</p>
-              <p className="text-xs text-slate-500">
-                Describe what you want, target role, level, interview type, and company
-              </p>
+              <p className="text-xs text-slate-500">Describe what you want and target company</p>
             </div>
             <span className="text-sm font-medium text-blue-700">{optionalOpen ? 'Hide' : 'Show'}</span>
           </button>
@@ -422,67 +410,20 @@ export function FindPage() {
                 />
               )}
 
-              <div className="grid gap-5 sm:grid-cols-2">
-                <div>
-                  <FieldLabel htmlFor="targetRole">Target Role</FieldLabel>
-                  <TextInput
-                    id="targetRole"
-                    list="find-role-options"
-                    placeholder="Select or type a role"
-                    value={form.targetRole}
-                    onChange={(event) => setForm({ ...form, targetRole: event.target.value })}
-                  />
-                  <datalist id="find-role-options">
-                    {TARGET_ROLES.map((role) => (
-                      <option key={role} value={role} />
-                    ))}
-                  </datalist>
-                </div>
-                <div>
-                  <FieldLabel htmlFor="level">Candidate Level</FieldLabel>
-                  <TextInput
-                    id="level"
-                    list="find-level-options"
-                    placeholder="Select or type a level"
-                    value={form.candidateLevel}
-                    onChange={(event) => setForm({ ...form, candidateLevel: event.target.value })}
-                  />
-                  <datalist id="find-level-options">
-                    {CANDIDATE_LEVELS.map((level) => (
-                      <option key={level} value={level} />
-                    ))}
-                  </datalist>
-                </div>
-                <div>
-                  <FieldLabel htmlFor="type">Interview Type</FieldLabel>
-                  <TextInput
-                    id="type"
-                    list="find-type-options"
-                    placeholder="Select or type a type"
-                    value={form.interviewType}
-                    onChange={(event) => setForm({ ...form, interviewType: event.target.value })}
-                  />
-                  <datalist id="find-type-options">
-                    {INTERVIEW_TYPES.map((type) => (
-                      <option key={type} value={type} />
-                    ))}
-                  </datalist>
-                </div>
-                <div>
-                  <FieldLabel htmlFor="company">Target Company</FieldLabel>
-                  <TextInput
-                    id="company"
-                    list="find-company-options"
-                    placeholder="Select or type a company"
-                    value={form.targetCompany}
-                    onChange={(event) => setForm({ ...form, targetCompany: event.target.value })}
-                  />
-                  <datalist id="find-company-options">
-                    {COMPANIES.map((company) => (
-                      <option key={company} value={company} />
-                    ))}
-                  </datalist>
-                </div>
+              <div>
+                <FieldLabel htmlFor="company">Target Company</FieldLabel>
+                <TextInput
+                  id="company"
+                  list="find-company-options"
+                  placeholder="Select or type a company"
+                  value={form.targetCompany}
+                  onChange={(event) => setForm({ ...form, targetCompany: event.target.value })}
+                />
+                <datalist id="find-company-options">
+                  {COMPANIES.map((company) => (
+                    <option key={company} value={company} />
+                  ))}
+                </datalist>
               </div>
             </div>
           ) : null}

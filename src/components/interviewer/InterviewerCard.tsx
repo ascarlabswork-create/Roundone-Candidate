@@ -93,20 +93,10 @@ export function InterviewerCard({
       </div>
 
       <div className="mt-4 flex flex-wrap gap-1.5">
-        {interviewer.interviewTypes.map((type) => (
-          <Badge key={type} tone="blue">
-            {type}
-          </Badge>
-        ))}
-        {[...interviewer.skills, ...interviewer.technologies].slice(0, 4).map((skill) => (
+        {[...interviewer.skills, ...interviewer.technologies].slice(0, 6).map((skill) => (
           <Badge key={skill}>{skill}</Badge>
         ))}
       </div>
-
-      <p className="mt-3 text-sm text-slate-600">
-        <span className="font-medium text-slate-800">Suitable for:</span>{' '}
-        {interviewer.candidateLevels.join(' · ')}
-      </p>
 
       {matchExplanation || (matchedFactors && matchedFactors.length > 0) ? (
         <div className="mt-4 rounded-lg bg-slate-50 p-3">

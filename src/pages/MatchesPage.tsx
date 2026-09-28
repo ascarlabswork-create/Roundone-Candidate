@@ -19,8 +19,6 @@ export function MatchesPage() {
 
   const chips = preferences
     ? [
-        preferences.candidateLevel,
-        preferences.interviewType,
         preferences.targetCompany,
         preferences.preferredDate
           ? `${preferredDateRangeLabel(preferences.preferredDate, preferences.preferredDateEnd)}${preferences.preferredTime ? ` ${timeWindowLabel(preferences.preferredTime)}` : ''}`
@@ -56,7 +54,7 @@ export function MatchesPage() {
         <div className="mt-8">
           <EmptyState
             title="Tell us what you are preparing for"
-            body="Matching needs a target role, level, and interview type so we can rank interviewers."
+            body="Matching needs your skills or a short goal so we can rank interviewers."
             action={
               <Link to="/candidate/find">
                 <Button>Find My Interviewer</Button>

@@ -33,13 +33,12 @@ const defaultFilters: InterviewerFilters = {
 }
 
 function filtersFromParams(params: URLSearchParams): InterviewerFilters {
-  const type = params.get('type')
   return {
     ...defaultFilters,
     query: params.get('q') ?? '',
-    interviewTypes: type ? [type] : params.getAll('types'),
-    candidateLevels: params.getAll('levels'),
-    targetRoles: params.getAll('roles'),
+    interviewTypes: [],
+    candidateLevels: [],
+    targetRoles: [],
     companies: params.getAll('companies'),
     experience: params.get('experience') ?? '',
     skills: params.getAll('skills'),
@@ -56,9 +55,6 @@ function filtersFromParams(params: URLSearchParams): InterviewerFilters {
 function filtersToParams(filters: InterviewerFilters) {
   const params = new URLSearchParams()
   if (filters.query) params.set('q', filters.query)
-  filters.interviewTypes.forEach((item) => params.append('types', item))
-  filters.candidateLevels.forEach((item) => params.append('levels', item))
-  filters.targetRoles.forEach((item) => params.append('roles', item))
   filters.companies.forEach((item) => params.append('companies', item))
   filters.skills.forEach((item) => params.append('skills', item))
   filters.languages.forEach((item) => params.append('languages', item))

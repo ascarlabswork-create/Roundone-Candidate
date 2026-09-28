@@ -1,19 +1,13 @@
 import { ArrowRight, BadgeCheck, ClipboardCheck, Target } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import {
-  CANDIDATE_LEVELS,
-  COMPANIES,
-  INTERVIEW_TYPES,
-  POPULAR_COMPANIES,
-  TARGET_ROLES,
-} from '../data/catalogs.ts'
+import { COMPANIES, POPULAR_COMPANIES } from '../data/catalogs.ts'
 import { CandidateDashboard } from '../components/dashboard/CandidateDashboard.tsx'
 import { Button } from '../components/ui/Button.tsx'
 import { Card, FieldLabel, TextInput } from '../components/ui/primitives.tsx'
 
 const steps = [
-  { n: '01', title: 'Tell us your goal', body: 'Share the role, interview type, skills, and when you can meet.' },
+  { n: '01', title: 'Share your skills', body: 'Upload a resume or add the skills you want to practice.' },
   { n: '02', title: 'Get matched', body: 'See ranked interviewers with a clear explanation of why they fit.' },
   { n: '03', title: 'Book your interview', body: 'Pick a service, a time slot, and confirm in minutes.' },
   { n: '04', title: 'Improve with feedback', body: 'Leave with scores, notes, and a recommended next interview.' },
@@ -21,18 +15,12 @@ const steps = [
 
 export function HomePage() {
   const navigate = useNavigate()
-  const [goal, setGoal] = useState({
-    targetRole: '',
-    candidateLevel: '',
-    targetCompany: '',
-  })
+  const [targetCompany, setTargetCompany] = useState('')
 
   function submitGoal(event: FormEvent) {
     event.preventDefault()
     const params = new URLSearchParams()
-    if (goal.targetRole) params.set('role', goal.targetRole)
-    if (goal.candidateLevel) params.set('level', goal.candidateLevel)
-    if (goal.targetCompany) params.set('company', goal.targetCompany)
+    if (targetCompany) params.set('company', targetCompany)
     navigate(`/candidate/find?${params.toString()}`)
   }
 
@@ -51,8 +39,8 @@ export function HomePage() {
               <span className="block">for your next interview</span>
             </h1>
             <p className="mt-5 max-w-xl text-base leading-7 text-slate-600 sm:text-lg">
-              Tell us your target role, interview type, skills and availability. RoundOne helps you
-              find relevant professionals for realistic mock interviews.
+              Tell us your skills and availability. RoundOne helps you find relevant professionals for
+              realistic mock interviews.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Link to="/candidate/find">
@@ -70,46 +58,16 @@ export function HomePage() {
 
           <Card className="p-6">
             <h2 className="text-lg font-semibold text-navy-950">What are you preparing for?</h2>
-            <p className="mt-1 text-sm text-slate-600">Start with a few details. You can refine matches next.</p>
-            <form className="mt-6 grid gap-4 sm:grid-cols-2" onSubmit={submitGoal}>
+            <p className="mt-1 text-sm text-slate-600">Start with a company focus, or continue with skills next.</p>
+            <form className="mt-6 grid gap-4" onSubmit={submitGoal}>
               <div>
-                <FieldLabel htmlFor="home-role">Target Role</FieldLabel>
-                <TextInput
-                  id="home-role"
-                  list="home-role-options"
-                  placeholder="Select or type a role"
-                  value={goal.targetRole}
-                  onChange={(event) => setGoal({ ...goal, targetRole: event.target.value })}
-                />
-                <datalist id="home-role-options">
-                  {TARGET_ROLES.map((role) => (
-                    <option key={role} value={role} />
-                  ))}
-                </datalist>
-              </div>
-              <div>
-                <FieldLabel htmlFor="home-level">Target Level</FieldLabel>
-                <TextInput
-                  id="home-level"
-                  list="home-level-options"
-                  placeholder="Select or type a level"
-                  value={goal.candidateLevel}
-                  onChange={(event) => setGoal({ ...goal, candidateLevel: event.target.value })}
-                />
-                <datalist id="home-level-options">
-                  {CANDIDATE_LEVELS.map((level) => (
-                    <option key={level} value={level} />
-                  ))}
-                </datalist>
-              </div>
-              <div className="sm:col-span-2">
                 <FieldLabel htmlFor="home-company">Target Company</FieldLabel>
                 <TextInput
                   id="home-company"
                   list="home-company-options"
                   placeholder="e.g. Google, Amazon, Flipkart"
-                  value={goal.targetCompany}
-                  onChange={(event) => setGoal({ ...goal, targetCompany: event.target.value })}
+                  value={targetCompany}
+                  onChange={(event) => setTargetCompany(event.target.value)}
                 />
                 <datalist id="home-company-options">
                   {COMPANIES.map((company) => (
@@ -117,29 +75,12 @@ export function HomePage() {
                   ))}
                 </datalist>
               </div>
-              <div className="sm:col-span-2">
-                <Button type="submit" fullWidth>
-                  Continue
-                  <ArrowRight className="h-4 w-4" />
-                </Button>
-              </div>
+              <Button type="submit" fullWidth>
+                Continue
+                <ArrowRight className="h-4 w-4" />
+              </Button>
             </form>
           </Card>
-        </div>
-      </section>
-
-      <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6">
-        <h2 className="text-lg font-semibold text-navy-950">Popular interview categories</h2>
-        <div className="mt-4 flex flex-wrap gap-2">
-          {INTERVIEW_TYPES.map((type) => (
-            <Link
-              key={type}
-              to={`/candidate/interviewers?type=${encodeURIComponent(type)}`}
-              className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 hover:border-navy-700 hover:text-navy-900"
-            >
-              {type}
-            </Link>
-          ))}
         </div>
       </section>
 
@@ -153,8 +94,8 @@ export function HomePage() {
             },
             {
               icon: Target,
-              title: 'Role-Specific Mock Interviews',
-              body: 'Coding, system design, behavioral, ML, product, and data science — matched to your level.',
+              title: 'Skill-based matching',
+              body: 'Ranked matches based on the skills you want to practice.',
             },
             {
               icon: ClipboardCheck,
@@ -199,7 +140,6 @@ export function HomePage() {
           </div>
         </div>
       </section>
-
     </div>
   )
 }

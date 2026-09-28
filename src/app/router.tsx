@@ -1,4 +1,4 @@
-import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { RequireCandidateAuth } from '../components/auth/RequireCandidateAuth.tsx'
 import { CandidateLayout } from '../components/layout/CandidateLayout.tsx'
 import { AuthCallbackPage } from '../pages/AuthCallbackPage.tsx'
@@ -24,11 +24,7 @@ import { PreparationPage } from '../pages/PreparationPage.tsx'
 import { ResumeSkillsPage } from '../pages/ResumeSkillsPage.tsx'
 import { ProgressPage } from '../pages/ProgressPage.tsx'
 import { SearchPage } from '../pages/SearchPage.tsx'
-import {
-  InterviewTypesPage,
-  NotFoundPage,
-  ResourcesPage,
-} from '../pages/SupportingPages.tsx'
+import { NotFoundPage, ResourcesPage } from '../pages/SupportingPages.tsx'
 
 export function AppRouter() {
   return (
@@ -57,7 +53,7 @@ export function AppRouter() {
             <Route path="/candidate/preparation" element={<PreparationPage />} />
             <Route path="/candidate/resume-skills" element={<ResumeSkillsPage />} />
             <Route path="/candidate/practice/:type" element={<PracticePage />} />
-            <Route path="/candidate/interview-types" element={<InterviewTypesPage />} />
+            <Route path="/candidate/interview-types" element={<Navigate to="/candidate/interviewers" replace />} />
             <Route path="/candidate/resources" element={<ResourcesPage />} />
             <Route path="/candidate/notifications" element={<NotificationsPage />} />
             <Route path="/candidate/profile" element={<CandidateProfilePage />} />

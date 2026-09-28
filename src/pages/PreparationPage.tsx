@@ -8,11 +8,10 @@ import {
   EmptyState,
   FieldLabel,
   PageHeader,
-  SelectInput,
   TextArea,
   TextInput,
 } from '../components/ui/primitives.tsx'
-import { INTERVIEW_TYPES, SKILLS, TARGET_ROLES } from '../data/catalogs.ts'
+import { SKILLS } from '../data/catalogs.ts'
 import { requestPreparationAssist } from '../preparation/aiAssist.ts'
 import {
   canGeneratePreparation,
@@ -130,48 +129,6 @@ export function PreparationPage() {
       />
 
       <form className="mt-8 space-y-5 rounded-xl border border-slate-200 bg-white p-5 sm:p-8" onSubmit={(event) => void generate(event)}>
-        <div className="grid gap-5 sm:grid-cols-2">
-          <div>
-            <FieldLabel htmlFor="prep-role">Target role</FieldLabel>
-            <TextInput
-              id="prep-role"
-              list="prep-role-options"
-              value={input.targetRole}
-              onChange={(event) => setInput({ ...input, targetRole: event.target.value })}
-              placeholder="Backend Engineer"
-            />
-            <datalist id="prep-role-options">
-              {TARGET_ROLES.map((role) => (
-                <option key={role} value={role} />
-              ))}
-            </datalist>
-          </div>
-          <div>
-            <FieldLabel htmlFor="prep-level">Experience level</FieldLabel>
-            <TextInput
-              id="prep-level"
-              value={input.experienceLevel}
-              onChange={(event) => setInput({ ...input, experienceLevel: event.target.value })}
-              placeholder="SDE 2"
-            />
-          </div>
-          <div className="sm:col-span-2">
-            <FieldLabel htmlFor="prep-type">Interview type</FieldLabel>
-            <SelectInput
-              id="prep-type"
-              value={input.interviewType}
-              onChange={(event) => setInput({ ...input, interviewType: event.target.value })}
-            >
-              <option value="">Select a type (optional)</option>
-              {INTERVIEW_TYPES.map((type) => (
-                <option key={type} value={type}>
-                  {type}
-                </option>
-              ))}
-            </SelectInput>
-          </div>
-        </div>
-
         <div>
           <FieldLabel htmlFor="prep-skills">Skills</FieldLabel>
           <div className="flex gap-2">
@@ -254,11 +211,6 @@ export function PreparationPage() {
             <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Based on your profile</p>
             <h2 className="mt-1 font-semibold text-navy-950">Preparation summary</h2>
             <p className="mt-2 text-sm leading-6 text-slate-700">{result.profileSummary}</p>
-            {input.targetRole ? (
-              <p className="mt-3 text-sm text-slate-600">
-                Target role: <span className="font-medium text-navy-950">{input.targetRole}</span>
-              </p>
-            ) : null}
           </Card>
 
           <Card className="p-5 sm:p-6">
