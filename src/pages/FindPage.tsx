@@ -212,7 +212,10 @@ export function FindPage() {
         title="Tell us about your interview"
         subtitle="We’ll rank interviewers against this goal. You can still browse everyone afterwards."
         actions={
-          <Link to="/candidate/job-match" className="text-sm font-medium text-blue-700">
+          <Link
+            to="/candidate/job-match"
+            className="inline-flex h-11 shrink-0 items-center justify-center whitespace-nowrap rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-navy-950 transition-colors hover:border-navy-700 hover:bg-slate-50 hover:text-navy-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
+          >
             Match interviewers to a job posting
           </Link>
         }
