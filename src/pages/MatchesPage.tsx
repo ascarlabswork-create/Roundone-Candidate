@@ -1,9 +1,9 @@
 import { Link } from 'react-router-dom'
-import { recommendMatchedInterviewers } from '../matching/index.ts'
-import { InterviewerCard, InterviewerCardSkeleton } from '../components/interviewer/InterviewerCard.tsx'
+import { SkillMatchCard, SkillMatchCardSkeleton } from '../components/interviewer/SkillMatchCard.tsx'
 import { Button } from '../components/ui/Button.tsx'
 import { EmptyState, ErrorState, PageHeader } from '../components/ui/primitives.tsx'
 import { useAsync } from '../lib/useAsync.ts'
+import { recommendMatchedInterviewers } from '../matching/index.ts'
 import { useMatching } from '../state/matching.tsx'
 
 export function MatchesPage() {
@@ -19,7 +19,7 @@ export function MatchesPage() {
       <PageHeader
         eyebrow="Recommended for you"
         title="Best matches for your skills"
-        subtitle="Ranked by skill overlap only. Availability, services, and other preferences are not used to hide matches."
+        subtitle="Ranked by skill overlap"
         actions={
           <Link to="/candidate/find">
             <Button variant="outline">Edit goal</Button>
@@ -43,22 +43,26 @@ export function MatchesPage() {
 
       {ready && state.status === 'loading' ? (
         <div className="mt-8 space-y-4">
-          <InterviewerCardSkeleton />
-          <InterviewerCardSkeleton />
+          <SkillMatchCardSkeleton />
+          <SkillMatchCardSkeleton />
+          <SkillMatchCardSkeleton />
         </div>
       ) : null}
 
       {ready && state.status === 'error' ? (
         <div className="mt-8">
-          <ErrorState body={state.error} />
+          <ErrorState
+            title="Couldn't load skill matches"
+            body="Couldn't load skill matches. Please try again."
+          />
         </div>
       ) : null}
 
       {ready && state.status === 'success' && state.data.length === 0 ? (
         <div className="mt-8">
           <EmptyState
-            title="No strong skill matches found yet."
-            body="We could not find listed interviewers who share your skills. Try different skills or browse everyone."
+            title="No skill matches found yet"
+            body="We couldn't find interviewers who share your current skills."
             action={
               <Link to="/candidate/interviewers">
                 <Button>Browse Interviewers</Button>
@@ -71,12 +75,10 @@ export function MatchesPage() {
       {ready && state.status === 'success' && state.data.length > 0 ? (
         <div className="mt-8 space-y-4">
           {state.data.map(({ interviewer, match }) => (
-            <InterviewerCard
+            <SkillMatchCard
               key={interviewer.id}
               interviewer={interviewer}
-              matchScore={match.score}
               skillMatch={match.skillMatch}
-              fromMatches
             />
           ))}
         </div>

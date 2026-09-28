@@ -1,7 +1,12 @@
-import type { MatchingPreferences, MatchResult } from '../types.ts'
+import type { MatchingPreferences } from '../types.ts'
 import { resolveMatchingCandidateSkills } from './candidateSkills.ts'
-import { loadMatchingCatalog, type MatchingCatalogPerson } from './catalog.ts'
-import { rankInterviewers } from './score.ts'
+import type { MatchingCatalogPerson } from './catalog.ts'
+import type { MatchResult } from '../types.ts'
+import {
+  matchInterviewersBySkills,
+  skillMatchRowToCatalogPerson,
+  skillMatchRowToMatchResult,
+} from '../services/skillMatch.ts'
 
 /** Top skill-compatible matches shown on Find → Matches. */
 export const MATCHING_RESULT_LIMIT = 5
@@ -14,32 +19,24 @@ export type RecommendedMatch = {
 }
 
 /**
- * Skill-only recommendations: rank public interviewers by skill overlap and return top 5.
- * Availability, services, role, price, and AI assist are not used for inclusion or ranking.
+ * Skill-only recommendations via secure match_interviewers_by_skills RPC.
+ * Does not use is_listed, availability, services, or other non-skill factors.
  */
 export async function recommendMatchedInterviewers(prefs: MatchingPreferences): Promise<RecommendedMatch[]> {
   const candidateSkills = await resolveMatchingCandidateSkills(prefs.skills)
   if (candidateSkills.length === 0) return []
 
-  let catalog: MatchingCatalogPerson[]
+  let rows
   try {
-    catalog = await loadMatchingCatalog()
+    rows = await matchInterviewersBySkills(candidateSkills)
   } catch (error) {
-    console.error('matching catalog failed', error)
+    console.error('skill match RPC failed', error)
     throw new Error('Unable to load interviewers. Please try again.')
   }
-  if (catalog.length === 0) return []
 
-  const skillPrefs: MatchingPreferences = { ...prefs, skills: candidateSkills }
-  const ranked = rankInterviewers(catalog, skillPrefs)
-  const byId = new Map(catalog.map((person) => [person.id, person]))
-
-  // Only interviewers with at least one overlapping skill appear in results.
-  const withOverlap = ranked.filter((match) => match.skillMatch.matchedSkills.length > 0)
-
-  return withOverlap.slice(0, MATCHING_RESULT_LIMIT).flatMap((match) => {
-    const interviewer = byId.get(match.interviewerId)
-    if (!interviewer) return []
-    return [{ interviewer, match, candidateSkills }]
-  })
+  return rows.slice(0, MATCHING_RESULT_LIMIT).map((row) => ({
+    interviewer: skillMatchRowToCatalogPerson(row),
+    match: skillMatchRowToMatchResult(row),
+    candidateSkills,
+  }))
 }

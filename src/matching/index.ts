@@ -18,4 +18,20 @@ export {
   normalizeSkill,
   skillMatchScore,
 } from './skills.ts'
+export {
+  canonicalizeSkill,
+  skillDisplayName,
+  skillLookupKey,
+  skillsMatch,
+} from './skillCanonical.ts'
 export { resolveMatchingCandidateSkills } from './candidateSkills.ts'
+export {
+  MATCH_INTERVIEWERS_BY_SKILLS_RPC,
+  matchInterviewersBySkills,
+} from '../services/skillMatch.ts'
+export {
+  mapSkillMatchRpcRow,
+  skillMatchRowToCatalogPerson,
+  skillMatchRowToMatchResult,
+  type SkillMatchRpcRow,
+} from '../services/skillMatchMap.ts'
