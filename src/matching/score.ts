@@ -158,12 +158,6 @@ function languageScore(interviewer: Interviewer, language: string) {
 
 export function buildReasons(breakdown: MatchBreakdown): MatchReason[] {
   return [
-    { key: 'type', label: 'Interview type match', matched: breakdown.interviewType >= 1 },
-    {
-      key: 'role-level',
-      label: 'Role/level match',
-      matched: breakdown.targetRole >= 0.6 && breakdown.candidateLevel >= 1,
-    },
     { key: 'skills', label: 'Relevant skills', matched: breakdown.skills >= 0.5 },
     { key: 'company', label: 'Company/domain experience', matched: breakdown.company >= 0.7 },
     { key: 'availability', label: 'Availability match', matched: breakdown.availability >= 0.7 },

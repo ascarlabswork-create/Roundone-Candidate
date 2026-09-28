@@ -263,26 +263,6 @@ function ExpertiseTab({ interviewer }: { interviewer: Interviewer }) {
           ))}
         </div>
       </section>
-      <section>
-        <h2 className="text-base font-semibold text-navy-950">Interview Types</h2>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {interviewer.interviewTypes.map((item) => (
-            <Badge key={item} tone="blue">
-              {item}
-            </Badge>
-          ))}
-        </div>
-      </section>
-      <section>
-        <h2 className="text-base font-semibold text-navy-950">Suitable Levels</h2>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {interviewer.candidateLevels.map((item) => (
-            <Badge key={item} tone="navy">
-              {item}
-            </Badge>
-          ))}
-        </div>
-      </section>
     </div>
   )
 }

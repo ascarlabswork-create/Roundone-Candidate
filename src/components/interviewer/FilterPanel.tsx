@@ -1,10 +1,7 @@
 import {
-  CANDIDATE_LEVELS,
   COMPANIES,
-  INTERVIEW_TYPES,
   LANGUAGES,
   SKILLS,
-  TARGET_ROLES,
 } from '../../data/catalogs.ts'
 import type { InterviewerFilters } from '../../types.ts'
 import { Button } from '../ui/Button.tsx'
@@ -104,24 +101,6 @@ export function FilterPanel({
         />
       </div>
 
-      <MultiCheck
-        label="Interview Type"
-        options={INTERVIEW_TYPES}
-        values={filters.interviewTypes}
-        onChange={(interviewTypes) => onChange({ ...filters, interviewTypes })}
-      />
-      <MultiCheck
-        label="Candidate Level"
-        options={CANDIDATE_LEVELS}
-        values={filters.candidateLevels}
-        onChange={(candidateLevels) => onChange({ ...filters, candidateLevels })}
-      />
-      <MultiCheck
-        label="Target Role"
-        options={TARGET_ROLES}
-        values={filters.targetRoles}
-        onChange={(targetRoles) => onChange({ ...filters, targetRoles })}
-      />
       <MultiCheck
         label="Company"
         options={COMPANIES}

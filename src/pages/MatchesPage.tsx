@@ -19,8 +19,6 @@ export function MatchesPage() {
 
   const chips = preferences
     ? [
-        preferences.candidateLevel,
-        preferences.interviewType,
         preferences.targetCompany,
         preferences.preferredDate
           ? `${preferredDateRangeLabel(preferences.preferredDate, preferences.preferredDateEnd)}${preferences.preferredTime ? ` ${timeWindowLabel(preferences.preferredTime)}` : ''}`
@@ -34,7 +32,7 @@ export function MatchesPage() {
       <PageHeader
         eyebrow="Recommended for you"
         title="Best matches for your interview goal"
-        subtitle="Only interviewers with current bookable availability are shown, then ranked by compatibility. Short explanations appear when matching assist is available."
+        subtitle="Ranked by skill compatibility. Bookable availability is shown on each card and does not hide skill matches. Short explanations appear when matching assist is available."
         actions={
           <Link to="/candidate/find">
             <Button variant="outline">Edit goal</Button>
@@ -56,7 +54,7 @@ export function MatchesPage() {
         <div className="mt-8">
           <EmptyState
             title="Tell us what you are preparing for"
-            body="Matching needs a target role, level, and interview type so we can rank interviewers."
+            body="Matching needs your skills or a short goal so we can rank interviewers."
             action={
               <Link to="/candidate/find">
                 <Button>Find My Interviewer</Button>
@@ -82,8 +80,8 @@ export function MatchesPage() {
       {ready && state.status === 'success' && state.data.length === 0 ? (
         <div className="mt-8">
           <EmptyState
-            title="No available interviewers match yet"
-            body="Matches only include listed interviewers who currently have a bookable slot. Try another date or browse the directory."
+            title="No interviewers match yet"
+            body="We could not find listed interviewers for this goal. Try different skills or browse the directory."
             action={
               <Link to="/candidate/interviewers">
                 <Button>Browse Interviewers</Button>
@@ -95,7 +93,7 @@ export function MatchesPage() {
 
       {ready && state.status === 'success' && state.data.length > 0 ? (
         <div className="mt-8 space-y-4">
-          {state.data.map(({ interviewer, match, ai }) => (
+          {state.data.map(({ interviewer, match, ai, hasBookableSlot }) => (
             <InterviewerCard
               key={interviewer.id}
               interviewer={interviewer}
@@ -103,6 +101,7 @@ export function MatchesPage() {
               reasons={match.reasons}
               matchedFactors={ai?.matchedFactors}
               matchExplanation={ai?.explanation}
+              hasBookableSlot={hasBookableSlot}
               fromMatches
             />
           ))}

@@ -44,18 +44,6 @@ function AvailabilityCell({ person }: { person: Interviewer }) {
   return <span>{next ? formatDateTimeInZone(next.start, person.availability.timezone) : 'See booking for live times'}</span>
 }
 
-function TypeBadges({ person }: { person: Interviewer }) {
-  return (
-    <div className="flex flex-wrap gap-1">
-      {person.interviewTypes.map((type) => (
-        <Badge key={type} tone="blue">
-          {type}
-        </Badge>
-      ))}
-    </div>
-  )
-}
-
 function SkillBadges({ person }: { person: Interviewer }) {
   return (
     <div className="flex flex-wrap gap-1">
@@ -118,11 +106,6 @@ function compareRows(matchById: Map<string, number>): Array<{
       key: 'completed',
       label: 'Completed interviews',
       cell: (person) => formatCount(person.completedInterviews),
-    },
-    {
-      key: 'types',
-      label: 'Interview types',
-      cell: (person) => <TypeBadges person={person} />,
     },
     {
       key: 'skills',

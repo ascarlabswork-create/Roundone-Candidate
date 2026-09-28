@@ -29,6 +29,7 @@ export function InterviewerCard({
   reasons,
   matchedFactors,
   matchExplanation,
+  hasBookableSlot,
   selected,
   onToggleCompare,
   compareFull,
@@ -39,6 +40,8 @@ export function InterviewerCard({
   reasons?: MatchReason[]
   matchedFactors?: string[]
   matchExplanation?: string
+  /** When set (Find → Matches), shows live bookable status without hiding the card. */
+  hasBookableSlot?: boolean
   selected?: boolean
   onToggleCompare?: () => void
   compareFull?: boolean
@@ -73,6 +76,11 @@ export function InterviewerCard({
                     Online
                   </span>
                 ) : null}
+                {hasBookableSlot === true ? (
+                  <Badge tone="green">Bookable now</Badge>
+                ) : hasBookableSlot === false ? (
+                  <Badge tone="slate">No open slots for your dates</Badge>
+                ) : null}
               </div>
               <p className="mt-0.5 text-sm text-slate-600">
                 {interviewer.currentRole} @ {interviewer.company}
@@ -93,20 +101,10 @@ export function InterviewerCard({
       </div>
 
       <div className="mt-4 flex flex-wrap gap-1.5">
-        {interviewer.interviewTypes.map((type) => (
-          <Badge key={type} tone="blue">
-            {type}
-          </Badge>
-        ))}
-        {[...interviewer.skills, ...interviewer.technologies].slice(0, 4).map((skill) => (
+        {[...interviewer.skills, ...interviewer.technologies].slice(0, 6).map((skill) => (
           <Badge key={skill}>{skill}</Badge>
         ))}
       </div>
-
-      <p className="mt-3 text-sm text-slate-600">
-        <span className="font-medium text-slate-800">Suitable for:</span>{' '}
-        {interviewer.candidateLevels.join(' · ')}
-      </p>
 
       {matchExplanation || (matchedFactors && matchedFactors.length > 0) ? (
         <div className="mt-4 rounded-lg bg-slate-50 p-3">
