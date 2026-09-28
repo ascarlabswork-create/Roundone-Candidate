@@ -67,7 +67,8 @@ export function FindPage() {
       initial.targetRole ||
         initial.candidateLevel ||
         initial.interviewType ||
-        initial.targetCompany,
+        initial.targetCompany ||
+        initial.naturalLanguageQuery?.trim(),
     ),
   )
 
@@ -257,37 +258,6 @@ export function FindPage() {
           </div>
         </div>
 
-        <div>
-          <FieldLabel htmlFor="intent">Describe what you want</FieldLabel>
-          <TextInput
-            id="intent"
-            placeholder="I want a backend interview for Python and FastAPI, preferably someone who has worked with startups."
-            value={form.naturalLanguageQuery ?? ''}
-            onChange={(event) => setForm({ ...form, naturalLanguageQuery: event.target.value })}
-            onBlur={() => {
-              window.clearTimeout(intentTimer.current)
-              const intent = form.naturalLanguageQuery?.trim() ?? ''
-              if (intent.length < 12) return
-              intentTimer.current = window.setTimeout(() => requestSuggestions(), 700)
-            }}
-          />
-          <p className="mt-1 text-xs text-slate-500">
-            We’ll turn this into structured matching signals. Ranking still uses verified interviewer data.
-          </p>
-        </div>
-
-        <div className="space-y-3">
-          <Button variant="outline" onClick={() => requestSuggestions()} disabled={suggestionStatus === 'loading'}>
-            {suggestionStatus === 'loading' ? 'Suggesting…' : 'Suggest matches'}
-          </Button>
-          <NormalizationSuggestions
-            status={suggestionStatus}
-            suggestions={suggestions}
-            currentSkills={form.skills}
-            onApply={applySuggestions}
-          />
-        </div>
-
         <div className="grid gap-5 sm:grid-cols-2">
           <div className="sm:col-span-2">
             <FieldLabel htmlFor="date-from">Preferred Date</FieldLabel>
@@ -365,7 +335,7 @@ export function FindPage() {
             <div>
               <p className="text-sm font-semibold text-navy-950">Optional details</p>
               <p className="text-xs text-slate-500">
-                Target role, level, interview type, and company
+                Describe what you want, target role, level, interview type, and company
               </p>
             </div>
             <span className="text-sm font-medium text-blue-700">{optionalOpen ? 'Hide' : 'Show'}</span>
@@ -373,6 +343,34 @@ export function FindPage() {
 
           {optionalOpen ? (
             <div className="space-y-5 border-t border-slate-100 px-4 py-4">
+              <div>
+                <FieldLabel htmlFor="intent">Describe what you want</FieldLabel>
+                <TextInput
+                  id="intent"
+                  placeholder="I want a backend interview for Python and FastAPI, preferably someone who has worked with startups."
+                  value={form.naturalLanguageQuery ?? ''}
+                  onChange={(event) => setForm({ ...form, naturalLanguageQuery: event.target.value })}
+                  onBlur={() => {
+                    window.clearTimeout(intentTimer.current)
+                    const intent = form.naturalLanguageQuery?.trim() ?? ''
+                    if (intent.length < 12) return
+                    intentTimer.current = window.setTimeout(() => requestSuggestions(), 700)
+                  }}
+                />
+                <p className="mt-1 text-xs text-slate-500">
+                  We’ll turn this into structured matching signals. Ranking still uses verified interviewer data.
+                </p>
+              </div>
+
+              {(suggestionStatus !== 'idle' || suggestions) && (
+                <NormalizationSuggestions
+                  status={suggestionStatus}
+                  suggestions={suggestions}
+                  currentSkills={form.skills}
+                  onApply={applySuggestions}
+                />
+              )}
+
               <div className="grid gap-5 sm:grid-cols-2">
                 <div>
                   <FieldLabel htmlFor="targetRole">Target Role</FieldLabel>
