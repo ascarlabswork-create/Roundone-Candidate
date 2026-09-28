@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   CANDIDATE_LEVELS,
   COMPANIES,
@@ -13,9 +13,25 @@ import { Button } from '../components/ui/Button.tsx'
 import { Chip, FieldLabel, PageHeader, SelectInput, TextInput } from '../components/ui/primitives.tsx'
 import { toNormalizationInput, type NormalizationPatch } from '../matching/normalizeModel.ts'
 import { usePreferenceNormalization } from '../matching/usePreferenceNormalization.ts'
+import { extractResumeText, RESUME_ACCEPT } from '../resume/resumeText.ts'
 import { emptyPreferences, useMatching } from '../state/matching.tsx'
 import type { TimeWindow } from '../data/catalogs.ts'
 import type { MatchingPreferences } from '../types.ts'
+
+function skillsFromResumeText(text: string, existing: string[]) {
+  const haystack = ` ${text.toLowerCase().replace(/\s+/g, ' ')} `
+  const next = [...existing]
+  for (const skill of SKILLS) {
+    const needle = skill.toLowerCase()
+    const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const boundary = new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`)
+    if (!boundary.test(haystack)) continue
+    if (next.some((item) => item.toLowerCase() === needle)) continue
+    next.push(skill)
+    if (next.length >= existing.length + 12) break
+  }
+  return next
+}
 
 export function FindPage() {
   const navigate = useNavigate()
@@ -24,6 +40,7 @@ export function FindPage() {
   const { status: suggestionStatus, suggestions, suggest, clear } = usePreferenceNormalization()
   const intentTimer = useRef<number>(0)
   const autoSuggested = useRef(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const initial = useMemo<MatchingPreferences>(
     () => ({
@@ -42,6 +59,19 @@ export function FindPage() {
 
   const [form, setForm] = useState<MatchingPreferences>(initial)
   const [skillDraft, setSkillDraft] = useState('')
+  const [resumeFileName, setResumeFileName] = useState<string | null>(null)
+  const [resumeExtracting, setResumeExtracting] = useState(false)
+  const [resumeError, setResumeError] = useState<string | null>(null)
+  const [optionalOpen, setOptionalOpen] = useState(() =>
+    Boolean(
+      initial.targetRole ||
+        initial.candidateLevel ||
+        initial.interviewType ||
+        initial.targetCompany ||
+        initial.preferredDate ||
+        initial.preferredTime,
+    ),
+  )
 
   function addSkill(skill: string) {
     const value = skill.trim()
@@ -75,8 +105,37 @@ export function FindPage() {
       targetCompany: patch.targetCompany ?? prev.targetCompany,
       skills: patch.skills ?? prev.skills,
     }))
+    if (patch.targetRole || patch.candidateLevel || patch.interviewType || patch.targetCompany) {
+      setOptionalOpen(true)
+    }
     setSkillDraft('')
     clear()
+  }
+
+  async function onResumeSelected(file: File | null) {
+    setResumeError(null)
+    if (!file) return
+
+    setResumeExtracting(true)
+    setResumeFileName(file.name)
+    try {
+      const text = await extractResumeText(file)
+      setForm((prev) => ({
+        ...prev,
+        skills: skillsFromResumeText(text, prev.skills),
+      }))
+    } catch (error) {
+      setResumeError(error instanceof Error ? error.message : 'Could not read that resume file.')
+    } finally {
+      setResumeExtracting(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  function clearResume() {
+    setResumeFileName(null)
+    setResumeError(null)
+    if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
   useEffect(() => {
@@ -102,9 +161,10 @@ export function FindPage() {
   }
 
   const canSubmit =
-    Boolean(form.targetRole && form.interviewType && form.candidateLevel) ||
-    Boolean(form.naturalLanguageQuery && form.naturalLanguageQuery.trim().length >= 12)
-  const structuredRequired = !(form.naturalLanguageQuery && form.naturalLanguageQuery.trim().length >= 12)
+    form.skills.length > 0 ||
+    Boolean(form.targetRole || form.interviewType || form.candidateLevel || form.targetCompany) ||
+    Boolean(form.naturalLanguageQuery && form.naturalLanguageQuery.trim().length >= 12) ||
+    Boolean(resumeFileName)
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
@@ -114,79 +174,55 @@ export function FindPage() {
       />
 
       <form onSubmit={submit} className="mt-8 space-y-5 rounded-xl border border-slate-200 bg-white p-5 sm:p-8">
-        <div className="grid gap-5 sm:grid-cols-2">
-          <div>
-            <FieldLabel htmlFor="targetRole">Target Role</FieldLabel>
-            <TextInput
-              id="targetRole"
-              required={structuredRequired}
-              list="find-role-options"
-              placeholder="Select or type a role"
-              value={form.targetRole}
-              onChange={(event) => setForm({ ...form, targetRole: event.target.value })}
-            />
-            <datalist id="find-role-options">
-              {TARGET_ROLES.map((role) => (
-                <option key={role} value={role} />
-              ))}
-            </datalist>
-          </div>
-          <div>
-            <FieldLabel htmlFor="level">Candidate Level</FieldLabel>
-            <TextInput
-              id="level"
-              required={structuredRequired}
-              list="find-level-options"
-              placeholder="Select or type a level"
-              value={form.candidateLevel}
-              onChange={(event) => setForm({ ...form, candidateLevel: event.target.value })}
-            />
-            <datalist id="find-level-options">
-              {CANDIDATE_LEVELS.map((level) => (
-                <option key={level} value={level} />
-              ))}
-            </datalist>
-          </div>
-          <div>
-            <FieldLabel htmlFor="type">Interview Type</FieldLabel>
-            <TextInput
-              id="type"
-              required={structuredRequired}
-              list="find-type-options"
-              placeholder="Select or type a type"
-              value={form.interviewType}
-              onChange={(event) => setForm({ ...form, interviewType: event.target.value })}
-            />
-            <datalist id="find-type-options">
-              {INTERVIEW_TYPES.map((type) => (
-                <option key={type} value={type} />
-              ))}
-            </datalist>
-          </div>
-          <div>
-            <FieldLabel htmlFor="company">Target Company</FieldLabel>
-            <TextInput
-              id="company"
-              list="find-company-options"
-              placeholder="Select or type a company"
-              value={form.targetCompany}
-              onChange={(event) => setForm({ ...form, targetCompany: event.target.value })}
-            />
-            <datalist id="find-company-options">
-              {COMPANIES.map((company) => (
-                <option key={company} value={company} />
-              ))}
-            </datalist>
+        <div>
+          <FieldLabel htmlFor="resume-file">Resume</FieldLabel>
+          <input
+            ref={fileInputRef}
+            id="resume-file"
+            type="file"
+            accept={RESUME_ACCEPT}
+            className="hidden"
+            onChange={(event) => void onResumeSelected(event.target.files?.[0] ?? null)}
+          />
+          <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={resumeExtracting}
+              >
+                {resumeExtracting ? 'Reading file…' : resumeFileName ? 'Replace file' : 'Upload resume'}
+              </Button>
+              {resumeFileName ? (
+                <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                  <span className="inline-flex max-w-full items-center gap-2 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-navy-950">
+                    <span className="truncate font-medium" title={resumeFileName}>
+                      {resumeFileName}
+                    </span>
+                    <button
+                      type="button"
+                      className="shrink-0 text-slate-500 hover:text-navy-900"
+                      onClick={clearResume}
+                      aria-label="Remove resume"
+                    >
+                      ×
+                    </button>
+                  </span>
+                  {!resumeExtracting && !resumeError ? (
+                    <span className="text-xs text-slate-500">Attached · matching skills added when found</span>
+                  ) : null}
+                </div>
+              ) : (
+                <span className="text-sm text-slate-500">PDF or plain text, up to 8 MB. The file stays visible here after upload.</span>
+              )}
+            </div>
+            {resumeError ? <p className="mt-2 text-sm text-red-700">{resumeError}</p> : null}
           </div>
         </div>
 
         <div>
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <FieldLabel htmlFor="skills">Skills / Technologies</FieldLabel>
-            <Link to="/candidate/resume-skills" className="text-xs font-medium text-blue-700 hover:text-blue-800">
-              Import from resume
-            </Link>
-          </div>
+          <FieldLabel htmlFor="skills">Skills / Technologies</FieldLabel>
           <div className="flex gap-2">
             <TextInput
               id="skills"
@@ -224,7 +260,7 @@ export function FindPage() {
         </div>
 
         <div>
-          <FieldLabel htmlFor="intent">Describe what you want (optional)</FieldLabel>
+          <FieldLabel htmlFor="intent">Describe what you want</FieldLabel>
           <TextInput
             id="intent"
             placeholder="I want a backend interview for Python and FastAPI, preferably someone who has worked with startups."
@@ -254,33 +290,117 @@ export function FindPage() {
           />
         </div>
 
-        <div className="grid gap-5 sm:grid-cols-2">
-          <div>
-            <FieldLabel htmlFor="date">Preferred Date</FieldLabel>
-            <TextInput
-              id="date"
-              type="date"
-              value={form.preferredDate}
-              onChange={(event) => setForm({ ...form, preferredDate: event.target.value })}
-            />
-          </div>
-          <div>
-            <FieldLabel htmlFor="time">Preferred Time</FieldLabel>
-            <SelectInput
-              id="time"
-              value={form.preferredTime}
-              onChange={(event) =>
-                setForm({ ...form, preferredTime: event.target.value as TimeWindow | '' })
-              }
-            >
-              <option value="">Any time</option>
-              {TIME_WINDOWS.map((window) => (
-                <option key={window.id} value={window.id}>
-                  {window.label}
-                </option>
-              ))}
-            </SelectInput>
-          </div>
+        <div className="rounded-lg border border-slate-200">
+          <button
+            type="button"
+            className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+            onClick={() => setOptionalOpen((open) => !open)}
+            aria-expanded={optionalOpen}
+          >
+            <div>
+              <p className="text-sm font-semibold text-navy-950">Optional details</p>
+              <p className="text-xs text-slate-500">
+                Target role, level, interview type, company, and preferred time
+              </p>
+            </div>
+            <span className="text-sm font-medium text-blue-700">{optionalOpen ? 'Hide' : 'Show'}</span>
+          </button>
+
+          {optionalOpen ? (
+            <div className="space-y-5 border-t border-slate-100 px-4 py-4">
+              <div className="grid gap-5 sm:grid-cols-2">
+                <div>
+                  <FieldLabel htmlFor="targetRole">Target Role</FieldLabel>
+                  <TextInput
+                    id="targetRole"
+                    list="find-role-options"
+                    placeholder="Select or type a role"
+                    value={form.targetRole}
+                    onChange={(event) => setForm({ ...form, targetRole: event.target.value })}
+                  />
+                  <datalist id="find-role-options">
+                    {TARGET_ROLES.map((role) => (
+                      <option key={role} value={role} />
+                    ))}
+                  </datalist>
+                </div>
+                <div>
+                  <FieldLabel htmlFor="level">Candidate Level</FieldLabel>
+                  <TextInput
+                    id="level"
+                    list="find-level-options"
+                    placeholder="Select or type a level"
+                    value={form.candidateLevel}
+                    onChange={(event) => setForm({ ...form, candidateLevel: event.target.value })}
+                  />
+                  <datalist id="find-level-options">
+                    {CANDIDATE_LEVELS.map((level) => (
+                      <option key={level} value={level} />
+                    ))}
+                  </datalist>
+                </div>
+                <div>
+                  <FieldLabel htmlFor="type">Interview Type</FieldLabel>
+                  <TextInput
+                    id="type"
+                    list="find-type-options"
+                    placeholder="Select or type a type"
+                    value={form.interviewType}
+                    onChange={(event) => setForm({ ...form, interviewType: event.target.value })}
+                  />
+                  <datalist id="find-type-options">
+                    {INTERVIEW_TYPES.map((type) => (
+                      <option key={type} value={type} />
+                    ))}
+                  </datalist>
+                </div>
+                <div>
+                  <FieldLabel htmlFor="company">Target Company</FieldLabel>
+                  <TextInput
+                    id="company"
+                    list="find-company-options"
+                    placeholder="Select or type a company"
+                    value={form.targetCompany}
+                    onChange={(event) => setForm({ ...form, targetCompany: event.target.value })}
+                  />
+                  <datalist id="find-company-options">
+                    {COMPANIES.map((company) => (
+                      <option key={company} value={company} />
+                    ))}
+                  </datalist>
+                </div>
+              </div>
+
+              <div className="grid gap-5 sm:grid-cols-2">
+                <div>
+                  <FieldLabel htmlFor="date">Preferred Date</FieldLabel>
+                  <TextInput
+                    id="date"
+                    type="date"
+                    value={form.preferredDate}
+                    onChange={(event) => setForm({ ...form, preferredDate: event.target.value })}
+                  />
+                </div>
+                <div>
+                  <FieldLabel htmlFor="time">Preferred Time</FieldLabel>
+                  <SelectInput
+                    id="time"
+                    value={form.preferredTime}
+                    onChange={(event) =>
+                      setForm({ ...form, preferredTime: event.target.value as TimeWindow | '' })
+                    }
+                  >
+                    <option value="">Any time</option>
+                    {TIME_WINDOWS.map((window) => (
+                      <option key={window.id} value={window.id}>
+                        {window.label}
+                      </option>
+                    ))}
+                  </SelectInput>
+                </div>
+              </div>
+            </div>
+          ) : null}
         </div>
 
         <div className="flex flex-col gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:justify-end">
