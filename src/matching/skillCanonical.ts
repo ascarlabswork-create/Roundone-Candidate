@@ -65,6 +65,12 @@ const CANONICAL_SKILLS: CanonicalDefinition[] = [
   },
 ]
 
+/** Approved alias phrases, longest first. Recognition only — labels still come from canonicalizeSkill. */
+export function canonicalSkillAliases(): string[] {
+  const aliases = CANONICAL_SKILLS.flatMap((skill) => skill.aliases)
+  return [...new Set(aliases)].sort((a, b) => b.length - a.length)
+}
+
 const ALIAS_TO_CANONICAL = new Map<string, CanonicalSkill>()
 for (const skill of CANONICAL_SKILLS) {
   const canonical = { key: skill.key, display: skill.display }

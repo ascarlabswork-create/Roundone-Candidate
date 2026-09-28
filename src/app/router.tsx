@@ -10,6 +10,7 @@ import { ConfirmationPage } from '../pages/ConfirmationPage.tsx'
 import { FeedbackPage } from '../pages/FeedbackPage.tsx'
 import { ReviewPage } from '../pages/ReviewPage.tsx'
 import { FindPage } from '../pages/FindPage.tsx'
+import { JobMatchPage } from '../pages/JobMatchPage.tsx'
 import { HomePage } from '../pages/HomePage.tsx'
 import { InterviewRoomPage } from '../pages/InterviewRoomPage.tsx'
 import { InterviewsPage } from '../pages/InterviewsPage.tsx'
@@ -38,6 +39,7 @@ export function AppRouter() {
           <Route element={<RequireCandidateAuth />}>
             <Route path="/" element={<HomePage />} />
             <Route path="/candidate/find" element={<FindPage />} />
+            <Route path="/candidate/job-match" element={<JobMatchPage />} />
             <Route path="/candidate/matches" element={<MatchesPage />} />
             <Route path="/candidate/interviewers" element={<SearchPage />} />
             <Route path="/candidate/interviewers/:id" element={<ProfilePage />} />
