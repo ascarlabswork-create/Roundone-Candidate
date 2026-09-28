@@ -169,6 +169,8 @@ export type MatchingPreferences = {
   targetCompany: string
   skills: string[]
   preferredDate: string
+  /** Inclusive end of preferred date range; empty means same as preferredDate. */
+  preferredDateEnd: string
   preferredTime: TimeWindow | ''
   budget: number
   language: string

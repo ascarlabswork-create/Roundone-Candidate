@@ -4,7 +4,7 @@ import { InterviewerCard, InterviewerCardSkeleton } from '../components/intervie
 import { Button } from '../components/ui/Button.tsx'
 import { Badge, EmptyState, ErrorState, PageHeader } from '../components/ui/primitives.tsx'
 import { formatINR } from '../lib/format.ts'
-import { timeWindowLabel, weekdayName } from '../lib/dates.ts'
+import { timeWindowLabel, preferredDateRangeLabel } from '../lib/dates.ts'
 import { useAsync } from '../lib/useAsync.ts'
 import { hasMeaningfulPreferences } from '../matching/index.ts'
 import { useMatching } from '../state/matching.tsx'
@@ -23,7 +23,7 @@ export function MatchesPage() {
         preferences.interviewType,
         preferences.targetCompany,
         preferences.preferredDate
-          ? `${weekdayName(preferences.preferredDate)}${preferences.preferredTime ? ` ${timeWindowLabel(preferences.preferredTime)}` : ''}`
+          ? `${preferredDateRangeLabel(preferences.preferredDate, preferences.preferredDateEnd)}${preferences.preferredTime ? ` ${timeWindowLabel(preferences.preferredTime)}` : ''}`
           : '',
         preferences.budget ? formatINR(preferences.budget) : '',
       ].filter(Boolean)
