@@ -1,3 +1,4 @@
+import * as pdfjs from 'pdfjs-dist'
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 
 /** File types accepted by the resume upload control. */
@@ -48,30 +49,39 @@ function normalize(text: string) {
 }
 
 async function extractPdfText(file: File): Promise<string> {
-  const pdfjs = await import('pdfjs-dist')
-  // The worker is emitted as a separate asset by Vite (?url import).
+  // Static import avoids a separate dynamic chunk that can 404 after redeploys
+  // when a cached page still points at an old hashed asset URL.
   pdfjs.GlobalWorkerOptions.workerSrc = workerUrl
 
-  const data = new Uint8Array(await file.arrayBuffer())
-  const loadingTask = pdfjs.getDocument({ data })
-  const pdf = await loadingTask.promise
-  const parts: string[] = []
+  try {
+    const data = new Uint8Array(await file.arrayBuffer())
+    const loadingTask = pdfjs.getDocument({ data })
+    const pdf = await loadingTask.promise
+    const parts: string[] = []
 
-  for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
-    const page = await pdf.getPage(pageNumber)
-    const content = await page.getTextContent()
-    const pageText = content.items
-      .map((item) => (typeof (item as { str?: unknown }).str === 'string' ? (item as { str: string }).str : ''))
-      .join(' ')
-    parts.push(pageText)
-    if (parts.join(' ').length > MAX_TEXT_CHARS * 2) break
-  }
+    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+      const page = await pdf.getPage(pageNumber)
+      const content = await page.getTextContent()
+      const pageText = content.items
+        .map((item) => (typeof (item as { str?: unknown }).str === 'string' ? (item as { str: string }).str : ''))
+        .join(' ')
+      parts.push(pageText)
+      if (parts.join(' ').length > MAX_TEXT_CHARS * 2) break
+    }
 
-  const text = normalize(parts.join('\n'))
-  if (!text) {
+    const text = normalize(parts.join('\n'))
+    if (!text) {
+      throw new Error(
+        'We could not read any text from that PDF (it may be a scanned image). Please paste the resume text below instead.',
+      )
+    }
+    return text
+  } catch (error) {
+    if (error instanceof Error && /scanned image|paste the resume/i.test(error.message)) {
+      throw error
+    }
     throw new Error(
-      'We could not read any text from that PDF (it may be a scanned image). Please paste the resume text below instead.',
+      'Could not read that PDF. Please refresh the page and try again, or upload a .txt resume / paste the text.',
     )
   }
-  return text
 }
