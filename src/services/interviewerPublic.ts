@@ -214,6 +214,7 @@ export async function listPublicDirectory(limit = MATCHING_CATALOG_LIMIT): Promi
   const { data, error } = await supabase
     .from('interviewer_public_directory')
     .select(PUBLIC_DIRECTORY_SELECT)
+    .eq('is_listed', true)
     .limit(limit)
   fail(error)
   if (!Array.isArray(data)) return []
