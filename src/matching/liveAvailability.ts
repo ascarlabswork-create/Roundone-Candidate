@@ -54,13 +54,26 @@ async function mapPool<T, R>(items: T[], limit: number, mapper: (item: T) => Pro
   return results
 }
 
+export async function flagInterviewersWithBookableSlots(
+  catalog: MatchingCatalogPerson[],
+  prefs: MatchingPreferences,
+): Promise<Map<string, boolean>> {
+  const flags = new Map<string, boolean>()
+  if (catalog.length === 0) return flags
+  const results = await mapPool(catalog, AVAILABILITY_CHECK_CONCURRENCY, (person) =>
+    hasLiveBookableSlot(person, prefs),
+  )
+  catalog.forEach((person, index) => {
+    flags.set(person.id, results[index])
+  })
+  return flags
+}
+
+/** @deprecated Prefer flagInterviewersWithBookableSlots — availability is no longer a hard pre-rank gate. */
 export async function keepInterviewersWithBookableSlots(
   catalog: MatchingCatalogPerson[],
   prefs: MatchingPreferences,
 ) {
-  if (catalog.length === 0) return catalog
-  const flags = await mapPool(catalog, AVAILABILITY_CHECK_CONCURRENCY, (person) =>
-    hasLiveBookableSlot(person, prefs),
-  )
-  return catalog.filter((_, index) => flags[index])
+  const flags = await flagInterviewersWithBookableSlots(catalog, prefs)
+  return catalog.filter((person) => flags.get(person.id))
 }
