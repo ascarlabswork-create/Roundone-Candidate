@@ -13,24 +13,46 @@ import { Button } from '../components/ui/Button.tsx'
 import { Chip, FieldLabel, PageHeader, SelectInput, TextInput } from '../components/ui/primitives.tsx'
 import { toNormalizationInput, type NormalizationPatch } from '../matching/normalizeModel.ts'
 import { usePreferenceNormalization } from '../matching/usePreferenceNormalization.ts'
+import { requestResumeSkillPlan } from '../resume/aiAssist.ts'
+import { canAnalyzeResume, type ResumeSkillPlan } from '../resume/aiModel.ts'
 import { extractResumeText, RESUME_ACCEPT } from '../resume/resumeText.ts'
 import { emptyPreferences, useMatching } from '../state/matching.tsx'
 import type { TimeWindow } from '../data/catalogs.ts'
 import type { MatchingPreferences } from '../types.ts'
 
+function mergeUniqueSkills(existing: string[], incoming: string[]) {
+  const next = [...existing]
+  for (const skill of incoming) {
+    const value = skill.trim()
+    if (value.length < 2) continue
+    if (next.some((item) => item.toLowerCase() === value.toLowerCase())) continue
+    next.push(value)
+  }
+  return next
+}
+
+/** Collect every skill/technology grounded in the resume skill plan. */
+function skillsFromResumePlan(plan: ResumeSkillPlan, existing: string[]) {
+  const incoming: string[] = []
+  for (const item of plan.extractedSkills) incoming.push(item.skill)
+  for (const item of plan.inferredSkills) incoming.push(item.skill)
+  for (const project of plan.projects) incoming.push(...project.technologies)
+  for (const experience of plan.experiences) incoming.push(...experience.technologies)
+  return mergeUniqueSkills(existing, incoming)
+}
+
+/** Fallback when AI is unavailable: match all catalog skills found in the resume text. */
 function skillsFromResumeText(text: string, existing: string[]) {
   const haystack = ` ${text.toLowerCase().replace(/\s+/g, ' ')} `
-  const next = [...existing]
+  const found: string[] = []
   for (const skill of SKILLS) {
     const needle = skill.toLowerCase()
     const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
     const boundary = new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`)
     if (!boundary.test(haystack)) continue
-    if (next.some((item) => item.toLowerCase() === needle)) continue
-    next.push(skill)
-    if (next.length >= existing.length + 12) break
+    found.push(skill)
   }
-  return next
+  return mergeUniqueSkills(existing, found)
 }
 
 export function FindPage() {
@@ -61,6 +83,7 @@ export function FindPage() {
   const [skillDraft, setSkillDraft] = useState('')
   const [resumeFileName, setResumeFileName] = useState<string | null>(null)
   const [resumeExtracting, setResumeExtracting] = useState(false)
+  const [resumeStatus, setResumeStatus] = useState<string | null>(null)
   const [resumeError, setResumeError] = useState<string | null>(null)
   const [optionalOpen, setOptionalOpen] = useState(() =>
     Boolean(
@@ -113,18 +136,45 @@ export function FindPage() {
 
   async function onResumeSelected(file: File | null) {
     setResumeError(null)
+    setResumeStatus(null)
     if (!file) return
 
     setResumeExtracting(true)
     setResumeFileName(file.name)
     try {
+      setResumeStatus('Reading resume…')
       const text = await extractResumeText(file)
-      setForm((prev) => ({
-        ...prev,
-        skills: skillsFromResumeText(text, prev.skills),
-      }))
+      if (!canAnalyzeResume(text)) {
+        throw new Error(
+          'That resume did not contain enough readable text. Please try another PDF, or paste a longer resume.',
+        )
+      }
+
+      setResumeStatus('Extracting skills from resume…')
+      const outcome = await requestResumeSkillPlan(text)
+      setForm((prev) => {
+        const usedAi = outcome.ok
+        const skills = usedAi
+          ? skillsFromResumePlan(outcome.plan, prev.skills)
+          : skillsFromResumeText(text, prev.skills)
+        const added = Math.max(0, skills.length - prev.skills.length)
+        // Defer status so we never set state synchronously inside another updater.
+        queueMicrotask(() => {
+          setResumeStatus(
+            usedAi
+              ? added > 0
+                ? `Added ${added} skill${added === 1 ? '' : 's'} from your resume`
+                : 'Resume attached · no new skills found beyond what you already added'
+              : added > 0
+                ? `Added ${added} catalog skill${added === 1 ? '' : 's'} (full AI extract unavailable)`
+                : 'Resume attached · skill extract unavailable — add skills manually',
+          )
+        })
+        return { ...prev, skills }
+      })
     } catch (error) {
       setResumeError(error instanceof Error ? error.message : 'Could not read that resume file.')
+      setResumeStatus(null)
     } finally {
       setResumeExtracting(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
@@ -134,6 +184,7 @@ export function FindPage() {
   function clearResume() {
     setResumeFileName(null)
     setResumeError(null)
+    setResumeStatus(null)
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
@@ -191,7 +242,7 @@ export function FindPage() {
                 onClick={() => fileInputRef.current?.click()}
                 disabled={resumeExtracting}
               >
-                {resumeExtracting ? 'Reading file…' : resumeFileName ? 'Replace file' : 'Upload resume'}
+                {resumeExtracting ? 'Extracting…' : resumeFileName ? 'Replace file' : 'Upload resume'}
               </Button>
               {resumeFileName ? (
                 <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
@@ -208,12 +259,12 @@ export function FindPage() {
                       ×
                     </button>
                   </span>
-                  {!resumeExtracting && !resumeError ? (
-                    <span className="text-xs text-slate-500">Attached · matching skills added when found</span>
-                  ) : null}
+                  {resumeStatus ? <span className="text-xs text-slate-500">{resumeStatus}</span> : null}
                 </div>
               ) : (
-                <span className="text-sm text-slate-500">PDF or plain text, up to 8 MB. The file stays visible here after upload.</span>
+                <span className="text-sm text-slate-500">
+                  PDF or plain text, up to 8 MB. We extract all skills found in the resume.
+                </span>
               )}
             </div>
             {resumeError ? <p className="mt-2 text-sm text-red-700">{resumeError}</p> : null}
