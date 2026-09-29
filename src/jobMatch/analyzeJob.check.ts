@@ -20,6 +20,50 @@ const html = `<!doctype html><html><head>
 
 const job = extractJobFromHtml(html, 'https://jobs.example.com/role')
 expect(job.company_name === 'Northwind Labs', '2 company from JSON-LD')
+
+const accenture = extractJobFromHtml(
+  `<html><head><title>Custom Software Engineer</title><script type="application/ld+json">{"@type":"JobPosting","title":"Custom Software Engineer","description":"Develop custom software.","hiringOrganization":"Accenture","identifier":{"name":"Accenture","value":"ATCI-5198132-S1909476"}}</script></head><body></body></html>`,
+  'https://www.accenture.com/in-en/careers/jobdetails?id=ATCI-5198132-S1909476_en',
+)
+expect(accenture.company_name === 'Accenture', '2 company from string hiringOrganization')
+expect(accenture.job_title === 'Custom Software Engineer', '3 accenture title')
+expect(accenture.job_id === 'ATCI-5198132-S1909476', '5 accenture job id')
+
+const fromProse = extractJobFromHtml(
+  `<html><head><title>Backend Engineer | Tata Consultancy Services</title><meta name="description" content="Learn more about the Backend Engineer position at Tata Consultancy Services."><meta property="og:site_name" content="LinkedIn"></head><body></body></html>`,
+  'https://www.linkedin.com/jobs/view/1',
+)
+expect(fromProse.company_name === 'Tata Consultancy Services', 'company from posting text, not the job board')
+
+const fromLabel = extractJobFromHtml(
+  `<html><head><title>Engineer</title></head><body><p>Company: Deloitte</p></body></html>`,
+  'https://in.indeed.com/viewjob?jk=1',
+)
+expect(fromLabel.company_name === 'Deloitte', 'company from labeled text')
+
+const fromHost = extractJobFromHtml(
+  `<html><head><title>Engineer</title></head><body><p>Build services.</p></body></html>`,
+  'https://www.wipro.com/careers/123',
+)
+expect(fromHost.company_name === 'Wipro', 'company from employer career site')
+
+const fromAts = extractJobFromHtml(
+  `<html><head><title>Engineer</title></head><body></body></html>`,
+  'https://boards.greenhouse.io/stripe/jobs/1',
+)
+expect(fromAts.company_name === 'Stripe', 'company from applicant tracking url')
+
+const boardOnly = extractJobFromHtml(
+  `<html><head><title>Engineer</title><meta property="og:site_name" content="Indeed"></head><body><p>Apply now.</p></body></html>`,
+  'https://in.indeed.com/viewjob?jk=2',
+)
+expect(boardOnly.company_name === null, 'job board name is not the employer')
+
+const legal = extractJobFromHtml(
+  `<html><head></head><body><script type="application/ld+json">{"@type":"JobPosting","title":"Consultant","hiringOrganization":{"legalName":"Capgemini"}}</script></body></html>`,
+  'https://www.capgemini.com/careers/1',
+)
+expect(legal.company_name === 'Capgemini', 'company from legalName')
 expect(job.job_title === 'Data Analyst', '3 title from JSON-LD')
 expect(job.description?.includes('Power BI dashboards') === true, '4 description')
 expect(job.job_id === 'JOB-42', '5 job id')
