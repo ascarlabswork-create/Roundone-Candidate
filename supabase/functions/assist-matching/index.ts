@@ -167,7 +167,7 @@ async function handleNormalize(
   };
 
   const system = [
-    "You normalize RoundOne candidate interview preferences.",
+    "You normalize jobround.ai candidate interview preferences.",
     "Map free-form input onto the provided vocabulary only.",
     "Never invent roles, skills, interview types, levels, or companies that are not in the vocabulary.",
     "Never invent interviewer skills, experience, reviews, prices, services, availability, or candidate qualifications.",
@@ -340,7 +340,7 @@ async function handlePracticeQuestions(
   );
 
   const system = [
-    "You generate RoundOne AI practice interview questions.",
+    "You generate jobround.ai AI practice interview questions.",
     "This is practice only, not a real booked interview or official interviewer feedback.",
     "Use only the provided role, interview type, skills, and difficulty.",
     "CRITICAL: Questions must be completely FRESH, UNIQUE, and DIVERSE. Never repeat questions or ask trivial variations.",
@@ -499,7 +499,7 @@ async function handlePracticeNextQuestion(
   const sessionSeed = readString(body.session_seed ?? body.sessionSeed, 60);
 
   const system = [
-    `You are ${interviewerName}, an expert RoundOne AI interviewer conducting a realistic, structured, voice-based interview.`,
+    `You are ${interviewerName}, an expert jobround.ai AI interviewer conducting a realistic, structured, voice-based interview.`,
     "This is practice only, not a real booked interview or official interviewer feedback.",
     "CRITICAL REQUIREMENT: Every interview session MUST feature completely DIFFERENT, FRESH, and NON-REPETITIVE questions.",
     "NEVER repeat questions the candidate was already asked in past sessions or earlier in this session.",
@@ -615,7 +615,7 @@ async function handlePracticeFeedback(
   }
 
   const system = [
-    "You are an expert interviewer evaluating one spoken or written candidate answer in a RoundOne AI practice interview.",
+    "You are an expert interviewer evaluating one spoken or written candidate answer in a jobround.ai AI practice interview.",
     "This is practice feedback only, not official interviewer feedback, a hiring decision, or a candidate ranking.",
     "Score 1-10 against expected_focus only:",
     "1-3 little coverage, 4-6 partial coverage, 7-8 solid with gaps, 9-10 thorough coverage.",
@@ -687,7 +687,7 @@ async function handleRealtimeSession(
   const voice = readString(body.voice, 20) || "echo";
 
   const instructions = [
-    `You are ${interviewerName}, an experienced, professional AI interviewer at RoundOne conducting a ${type} interview for a ${role} position.`,
+    `You are ${interviewerName}, an experienced, professional AI interviewer at jobround.ai conducting a ${type} interview for a ${role} position.`,
     "Speak in a clear, natural, professional, and concise interviewer tone (1-3 sentences max).",
     "Listen attentively to the candidate's spoken responses.",
     "Do not lecture, preach, or give long speeches.",
@@ -864,7 +864,7 @@ async function handleResumeSkillPlan(
   const grounded = (term: string) => groundedInResume(term, rawLower, alnumHaystack);
 
   const system = [
-    "You are RoundOne's resume analysis engine. You read ONE candidate resume and extract ONLY facts that are explicitly present in it.",
+    "You are jobround.ai's resume analysis engine. You read ONE candidate resume and extract ONLY facts that are explicitly present in it.",
     "This produces an interview skill plan for the candidate to review. It is not a hiring decision or a resume score.",
     "ABSOLUTE RULE: Never invent, assume, guess, or embellish. Do NOT add a skill, technology, tool, framework, language, project, company, role, responsibility, achievement, certification, or education item that is not actually written in the resume text.",
     "If the resume does not clearly support something, leave it out. Do not pad the output with generic or commonly-expected interview skills.",
@@ -1073,7 +1073,7 @@ async function handlePrepare(
   }
 
   const system = [
-    "You create RoundOne AI interview preparation suggestions for a candidate.",
+    "You create jobround.ai AI interview preparation suggestions for a candidate.",
     "This is preparation guidance only, not a hiring decision, resume score, or official interviewer feedback.",
     "Use only the supplied target role, experience level, skills, interview type, and optional resume/background text.",
     "Do not invent employers, projects, degrees, or technologies that are not supported by the input.",
@@ -1299,7 +1299,7 @@ Deno.serve(async (req) => {
   }
 
   const system = [
-    "You assist RoundOne interviewer matching.",
+    "You assist jobround.ai interviewer matching.",
     "Use only the provided candidate preference fields and interviewer/service fields.",
     "Do not invent qualifications, reviews, availability, prices, or hiring outcomes.",
     "Do not use words like guaranteed, perfect match, best interviewer, or get hired.",

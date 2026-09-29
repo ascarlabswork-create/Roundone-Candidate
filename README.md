@@ -1,4 +1,4 @@
-# RoundOne — Candidate application
+# jobround.ai — Candidate application
 
 Candidate-facing app for finding verified interviewers, booking mock interviews, viewing private feedback, practicing with AI, and preparing for interviews.
 

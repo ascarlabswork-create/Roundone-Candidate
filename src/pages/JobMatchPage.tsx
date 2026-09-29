@@ -210,7 +210,7 @@ export function JobMatchPage() {
       <PageHeader
         eyebrow="Job-based discovery"
         title="Find an Interviewer for a Job"
-        subtitle="Paste a public job URL. RoundOne reads the posting, then ranks interviewers by how well their skills cover that job."
+        subtitle="Paste a public job URL. jobround.ai reads the posting, then ranks interviewers by how well their skills cover that job."
       />
 
       <form onSubmit={onAnalyze} className="mt-8 space-y-4 rounded-xl border border-slate-200 bg-white p-5 sm:p-6">

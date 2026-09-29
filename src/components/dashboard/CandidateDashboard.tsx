@@ -178,7 +178,7 @@ export function CandidateDashboard() {
         <div>
           <p className="text-sm font-semibold uppercase tracking-wide text-blue-700">Dashboard</p>
           <h1 className="mt-1 text-2xl font-semibold text-navy-950 sm:text-3xl">
-            {account?.profile.full_name ? `Welcome back, ${account.profile.full_name}` : 'Your RoundOne overview'}
+            {account?.profile.full_name ? `Welcome back, ${account.profile.full_name}` : 'Your jobround.ai overview'}
           </h1>
           <p className="mt-2 text-sm text-slate-600">Your next interview, progress, and anything that needs attention.</p>
         </div>

@@ -8,7 +8,7 @@ export function Footer() {
         <div className="md:col-span-2">
           <Logo />
           <p className="mt-3 max-w-md text-sm text-slate-600">
-            RoundOne helps candidates find verified interviewers, book realistic mock interviews, and
+            jobround.ai helps candidates find verified interviewers, book realistic mock interviews, and
             improve with structured feedback.
           </p>
         </div>
@@ -59,7 +59,7 @@ export function Footer() {
         </div>
       </div>
       <div className="border-t border-slate-200 py-4 text-center text-xs text-slate-500">
-        © {new Date().getFullYear()} RoundOne. Candidate prototype.
+        © {new Date().getFullYear()} jobround.ai. Candidate prototype.
       </div>
     </footer>
   )

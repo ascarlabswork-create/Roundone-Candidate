@@ -1,5 +1,5 @@
 /**
- * Deterministic skill canonicalization for RoundOne matching.
+ * Deterministic skill canonicalization for jobround.ai matching.
  * Approved aliases only — no fuzzy match, no runtime LLM.
  *
  * Explicit mapping:
