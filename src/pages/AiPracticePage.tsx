@@ -625,7 +625,7 @@ export function AiPracticePage() {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wider text-blue-800">
-                  RoundOne AI Practice Evaluation · Conducted by {interviewer.name}
+                  jobround.ai AI Practice Evaluation · Conducted by {interviewer.name}
                 </p>
                 <h2 className="mt-1 text-2xl font-bold text-navy-950 sm:text-3xl">
                   AI Practice Score:{' '}

@@ -11,7 +11,7 @@ export function Logo({
   inverted?: boolean
 }) {
   return (
-    <Link to="/" className={cn('inline-flex items-center gap-2', className)} aria-label="RoundOne home">
+    <Link to="/" className={cn('inline-flex items-center gap-2', className)} aria-label="jobround.ai home">
       <span
         className={cn(
           'flex h-8 w-8 items-center justify-center rounded-lg text-sm font-bold',
@@ -27,7 +27,7 @@ export function Logo({
             inverted ? 'text-white' : 'text-navy-950',
           )}
         >
-          RoundOne
+          jobround.ai
         </span>
       )}
     </Link>

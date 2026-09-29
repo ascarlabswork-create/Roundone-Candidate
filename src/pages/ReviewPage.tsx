@@ -164,7 +164,7 @@ export function ReviewPage() {
         <Card className="border-emerald-200 bg-emerald-50 p-5">
           <p className="font-semibold text-emerald-800">Review submitted successfully</p>
           <p className="mt-1 text-sm text-emerald-800">
-            RoundOne will moderate it before it can appear on the interviewer&apos;s public profile.
+            jobround.ai will moderate it before it can appear on the interviewer&apos;s public profile.
           </p>
         </Card>
       ) : null}
@@ -250,7 +250,7 @@ export function ReviewPage() {
                 Show my name publicly
                 <span className="mt-1 block text-slate-500">
                   Unchecked by default. If approved, other candidates see your first name and last initial. Otherwise they
-                  see “Anonymous Candidate”. RoundOne sets the public name from your profile.
+                  see “Anonymous Candidate”. jobround.ai sets the public name from your profile.
                 </span>
               </span>
             </label>
@@ -306,7 +306,7 @@ function SubmittedReview({ report }: { report: CandidateReviewRecord }) {
       ? 'This review is visible on the interviewer’s public profile.'
       : report.moderationStatus === 'rejected'
         ? 'This review was not published.'
-        : 'This review is pending RoundOne moderation and is not public yet.'
+        : 'This review is pending jobround.ai moderation and is not public yet.'
 
   return (
     <div className="space-y-4">

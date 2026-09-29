@@ -41,7 +41,7 @@ export function ResourcesPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
-      <PageHeader title="Resources" subtitle="Short reads for candidates preparing with RoundOne." />
+      <PageHeader title="Resources" subtitle="Short reads for candidates preparing with jobround.ai." />
       <div className="mt-8 space-y-3">
         {items.map((item) => (
           <Card key={item.title} className="p-5">

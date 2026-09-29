@@ -39,7 +39,7 @@ export function HomePage() {
               <span className="block">for your next interview</span>
             </h1>
             <p className="mt-5 max-w-xl text-base leading-7 text-slate-600 sm:text-lg">
-              Tell us your skills and availability. RoundOne helps you find relevant professionals for
+              Tell us your skills and availability. jobround.ai helps you find relevant professionals for
               realistic mock interviews.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -113,7 +113,7 @@ export function HomePage() {
       </section>
 
       <section className="mx-auto max-w-7xl px-4 py-14 sm:px-6">
-        <h2 className="text-2xl font-semibold text-navy-950">How RoundOne Works</h2>
+        <h2 className="text-2xl font-semibold text-navy-950">How jobround.ai Works</h2>
         <div className="mt-8 grid gap-6 md:grid-cols-4">
           {steps.map((step) => (
             <div key={step.n} className="rounded-xl border border-slate-200 bg-white p-5">

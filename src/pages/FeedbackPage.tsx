@@ -77,7 +77,7 @@ export function FeedbackPage() {
       <div>
         <h1 className="text-2xl font-semibold text-navy-950">Interview Feedback</h1>
         <p className="mt-2 text-sm text-slate-600">
-          Private performance feedback from your interviewer. Only you and authorized RoundOne staff can see this.
+          Private performance feedback from your interviewer. Only you and authorized jobround.ai staff can see this.
         </p>
       </div>
 
