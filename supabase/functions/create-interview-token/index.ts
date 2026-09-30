@@ -22,6 +22,13 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return value as Record<string, unknown>;
 }
 
+function livekitSocketUrl(value: string) {
+  const url = value.trim().replace(/\/+$/, "");
+  if (url.startsWith("https://")) return `wss://${url.slice("https://".length)}`;
+  if (url.startsWith("http://")) return `ws://${url.slice("http://".length)}`;
+  return url;
+}
+
 function readUuid(value: unknown) {
   if (typeof value !== "string") return null;
   const text = value.trim();
@@ -36,7 +43,7 @@ Deno.serve(async (req) => {
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
-  const livekitUrl = Deno.env.get("LIVEKIT_URL") ?? "";
+  const livekitUrl = livekitSocketUrl(Deno.env.get("LIVEKIT_URL") ?? "");
   const livekitKey = Deno.env.get("LIVEKIT_API_KEY") ?? "";
   const livekitSecret = Deno.env.get("LIVEKIT_API_SECRET") ?? "";
   const authorization = req.headers.get("Authorization") ?? "";
@@ -44,7 +51,8 @@ Deno.serve(async (req) => {
   if (!supabaseUrl || !anonKey || !authorization.toLowerCase().startsWith("bearer ")) {
     return json(401, { error: "not_authenticated" });
   }
-  if (!livekitUrl || !livekitKey || !livekitSecret) {
+  const socketUrlReady = livekitUrl.startsWith("wss://") || livekitUrl.startsWith("ws://");
+  if (!socketUrlReady || !livekitKey || !livekitSecret) {
     console.log(JSON.stringify({ event: "interview_token_unconfigured" }));
     return json(503, { error: "unconfigured" });
   }

@@ -1,5 +1,6 @@
 import { requestRealtimeSession, requestSpeechAudio } from './aiAssist.ts'
 import type { PracticeSetup } from './aiModel.ts'
+import { microphoneFailureMessage, requestPracticeMicrophone } from './microphoneAccess.ts'
 
 export type VoiceState =
   | 'idle'
@@ -152,28 +153,28 @@ export class VoiceClient {
     this.callbacks.onCandidateTranscript(this.accumulatedTranscript, true)
   }
 
-  async start(setup: PracticeSetup, voice = 'echo', interviewerName = 'John'): Promise<boolean> {
+  async start(
+    setup: PracticeSetup,
+    voice = 'echo',
+    interviewerName = 'John',
+    existingStream?: MediaStream | null,
+  ): Promise<boolean> {
     this.setState('connecting')
     this.currentVoice = voice
 
-    try {
-      this.micStream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
-      })
-    } catch (err: unknown) {
-      const errName = (err as Error)?.name || ''
-      if (errName === 'NotAllowedError' || errName === 'PermissionDeniedError') {
+    const liveStream = existingStream?.getAudioTracks().some((track) => track.readyState === 'live')
+      ? existingStream
+      : null
+    if (liveStream) {
+      this.micStream = liveStream
+    } else {
+      try {
+        this.micStream = await requestPracticeMicrophone()
+      } catch (err: unknown) {
         this.setState('error')
-        this.callbacks.onError('Microphone access is required for the voice interview.')
+        this.callbacks.onError(microphoneFailureMessage(err))
         return false
       }
-      this.setState('error')
-      this.callbacks.onError('Microphone device unavailable or not found.')
-      return false
     }
 
     this.sessionActive = true
@@ -342,8 +343,17 @@ export class VoiceClient {
           }
         }
 
-        recognition.onerror = () => {
-          // Keep listening or allow candidate to continue
+        recognition.onerror = (event: { error?: string }) => {
+          const code = event?.error
+          if (code === 'not-allowed' || code === 'service-not-allowed') {
+            this.setState('error')
+            this.callbacks.onError(microphoneFailureMessage(Object.assign(new Error(code), { name: 'NotAllowedError' })))
+            return
+          }
+          if (code === 'audio-capture') {
+            this.setState('error')
+            this.callbacks.onError(microphoneFailureMessage(Object.assign(new Error(code), { name: 'NotFoundError' })))
+          }
         }
 
         recognition.onend = () => {

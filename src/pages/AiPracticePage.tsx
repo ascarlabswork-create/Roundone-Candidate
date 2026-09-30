@@ -48,6 +48,7 @@ import {
   writePracticeSession,
   type SavedPracticeSession,
 } from '../practice/session.ts'
+import { microphoneFailureMessage, microphoneStatusLabel, requestPracticeMicrophone } from '../practice/microphoneAccess.ts'
 import { VoiceClient, type VoiceState } from '../practice/voiceClient.ts'
 import { getCandidatePreferencesIfPresent, getCandidateSkills } from '../services/candidateProfile.ts'
 import { getJobTarget } from '../services/jobTargets.ts'
@@ -368,7 +369,18 @@ export function AiPracticePage() {
     setError(null)
     setPersistError(null)
 
+    let micStream: MediaStream | null = null
+    try {
+      micStream = await requestPracticeMicrophone()
+    } catch (caught) {
+      submittingRef.current = false
+      setBusy(false)
+      setError(microphoneFailureMessage(caught))
+      return
+    }
+
     let sessionId: string | null = null
+    let handedOff = false
     try {
       sessionId = await startPracticeSession(session.setup)
       const candContext = getCandidateContext()
@@ -386,6 +398,7 @@ export function AiPracticePage() {
       })
 
       if (!first) {
+        micStream.getTracks().forEach((track) => track.stop())
         if (sessionId) await failPracticeSession(sessionId)
         setError(UNAVAILABLE)
         return
@@ -406,9 +419,11 @@ export function AiPracticePage() {
         startedAt,
       })
 
-      // Initialize voice connection
-      await setupVoiceClient(first)
+      // Initialize voice connection with the microphone already granted on this click.
+      await setupVoiceClient(first, micStream)
+      handedOff = true
     } catch (caught: unknown) {
+      if (!handedOff) micStream.getTracks().forEach((track) => track.stop())
       if (sessionId) await failPracticeSession(sessionId)
       setError(caught instanceof Error ? caught.message : UNAVAILABLE)
     } finally {
@@ -428,7 +443,25 @@ export function AiPracticePage() {
     }
   }
 
-  async function setupVoiceClient(initialQuestion: PracticeAiQuestion) {
+  async function enableMicrophone() {
+    setError(null)
+    let stream: MediaStream
+    try {
+      stream = await requestPracticeMicrophone()
+    } catch (caught) {
+      setVoiceState('error')
+      setError(microphoneFailureMessage(caught))
+      return
+    }
+    const question = sessionRef.current.questions[sessionRef.current.index]
+    if (!question) {
+      stream.getTracks().forEach((track) => track.stop())
+      return
+    }
+    await setupVoiceClient(question, stream)
+  }
+
+  async function setupVoiceClient(initialQuestion: PracticeAiQuestion, existingStream?: MediaStream | null) {
     if (voiceClientRef.current) {
       voiceClientRef.current.close()
     }
@@ -460,8 +493,9 @@ export function AiPracticePage() {
     })
 
     voiceClientRef.current = client
-    const started = await client.start(sessionRef.current.setup, persona.voice, persona.name)
+    const started = await client.start(sessionRef.current.setup, persona.voice, persona.name, existingStream)
     if (started) {
+      setError(null)
       await client.speakQuestion(initialQuestion.question, persona.voice)
     }
   }
@@ -1033,26 +1067,23 @@ export function AiPracticePage() {
                   onClick={handleMuteToggle}
                   aria-label={micMuted ? 'Unmute microphone' : 'Mute microphone'}
                   className={`flex h-10 w-10 items-center justify-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    micMuted
+                    voiceState === 'error' || micMuted
                       ? 'bg-red-100 text-red-700 hover:bg-red-200'
                       : 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
                   }`}
                 >
-                  {micMuted ? <MicOffIcon className="h-5 w-5" /> : <MicIcon className="h-5 w-5" />}
+                  {voiceState === 'error' || micMuted ? <MicOffIcon className="h-5 w-5" /> : <MicIcon className="h-5 w-5" />}
                 </button>
                 <div>
                   <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Microphone</p>
-                  <p className="text-xs font-semibold text-navy-900">
-                    {voiceState === 'speaking'
-                      ? 'Paused — interviewer is speaking'
-                      : voiceState === 'evaluating'
-                        ? 'Paused — evaluating your answer'
-                        : micMuted
-                          ? 'Muted (Audio paused)'
-                          : 'Active (Listening for answer)'}
-                  </p>
+                  <p className="text-xs font-semibold text-navy-900">{microphoneStatusLabel(voiceState, micMuted)}</p>
                 </div>
               </div>
+              {voiceState === 'error' ? (
+                <Button type="button" onClick={() => void enableMicrophone()}>
+                  Enable microphone
+                </Button>
+              ) : null}
 
               {voiceState === 'speaking' && (
                 <button
@@ -1085,7 +1116,11 @@ export function AiPracticePage() {
                   }))
                   voiceClientRef.current?.setAccumulatedTranscript(val)
                 }}
-                placeholder="Speak your answer into the microphone. Your words will be transcribed here live."
+                placeholder={
+                  voiceState === 'error'
+                    ? 'Type your answer here, or allow the microphone to transcribe it.'
+                    : 'Speak your answer into the microphone. Your words will be transcribed here live.'
+                }
                 className="mt-1 min-h-32 text-sm sm:min-h-36"
               />
               <p className="mt-1.5 text-xs text-slate-500">
