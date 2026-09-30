@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { RequireCandidateAuth } from '../components/auth/RequireCandidateAuth.tsx'
+import { BookingCallListener } from '../components/interview/BookingCallListener.tsx'
 import { CandidateLayout } from '../components/layout/CandidateLayout.tsx'
 import { AuthCallbackPage } from '../pages/AuthCallbackPage.tsx'
 import { AuthPage } from '../pages/AuthPage.tsx'
@@ -30,6 +31,7 @@ import { NotFoundPage, ResourcesPage } from '../pages/SupportingPages.tsx'
 export function AppRouter() {
   return (
     <BrowserRouter>
+      <BookingCallListener />
       <Routes>
         <Route element={<CandidateLayout />}>
           <Route path="/candidate/login" element={<AuthPage mode="login" />} />
