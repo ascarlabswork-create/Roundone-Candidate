@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { JobMatchCard } from '../components/interviewer/JobMatchCard.tsx'
 import { Button } from '../components/ui/Button.tsx'
 import { EmptyState, FieldLabel, PageHeader, Skeleton, TextArea, TextInput } from '../components/ui/primitives.tsx'
@@ -54,6 +54,7 @@ function draftFromTarget(target: JobTarget): ReviewDraft {
 }
 
 export function JobMatchPage() {
+  const navigate = useNavigate()
   const [params] = useSearchParams()
   const targetId = params.get('target')
   const [url, setUrl] = useState('')
@@ -107,6 +108,18 @@ export function JobMatchPage() {
     }
     const saved = savedId ? await updateJobTarget(savedId, input) : await createJobTarget(input)
     setSavedId(saved.id)
+    return saved.id
+  }
+
+  async function practiceForJob() {
+    if (!review) return
+    setFindError('')
+    try {
+      const id = await saveReviewed(review, 'analyzed')
+      navigate(`/candidate/practice/mock?fresh=1&job=${id}`)
+    } catch (error) {
+      setFindError(error instanceof Error ? error.message : 'Save this job before practicing for it.')
+    }
   }
 
   async function onAnalyze(event: FormEvent) {
@@ -335,9 +348,14 @@ export function JobMatchPage() {
             </div>
           </div>
           {findError ? <p className="text-sm text-red-700">{findError}</p> : null}
-          <Button type="button" disabled={finding || review.skills.length === 0} onClick={() => void loadMatches(1, search)}>
-            {finding ? 'Finding interviewers...' : 'Find Interviewers'}
-          </Button>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button type="button" disabled={finding || review.skills.length === 0} onClick={() => void loadMatches(1, search)}>
+              {finding ? 'Finding interviewers...' : 'Find Interviewers'}
+            </Button>
+            <Button type="button" variant="outline" disabled={finding} onClick={() => void practiceForJob()}>
+              Practice for this Job
+            </Button>
+          </div>
         </section>
       ) : null}
 

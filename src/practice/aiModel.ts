@@ -196,6 +196,13 @@ export function recordAskedQuestions(questionTexts: string[]) {
   writeJson(RECENT_QUESTIONS_KEY, current.slice(0, MAX_RECENT_QUESTIONS))
 }
 
+export type PracticeJobContext = {
+  companyName: string
+  jobTitle: string
+  description: string
+  skills: string[]
+}
+
 export type PracticeSetup = {
   targetRole: string
   interviewType: string
@@ -203,6 +210,8 @@ export type PracticeSetup = {
   difficulty: PracticeDifficulty
   questionCount: PracticeQuestionCount
   interviewerId?: string
+  jobTargetId?: string
+  jobContext?: PracticeJobContext
 }
 
 export type PracticeAiQuestion = {
@@ -296,9 +305,12 @@ function parseOnePracticeQuestion(
   const expectedFocus = uniqueStrings(parsed.expected_focus ?? parsed.expectedFocus, 5, 80, 4)
   if (expectedFocus.length < 2) return null
   const topic = readTrimmed(parsed.topic, 40)
+  const topicPool = [...setup.skills, ...(setup.jobContext?.skills ?? [])]
   const groundedTopic =
-    setup.skills.find((skill) => skill.toLowerCase() === topic.toLowerCase()) ??
-    (topic.toLowerCase() === setup.interviewType.toLowerCase() ? setup.interviewType : setup.skills[0] || setup.interviewType)
+    topicPool.find((skill) => skill.toLowerCase() === topic.toLowerCase()) ??
+    (topic.toLowerCase() === setup.interviewType.toLowerCase()
+      ? setup.interviewType
+      : setup.skills[0] || setup.jobContext?.skills[0] || setup.interviewType)
   return {
     id: idHint,
     question,

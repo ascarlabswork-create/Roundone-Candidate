@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase.ts'
-import type { CandidateContext, AdaptiveState, StructuredInterviewContext } from './contextEngine.ts'
+import { toSafeJobContext, type CandidateContext, type AdaptiveState, type StructuredInterviewContext } from './contextEngine.ts'
 import {
   PRACTICE_AI_FUNCTION,
   PRACTICE_FEEDBACK_TIMEOUT_MS,
@@ -51,6 +51,11 @@ function setupBody(setup: PracticeSetup) {
     difficulty: setup.difficulty,
     questionCount: setup.questionCount,
   }
+}
+
+function jobRequestFields(setup: PracticeSetup) {
+  const job = toSafeJobContext(setup.jobContext)
+  return job ? { job_context: job } : {}
 }
 
 export async function requestRealtimeSession(
@@ -107,6 +112,7 @@ export async function requestPracticeQuestions(
       body: {
         mode: 'practice_questions',
         setup: setupBody(setup),
+        ...jobRequestFields(setup),
         exclude_questions: (excludeQuestions ?? []).slice(0, 40),
         session_seed: `${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       },
@@ -149,6 +155,7 @@ export async function requestNextPracticeQuestion(
       body: {
         mode: 'practice_next_question',
         setup: setupBody(setup),
+        ...jobRequestFields(setup),
         interviewerName: context?.interviewerName || 'John',
         question_number: questionNumber,
         prior_turns: priorTurns.map((turn) => ({
@@ -185,6 +192,7 @@ export async function requestNextPracticeQuestion(
         body: {
           mode: 'practice_next_question',
           setup: setupBody(setup),
+          ...jobRequestFields(setup),
           interviewerName: context?.interviewerName || 'John',
           question_number: questionNumber,
           prior_turns: priorTurns.map((turn) => ({

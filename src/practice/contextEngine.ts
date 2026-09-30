@@ -2,6 +2,7 @@ import type {
   PracticeAiFeedback,
   PracticeAiQuestion,
   PracticeDifficulty,
+  PracticeJobContext,
   PracticeSetup,
   PracticeTurn,
 } from './aiModel.ts'
@@ -42,15 +43,55 @@ export type InterviewTurnContext = {
   missing_points?: string[]
 }
 
+export type JobPracticeContext = {
+  company_name: string
+  job_title: string
+  description: string
+  skills: string[]
+}
+
 export type StructuredInterviewContext = {
   candidate: CandidateContext
   interview: InterviewContext
   state: AdaptiveState
   turns: InterviewTurnContext[]
+  job?: JobPracticeContext
+}
+
+export function toSafeJobContext(job: PracticeJobContext | null | undefined): JobPracticeContext | null {
+  if (!job) return null
+  const company_name = job.companyName.replace(/<[^>]*>/g, '').trim().slice(0, 120)
+  const job_title = job.jobTitle.replace(/<[^>]*>/g, '').trim().slice(0, 160)
+  const description = job.description.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim().slice(0, 4000)
+  const skills: string[] = []
+  for (const item of job.skills) {
+    const skill = item.replace(/<[^>]*>/g, '').trim().slice(0, 40)
+    if (!skill) continue
+    if (skills.some((existing) => existing.toLowerCase() === skill.toLowerCase())) continue
+    skills.push(skill)
+    if (skills.length >= 12) break
+  }
+  if (!company_name && !job_title && !description && skills.length === 0) return null
+  return { company_name, job_title, description, skills }
+}
+
+function interviewTopics(setup: PracticeSetup) {
+  const own = setup.skills.map((skill) => skill.trim()).filter(Boolean)
+  const jobSkills = (setup.jobContext?.skills ?? []).map((skill) => skill.trim()).filter(Boolean)
+  if (jobSkills.length === 0) {
+    return own.length > 0 ? own : [setup.interviewType || 'General']
+  }
+  const merged: string[] = []
+  for (const skill of [...jobSkills, ...own]) {
+    if (merged.some((item) => item.toLowerCase() === skill.toLowerCase())) continue
+    merged.push(skill)
+    if (merged.length >= 8) break
+  }
+  return merged.length > 0 ? merged : [setup.interviewType || 'General']
 }
 
 export function buildInitialAdaptiveState(setup: PracticeSetup): AdaptiveState {
-  const topics = setup.skills.map((s) => s.trim()).filter(Boolean)
+  const topics = interviewTopics(setup)
   return {
     current_question: 1,
     tested_topics: [],
@@ -139,8 +180,8 @@ export function buildStructuredContext(
   setup: PracticeSetup,
   turns: PracticeTurn[],
 ): StructuredInterviewContext {
-  const topics = setup.skills.map((s) => s.trim()).filter(Boolean)
-  const allTopics = topics.length > 0 ? topics : [setup.interviewType || 'General']
+  const allTopics = interviewTopics(setup)
+  const job = toSafeJobContext(setup.jobContext)
 
   let state = buildInitialAdaptiveState(setup)
   const scores: number[] = []
@@ -176,10 +217,11 @@ export function buildStructuredContext(
     interview: {
       type: setup.interviewType.trim().slice(0, 60),
       difficulty: state.difficulty,
-      topics: allTopics.slice(0, 6),
+      topics: job ? allTopics.slice(0, 8) : allTopics.slice(0, 6),
       question_count: setup.questionCount,
     },
     state,
     turns: turnContexts,
+    ...(job ? { job } : {}),
   }
 }
