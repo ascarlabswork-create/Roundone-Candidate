@@ -1,16 +1,8 @@
-import {
-  MessageSquare,
-  Mic,
-  MicOff,
-  MonitorUp,
-  MoreHorizontal,
-  PhoneOff,
-  Video,
-  VideoOff,
-} from 'lucide-react'
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { PhoneOff } from 'lucide-react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { formatBookingTime, formatCivilDateWithYear, isoDateInZone } from '../availability/index.ts'
+import { shouldEnterCall } from '../interview/callModel.ts'
 import { Logo } from '../components/layout/Logo.tsx'
 import { CandidateFeedbackAction } from '../components/interviews/CandidateFeedbackAction.tsx'
 import { CandidateReviewAction } from '../components/interviews/CandidateReviewAction.tsx'
@@ -24,6 +16,10 @@ import {
   interviewStatusLabel,
   type CandidateInterview,
 } from '../services/interviewSessions.ts'
+
+const InterviewCall = lazy(() =>
+  import('../components/interview/InterviewCall.tsx').then((mod) => ({ default: mod.InterviewCall })),
+)
 
 const codingProblem = {
   title: 'Design an LRU Cache',
@@ -77,8 +73,6 @@ export function InterviewRoomPage() {
   const interviewState = useAsync(() => getCandidateInterviewByBooking(id), [id])
   const [joined, setJoined] = useState(wantJoin)
   const [now, setNow] = useState(() => Date.now())
-  const [muted, setMuted] = useState(false)
-  const [cameraOff, setCameraOff] = useState(false)
   const [notes, setNotes] = useState('')
   const [code, setCode] = useState(codingProblem.starter)
   const [ran, setRan] = useState(false)
@@ -124,11 +118,22 @@ export function InterviewRoomPage() {
   const clockNow = new Date(now)
   const joinable = canJoinInterview(interview, interview.session, clockNow)
   const joinState = interviewJoinState(interview, interview.session, clockNow)
-  const showWorkspace = joinable && (joined || wantJoin || interview.status === 'in_progress')
+  const live = shouldEnterCall({
+    status: interview.status,
+    hasSession: Boolean(interview.session),
+    ended: Boolean(interview.session?.endedAt),
+    endsAt: interview.endsAtUtc,
+    now: clockNow,
+  })
+  const showWorkspace = live && Boolean(interview.session) && (joined || wantJoin || interview.status === 'confirmed' || interview.status === 'in_progress')
   const remaining = remainingUntil(interview.endsAtUtc, clockNow)
 
   if (joinState === 'completed' || joinState === 'cancelled' || joinState === 'no_show' || joinState === 'no_session' || joinState === 'unavailable') {
     return <InterviewStatusScreen interview={interview} joinState={joinState} />
+  }
+
+  if (!showWorkspace && interview.session && (interview.status === 'confirmed' || interview.status === 'in_progress')) {
+    return <InterviewStatusScreen interview={interview} joinState="unavailable" />
   }
 
   if (!showWorkspace) {
@@ -139,14 +144,11 @@ export function InterviewRoomPage() {
     <StubWorkspace
       interview={interview}
       remaining={remaining}
-      muted={muted}
-      cameraOff={cameraOff}
+      accepted={params.get('accepted') === '1'}
       notes={notes}
       code={code}
       ran={ran}
       mobileTab={mobileTab}
-      onMute={() => setMuted((value) => !value)}
-      onCamera={() => setCameraOff((value) => !value)}
       onNotes={setNotes}
       onCode={setCode}
       onRun={() => setRan(true)}
@@ -250,7 +252,7 @@ function UpcomingInterviewScreen({
           </Button>
           {!joinable ? (
             <p className="text-center text-xs text-slate-500">
-              Join opens 15 minutes before the scheduled start. This is a stub workspace — no live video yet.
+              Join opens 15 minutes before the scheduled start.
             </p>
           ) : null}
           <Button variant="outline" onClick={() => navigate('/candidate/interviews')}>
@@ -292,14 +294,11 @@ function InterviewHeader({ interview }: { interview: CandidateInterview }) {
 function StubWorkspace({
   interview,
   remaining,
-  muted,
-  cameraOff,
+  accepted,
   notes,
   code,
   ran,
   mobileTab,
-  onMute,
-  onCamera,
   onNotes,
   onCode,
   onRun,
@@ -308,14 +307,11 @@ function StubWorkspace({
 }: {
   interview: CandidateInterview
   remaining: number
-  muted: boolean
-  cameraOff: boolean
+  accepted: boolean
   notes: string
   code: string
   ran: boolean
   mobileTab: 'video' | 'work' | 'notes'
-  onMute: () => void
-  onCamera: () => void
   onNotes: (value: string) => void
   onCode: (value: string) => void
   onRun: () => void
@@ -362,18 +358,20 @@ function StubWorkspace({
 
       <div className="grid flex-1 gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className={`space-y-4 ${mobileTab !== 'video' && mobileTab !== 'work' ? 'hidden md:block' : ''}`}>
-          <div className={`grid gap-3 ${mobileTab === 'work' ? 'hidden md:grid' : 'grid'} md:grid-cols-3`}>
-            <div className="relative min-h-48 rounded-xl bg-navy-800 md:col-span-2">
-              <div className="flex h-full items-center justify-center text-sm text-white/80">
-                {interview.interviewerName} · interviewer video (stub)
-              </div>
+          {interview.session ? (
+            <div className={mobileTab === 'work' ? 'hidden md:block' : ''}>
+              <Suspense fallback={<Skeleton className="h-64" />}>
+                <InterviewCall
+                  bookingId={interview.id}
+                  sessionId={interview.session.id}
+                  role="candidate"
+                  remoteName={interview.interviewerName}
+                  accepted={accepted}
+                  onLeave={onLeave}
+                />
+              </Suspense>
             </div>
-            <div className="relative min-h-32 rounded-xl bg-navy-800">
-              <div className="flex h-full items-center justify-center text-sm text-white/70">
-                {cameraOff ? 'Camera off' : 'You · candidate video (stub)'}
-              </div>
-            </div>
-          </div>
+          ) : null}
 
           <div className={`${mobileTab === 'video' ? 'hidden md:block' : ''}`}>
             {isCoding ? (
@@ -459,48 +457,12 @@ function StubWorkspace({
         </aside>
       </div>
 
-      <div className="flex flex-wrap items-center justify-center gap-2 border-t border-white/10 px-4 py-3">
-        <Control label={muted ? 'Unmute' : 'Mute'} onClick={onMute}>
-          {muted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-        </Control>
-        <Control label={cameraOff ? 'Start video' : 'Video'} onClick={onCamera}>
-          {cameraOff ? <VideoOff className="h-4 w-4" /> : <Video className="h-4 w-4" />}
-        </Control>
-        <Control label="Screen Share">
-          <MonitorUp className="h-4 w-4" />
-        </Control>
-        <Control label="Chat">
-          <MessageSquare className="h-4 w-4" />
-        </Control>
-        <Control label="More">
-          <MoreHorizontal className="h-4 w-4" />
-        </Control>
+      <div className="flex justify-center border-t border-white/10 px-4 py-3">
         <Button variant="danger" onClick={onLeave}>
           <PhoneOff className="h-4 w-4" />
           Leave Interview
         </Button>
       </div>
     </div>
-  )
-}
-
-function Control({
-  label,
-  children,
-  onClick,
-}: {
-  label: string
-  children: ReactNode
-  onClick?: () => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-2 text-sm hover:bg-white/20"
-    >
-      {children}
-      <span className="hidden sm:inline">{label}</span>
-    </button>
   )
 }
