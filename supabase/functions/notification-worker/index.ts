@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
+import { n8nEmailPayload, type N8nEmailPayload } from "./emailPayload.ts";
 
 const MAX_BODY_BYTES = 16_384;
 const MAX_CLAIM_LIMIT = 50;
@@ -225,14 +226,152 @@ async function handleClaim(supabase: SupabaseClient, body: Record<string, unknow
     .filter((item): item is Record<string, unknown> => item != null)
     .map(mapClaimRow);
 
+  const published = [];
+  for (const row of deliveries) {
+    const email = n8nEmailPayload({
+      deliveryId: row.delivery_id,
+      notificationId: row.notification_id,
+      channel: row.channel,
+      recipient: row.recipient,
+      eventKind: row.notification_kind,
+      title: row.notification_title,
+      bookingId: row.booking_id,
+      deepLinkPath: row.deep_link_path,
+    });
+    let status = row.status;
+    if (row.channel === "email") {
+      status = await forwardEmailDelivery(supabase, email);
+    }
+    published.push({
+      ...row,
+      recipient: email.recipient,
+      subject: email.subject,
+      event_kind: email.event_kind,
+      deep_link_path: email.deep_link_path,
+      status,
+    });
+  }
+
   console.log(JSON.stringify({
     event: "notification_worker_claim_ok",
     action: "claim",
-    claimed: deliveries.length,
-    delivery_ids: deliveries.map((d) => d.delivery_id),
+    claimed: published.length,
+    delivery_ids: published.map((d) => d.delivery_id),
   }));
 
-  return json(200, { deliveries });
+  return json(200, { deliveries: published });
+}
+
+async function forwardEmailDelivery(
+  supabase: SupabaseClient,
+  payload: N8nEmailPayload,
+): Promise<string> {
+  const url = Deno.env.get("N8N_NOTIFICATION_WEBHOOK_URL") ?? "";
+  const secret = Deno.env.get("N8N_NOTIFICATION_WEBHOOK_SECRET") ?? "";
+  if (!url || !secret) {
+    console.log(JSON.stringify({
+      event: "notification_worker_n8n_unconfigured",
+      delivery_id: payload.delivery_id,
+    }));
+    return "processing";
+  }
+
+  let webhook: URL;
+  try {
+    webhook = new URL(url);
+  } catch {
+    await markEmailFailure(supabase, payload.delivery_id, "n8n webhook url is invalid", false);
+    return "failed";
+  }
+  if (webhook.protocol !== "https:") {
+    await markEmailFailure(supabase, payload.delivery_id, "n8n webhook url must be https", false);
+    return "failed";
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
+  try {
+    const response = await fetch(webhook.toString(), {
+      method: "POST",
+      redirect: "manual",
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${secret}`,
+      },
+      body: JSON.stringify(payload),
+    });
+    if (response.status >= 300 && response.status < 400) {
+      await markEmailFailure(supabase, payload.delivery_id, "n8n webhook redirected", true);
+      return "pending";
+    }
+    if (!response.ok) {
+      const retryable = response.status === 429 || response.status >= 500;
+      await markEmailFailure(
+        supabase,
+        payload.delivery_id,
+        `n8n webhook failed (${response.status})`,
+        retryable,
+      );
+      return retryable ? "pending" : "failed";
+    }
+
+    let providerMessageId: string | null = null;
+    try {
+      const body = asRecord(await response.json());
+      const rawId = body?.provider_message_id ?? body?.id;
+      providerMessageId = sanitizeProviderMessageId(rawId);
+    } catch {
+      providerMessageId = null;
+    }
+
+    const { error } = await supabase.rpc("mark_notification_delivery_sent", {
+      p_delivery_id: payload.delivery_id,
+      p_provider_message_id: providerMessageId,
+    });
+    if (error) {
+      console.log(JSON.stringify({
+        event: "notification_worker_db_error",
+        action: "mark_sent",
+        category: "rpc_failed",
+        delivery_id: payload.delivery_id,
+      }));
+      return "processing";
+    }
+    return "sent";
+  } catch (error) {
+    const timedOut = error instanceof Error && error.name === "AbortError";
+    await markEmailFailure(
+      supabase,
+      payload.delivery_id,
+      timedOut ? "n8n webhook timed out" : "n8n webhook request failed",
+      true,
+    );
+    return "pending";
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function markEmailFailure(
+  supabase: SupabaseClient,
+  deliveryId: string,
+  message: string,
+  retryable: boolean,
+) {
+  const { error } = await supabase.rpc("mark_notification_delivery_failed", {
+    p_delivery_id: deliveryId,
+    p_error: message,
+    p_retryable: retryable,
+  });
+  if (error) {
+    console.log(JSON.stringify({
+      event: "notification_worker_db_error",
+      action: "mark_failed",
+      category: "rpc_failed",
+      delivery_id: deliveryId,
+    }));
+  }
 }
 
 async function handleMarkSent(supabase: SupabaseClient, body: Record<string, unknown>) {
