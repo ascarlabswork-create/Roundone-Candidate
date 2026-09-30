@@ -100,6 +100,213 @@ function readJsonLdJobs(html: string): JsonLdJob[] {
   return jobs
 }
 
+function organizationName(org: unknown): string | undefined {
+  if (typeof org === 'string') return collapseText(stripTags(org)) || undefined
+  if (Array.isArray(org)) {
+    for (const item of org) {
+      const name = organizationName(item)
+      if (name) return name
+    }
+    return undefined
+  }
+  if (!org || typeof org !== 'object') return undefined
+  const row = org as Record<string, unknown>
+  const name = row.name ?? row.legalName
+  return typeof name === 'string' ? collapseText(stripTags(name)) || undefined : undefined
+}
+
+const JOB_BOARDS = new Set([
+  'linkedin',
+  'indeed',
+  'glassdoor',
+  'monster',
+  'naukri',
+  'foundit',
+  'shine',
+  'timesjobs',
+  'instahyre',
+  'wellfound',
+  'ziprecruiter',
+  'simplyhired',
+  'dice',
+  'cutshort',
+  'hirist',
+  'iimjobs',
+  'jooble',
+  'careerbuilder',
+  'reed',
+  'totaljobs',
+  'seek',
+  'jobstreet',
+  'greenhouse',
+  'lever',
+  'workday',
+  'myworkday',
+  'myworkdayjobs',
+  'smartrecruiters',
+  'ashby',
+  'ashbyhq',
+  'workable',
+  'bamboohr',
+  'jobvite',
+  'icims',
+  'successfactors',
+  'taleo',
+  'eightfold',
+  'recruitee',
+])
+
+const GENERIC_COMPANY = new Set([
+  'careers',
+  'jobs',
+  'job',
+  'apply',
+  'home',
+  'search',
+  'unavailable',
+  'na',
+  'n/a',
+  'confidential',
+  'company',
+  'employer',
+  'organization',
+  'organisation',
+  'hiring',
+  'position',
+  'role',
+  'untitled',
+  'description',
+  'overview',
+  'about',
+])
+
+function isJobBoardName(value: string) {
+  const key = value.toLowerCase().replace(/[^a-z0-9]/g, '')
+  return JOB_BOARDS.has(key)
+}
+
+function plausibleCompany(value: string, title: string | null) {
+  const text = value.trim()
+  if (text.length < 2 || text.length > 80) return false
+  if (!/[a-z]/i.test(text)) return false
+  if (text.split(/\s+/).length > 8) return false
+  if (GENERIC_COMPANY.has(text.toLowerCase())) return false
+  if (/^(job|requisition|posting|identifier|reference|req)\b/i.test(text)) return false
+  if (title && text.toLowerCase() === title.trim().toLowerCase()) return false
+  if (isJobBoardName(text)) return false
+  return true
+}
+
+function trimCompany(value: string) {
+  return collapseText(stripTags(value))
+    .replace(/[|.,;:]+$/g, '')
+    .replace(/\s+\b(careers|jobs|job openings|hiring)\b$/i, '')
+    .trim()
+}
+
+function acceptCompany(value: string | null | undefined, title: string | null) {
+  if (!value) return null
+  const text = trimCompany(value)
+  return plausibleCompany(text, title) ? text : null
+}
+
+function displayBrand(slug: string) {
+  const cleaned = slug.replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim()
+  if (!cleaned || GENERIC_COMPANY.has(cleaned.toLowerCase())) return null
+  if (cleaned.length <= 3 && !cleaned.includes(' ')) return cleaned.toUpperCase()
+  return cleaned.replace(/\b[a-z]/g, (letter) => letter.toUpperCase())
+}
+
+function companyFromProse(text: string | null, title: string | null) {
+  if (!text) return null
+  const patterns = [
+    /\b(?:position|role|job|opportunity|opening|career|careers)\s+at\s+([A-Z][A-Za-z0-9&.'’+-]*(?:\s+[A-Z][A-Za-z0-9&.'’+-]*){0,5})/,
+    /^([A-Z][A-Za-z0-9&.'’+-]*(?:\s+[A-Z][A-Za-z0-9&.'’+-]*){0,4})\s+is\s+(?:hiring|seeking|looking)/m,
+  ]
+  for (const pattern of patterns) {
+    const match = text.match(pattern)
+    const accepted = acceptCompany(match?.[1], title)
+    if (accepted) return accepted
+  }
+  return null
+}
+
+function companyFromTitle(title: string | null) {
+  if (!title) return null
+  const parts = title.split(/\s+[|–—/]\s+|\s+-\s+/)
+  if (parts.length < 2) return null
+  const tail = parts[parts.length - 1]
+  return acceptCompany(tail, parts[0])
+}
+
+function companyFromLabel(text: string | null, title: string | null) {
+  if (!text) return null
+  const match = text.match(/\b(?:company name|hiring company|company|employer|organization|organisation)\s*[:|-]\s*([^\n,.]{2,80})/i)
+  return acceptCompany(match?.[1], title)
+}
+
+function quotedCompany(html: string, title: string | null) {
+  const match = html.match(/"(?:companyName|employerName|organizationName|hiringCompany)"\s*:\s*"([^"\\]{2,80})"/)
+  return acceptCompany(match?.[1], title)
+}
+
+function hostLabels(hostname: string) {
+  return hostname.toLowerCase().replace(/\.$/, '').split('.').filter(Boolean)
+}
+
+function registrableBrand(hostname: string) {
+  const labels = hostLabels(hostname).filter((label) => !['www', 'www2', 'm', 'mobile'].includes(label))
+  if (labels.length < 2) return null
+  const suffix = labels[labels.length - 2]
+  const brand = ['co', 'com', 'org', 'net', 'ac', 'gov'].includes(suffix) && labels.length >= 3
+    ? labels[labels.length - 3]
+    : labels[labels.length - 2]
+  return brand
+}
+
+function isJobBoardHost(hostname: string) {
+  const brand = registrableBrand(hostname)
+  return brand != null && JOB_BOARDS.has(brand)
+}
+
+function companyFromCareerUrl(rawUrl: string | null, title: string | null) {
+  if (!rawUrl) return null
+  let url: URL
+  try {
+    url = new URL(rawUrl)
+  } catch {
+    return null
+  }
+  const host = url.hostname.toLowerCase()
+  const parts = url.pathname.split('/').filter(Boolean)
+  const ats =
+    host.endsWith('greenhouse.io') ||
+    host.endsWith('lever.co') ||
+    host.endsWith('ashbyhq.com') ||
+    host.endsWith('workable.com') ||
+    host.endsWith('recruitee.com') ||
+    host.endsWith('smartrecruiters.com')
+  if (ats) {
+    const slug = parts.find((part) => !['jobs', 'job', 'embed', 'apply', 'j'].includes(part.toLowerCase()))
+    return acceptCompany(slug ? displayBrand(slug) : null, title)
+  }
+  if (host.endsWith('myworkdayjobs.com')) {
+    const subdomain = host.split('.')[0]
+    if (subdomain && !/^wd\d+$/i.test(subdomain)) return acceptCompany(displayBrand(subdomain), title)
+  }
+  if (isJobBoardHost(host)) return null
+  const brand = registrableBrand(host)
+  return acceptCompany(brand ? displayBrand(brand) : null, title)
+}
+
+function resolveCompany(candidates: Array<string | null | undefined>, title: string | null) {
+  for (const candidate of candidates) {
+    const accepted = acceptCompany(candidate, title)
+    if (accepted) return accepted
+  }
+  return null
+}
+
 function collectJobs(value: unknown, jobs: JsonLdJob[]) {
   if (!value || typeof value !== 'object') return
   if (Array.isArray(value)) {
@@ -110,14 +317,14 @@ function collectJobs(value: unknown, jobs: JsonLdJob[]) {
   const type = row['@type']
   const types = Array.isArray(type) ? type.map(String) : [String(type ?? '')]
   if (types.some((item) => item.toLowerCase() === 'jobposting')) {
-    const org = row.hiringOrganization
-    const orgRow = org && typeof org === 'object' ? (org as Record<string, unknown>) : null
     const identifier = row.identifier
     let jobId: string | undefined
+    let identifierName: string | undefined
     if (typeof identifier === 'string') jobId = identifier
     else if (identifier && typeof identifier === 'object') {
       const idRow = identifier as Record<string, unknown>
       if (typeof idRow.value === 'string') jobId = idRow.value
+      if (typeof idRow.name === 'string') identifierName = idRow.name
     }
     const skills = Array.isArray(row.skills)
       ? row.skills.filter((item): item is string => typeof item === 'string')
@@ -128,7 +335,10 @@ function collectJobs(value: unknown, jobs: JsonLdJob[]) {
       title: typeof row.title === 'string' ? collapseText(stripTags(row.title)) : undefined,
       description: typeof row.description === 'string' ? collapseText(stripTags(row.description)) : undefined,
       identifier: jobId ? collapseText(jobId) : undefined,
-      company: orgRow && typeof orgRow.name === 'string' ? collapseText(stripTags(orgRow.name)) : undefined,
+      company:
+        organizationName(row.hiringOrganization) ||
+        organizationName(row.publisher) ||
+        (identifierName ? collapseText(stripTags(identifierName)) : undefined),
       skills,
     })
   }
@@ -203,9 +413,24 @@ export function extractJobFromHtml(html: string, sourceUrl: string | null, jobId
   const jobs = readJsonLdJobs(html)
   const job = jobs[0]
   const text = visibleText(html)
-  const description = clip(job?.description || metaContent(html, 'og:description') || metaContent(html, 'description') || text)
+  const metaDescription = metaContent(html, 'og:description') || metaContent(html, 'description')
+  const description = clip(job?.description || metaDescription || text)
   const title = job?.title || metaContent(html, 'og:title') || pageTitle(html)
-  const company = job?.company || metaContent(html, 'og:site_name')
+  const company = resolveCompany(
+    [
+      job?.company,
+      metaContent(html, 'og:site_name'),
+      metaContent(html, 'application-name'),
+      quotedCompany(html, title),
+      companyFromProse(metaDescription, title),
+      companyFromProse(description, title),
+      companyFromProse(text, title),
+      companyFromTitle(title),
+      companyFromLabel(text, title),
+      companyFromCareerUrl(sourceUrl, title),
+    ],
+    title,
+  )
   const skills = uniqueSkills([...(job?.skills ?? []), ...extractExplicitSkills(`${title ?? ''}\n${description ?? ''}\n${text}`)])
   return {
     company_name: emptyToNull(company),
@@ -221,7 +446,7 @@ export function extractJobFromHtml(html: string, sourceUrl: string | null, jobId
 export function extractJobFromManual(description: string, jobIdHint?: string | null): ExtractedJob {
   const text = collapseText(description).slice(0, MAX_DESCRIPTION)
   return {
-    company_name: null,
+    company_name: companyFromProse(text, null) || companyFromLabel(text, null),
     job_title: null,
     job_id: emptyToNull(jobIdHint || null),
     description: text || null,
