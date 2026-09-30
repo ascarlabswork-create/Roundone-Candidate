@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { attachJobContext, jobPracticeRules, readSafeJobContext } from "./jobPractice.ts";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -304,11 +305,12 @@ function defaultQuestionType(interviewType: string) {
   return "technical";
 }
 
-function groundTopic(value: string, skills: string[], interviewType: string) {
-  const canonical = matchVocab(value, skills);
+function groundTopic(value: string, skills: string[], interviewType: string, extraSkills: string[] = []) {
+  const pool = extraSkills.length > 0 ? [...skills, ...extraSkills] : skills;
+  const canonical = matchVocab(value, pool);
   if (canonical) return canonical;
   if (value.trim() && value.trim().toLowerCase() === interviewType.trim().toLowerCase()) return interviewType;
-  return skills[0] || interviewType;
+  return skills[0] || extraSkills[0] || interviewType;
 }
 
 function parseFocus(value: unknown) {
@@ -333,6 +335,7 @@ async function handlePracticeQuestions(
   };
   if (!setup.targetRole || !setup.interviewType) return json(400, { error: "invalid_body" });
 
+  const job = readSafeJobContext(body.job_context ?? body.jobContext ?? setupRow.jobContext ?? setupRow.job_context);
   const excludeQuestions = readStringList(
     body.exclude_questions ?? body.excludeQuestions ?? body.recent_questions ?? body.recentQuestions,
     50,
@@ -355,9 +358,18 @@ async function handlePracticeQuestions(
     "difficulty must match the requested difficulty.",
     "expected_focus is 2 to 5 short rubric bullets.",
     "Each question must explore a distinct architectural or problem-solving facet.",
+    ...jobPracticeRules(job),
   ].filter(Boolean).join(" ");
 
-  const completed = await completeJson(apiKey, model, baseUrl, system, { setup, exclude_questions: excludeQuestions.slice(0, 30) }, 11000, 0.75);
+  const completed = await completeJson(
+    apiKey,
+    model,
+    baseUrl,
+    system,
+    attachJobContext({ setup, exclude_questions: excludeQuestions.slice(0, 30) }, job),
+    11000,
+    0.75,
+  );
   if (completed instanceof Response) return completed;
 
   const fallbackType = defaultQuestionType(setup.interviewType);
@@ -389,7 +401,7 @@ async function handlePracticeQuestions(
       question_id: `pq-${questions.length + 1}`,
       question,
       question_type: PRACTICE_QUESTION_TYPES.includes(questionType) ? questionType : fallbackType,
-      topic: groundTopic(readString(row.topic, 40), setup.skills, setup.interviewType),
+      topic: groundTopic(readString(row.topic, 40), setup.skills, setup.interviewType, job?.skills ?? []),
       difficulty: PRACTICE_DIFFICULTIES.includes(difficulty) ? difficulty : setup.difficulty,
       expected_focus: focus.slice(0, 5),
     });
@@ -489,6 +501,7 @@ async function handlePracticeNextQuestion(
       : setup.difficulty,
   };
 
+  const job = readSafeJobContext(body.job_context ?? body.jobContext ?? setupRow.jobContext ?? setupRow.job_context);
   const interviewerName = readString(body.interviewerName ?? body.interviewer_name ?? setupRow.interviewerName ?? setupRow.interviewer_name, 40) || "John";
   const excludeQuestions = readStringList(
     body.exclude_questions ?? body.excludeQuestions ?? body.recent_questions ?? body.recentQuestions,
@@ -523,6 +536,7 @@ async function handlePracticeNextQuestion(
     "question_type must be technical, behavioral, system_design, or product.",
     "difficulty must match the requested difficulty.",
     "expected_focus is 2 to 5 short rubric bullets.",
+    ...jobPracticeRules(job),
   ].filter(Boolean).join(" ");
 
   const completed = await completeJson(
@@ -530,7 +544,7 @@ async function handlePracticeNextQuestion(
     model,
     baseUrl,
     system,
-    {
+    attachJobContext({
       setup,
       question_number: questionNumber,
       prior_turns: priorTurns,
@@ -539,7 +553,7 @@ async function handlePracticeNextQuestion(
       exclude_questions: excludeQuestions.slice(0, 30),
       focus_dimension: focusDimension,
       session_seed: sessionSeed,
-    },
+    }, job),
     11000,
     0.75,
   );
@@ -589,7 +603,7 @@ async function handlePracticeNextQuestion(
       question_id: `pq-${questionNumber}`,
       question,
       question_type: PRACTICE_QUESTION_TYPES.includes(questionType) ? questionType : fallbackType,
-      topic: groundTopic(readString(row.topic, 40), setup.skills, setup.interviewType),
+      topic: groundTopic(readString(row.topic, 40), setup.skills, setup.interviewType, job?.skills ?? []),
       difficulty: PRACTICE_DIFFICULTIES.includes(difficulty) ? difficulty : setup.difficulty,
       expected_focus: focus.slice(0, 5),
     },

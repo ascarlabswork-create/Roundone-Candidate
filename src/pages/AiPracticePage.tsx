@@ -12,6 +12,8 @@ import {
   TextInput,
 } from '../components/ui/primitives.tsx'
 import { INTERVIEW_TYPES, SKILLS, TARGET_ROLES } from '../data/catalogs.ts'
+import { dedupeSkills } from '../matching/skills.ts'
+import { isUuid } from '../lib/uuid.ts'
 import { requestNextPracticeQuestion, requestPracticeFeedback } from '../practice/aiAssist.ts'
 import {
   PRACTICE_ANSWER_MAX,
@@ -48,6 +50,7 @@ import {
 } from '../practice/session.ts'
 import { VoiceClient, type VoiceState } from '../practice/voiceClient.ts'
 import { getCandidatePreferencesIfPresent, getCandidateSkills } from '../services/candidateProfile.ts'
+import { getJobTarget } from '../services/jobTargets.ts'
 import { getResumeProjects } from '../services/resumeSkills.ts'
 import {
   failPracticeSession,
@@ -63,6 +66,23 @@ function difficultyLabel(value: PracticeDifficulty) {
   if (value === 'beginner') return 'Beginner'
   if (value === 'advanced') return 'Advanced'
   return 'Intermediate'
+}
+
+function JobPracticeContext({ setup }: { setup: PracticeSetup }) {
+  const job = setup.jobContext
+  if (!job) return null
+  const title = job.jobTitle || 'Saved job'
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Practice for this job</p>
+      <p className="mt-1 text-sm font-semibold text-navy-950">
+        {title}
+        {job.companyName ? ` · ${job.companyName}` : ''}
+      </p>
+      {job.skills.length > 0 ? <p className="mt-1 text-sm text-slate-600">{job.skills.slice(0, 6).join(', ')}</p> : null}
+      <p className="mt-1 text-xs text-slate-500">Practice questions for this role. Not the company's real interview.</p>
+    </div>
+  )
 }
 
 function MicIcon({ className = 'h-5 w-5' }: { className?: string }) {
@@ -128,6 +148,7 @@ export function AiPracticePage() {
   const [confirmEndOpen, setConfirmEndOpen] = useState(false)
   const [resumePrompt, setResumePrompt] = useState(false)
   const [autoSubmitCountdown, setAutoSubmitCountdown] = useState<number | null>(null)
+  const [jobNotice, setJobNotice] = useState<string | null>(null)
 
   const submittingRef = useRef(false)
   const sessionRef = useRef(session)
@@ -159,6 +180,7 @@ export function AiPracticePage() {
   useEffect(() => {
     const again = searchParams.get('again') === '1'
     const fresh = searchParams.get('fresh') === '1'
+    const jobTargetId = searchParams.get('job') ?? ''
     if (!again && !fresh) return
     const next = emptyPracticeSession()
     if (again) {
@@ -175,6 +197,9 @@ export function AiPracticePage() {
           .slice(0, 6),
       }
     }
+    if (isUuid(jobTargetId)) {
+      next.setup = { ...next.setup, jobTargetId }
+    }
     setSession(next)
     setError(null)
     setPersistError(null)
@@ -182,6 +207,56 @@ export function AiPracticePage() {
     setResumePrompt(false)
     setSearchParams({}, { replace: true })
   }, [searchParams, setSearchParams])
+
+  useEffect(() => {
+    const id = session.setup.jobTargetId
+    if (!id || session.setup.jobContext || session.phase !== 'setup') return
+    let cancelled = false
+    setJobNotice(null)
+    void getJobTarget(id)
+      .then((target) => {
+        if (cancelled) return
+        if (!target) {
+          setJobNotice('That saved job is not available for this account. You can still start a general practice interview.')
+          setSession((current) => ({
+            ...current,
+            setup: { ...current.setup, jobTargetId: undefined, jobContext: undefined },
+          }))
+          return
+        }
+        const jobContext = {
+          companyName: target.companyName ?? '',
+          jobTitle: target.jobTitle ?? '',
+          description: target.description ?? '',
+          skills: target.skills,
+        }
+        setSession((current) => {
+          if (current.setup.jobTargetId !== id) return current
+          const skills = dedupeSkills([...jobContext.skills, ...current.setup.skills]).slice(0, 6)
+          return {
+            ...current,
+            setup: {
+              ...current.setup,
+              jobContext,
+              targetRole: jobContext.jobTitle || current.setup.targetRole,
+              interviewType: current.setup.interviewType || 'Technical',
+              skills: skills.length > 0 ? skills : current.setup.skills,
+            },
+          }
+        })
+      })
+      .catch(() => {
+        if (cancelled) return
+        setJobNotice('That saved job could not be loaded. You can still start a general practice interview.')
+        setSession((current) => ({
+          ...current,
+          setup: { ...current.setup, jobTargetId: undefined },
+        }))
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [session.phase, session.setup.jobContext, session.setup.jobTargetId])
 
   useEffect(() => {
     if (prefilled || session.phase !== 'setup' || !account) return
@@ -563,8 +638,11 @@ export function AiPracticePage() {
   }
 
   const question = session.questions[session.index]
+  const waitingForJob = Boolean(session.setup.jobTargetId && !session.setup.jobContext)
   const canStart =
-    Boolean(session.setup.targetRole.trim() && session.setup.interviewType.trim()) && session.setup.skills.length > 0
+    Boolean(session.setup.targetRole.trim() && session.setup.interviewType.trim()) &&
+    session.setup.skills.length > 0 &&
+    !waitingForJob
   const totalQuestions = session.setup.questionCount
   const progressDenom = Math.max(totalQuestions, 1)
 
@@ -740,6 +818,11 @@ export function AiPracticePage() {
           title="You're about to start your AI Interview"
           subtitle="Answer naturally as you would in a real interview."
         />
+        {session.setup.jobContext ? (
+          <div className="mt-6">
+            <JobPracticeContext setup={session.setup} />
+          </div>
+        ) : null}
         <Card className="mt-8 space-y-4 p-5 sm:p-6">
           {/* Selected Interviewer Banner */}
           <div className="flex items-center gap-3.5 rounded-xl border border-blue-200 bg-blue-50/70 p-4">
@@ -845,6 +928,11 @@ export function AiPracticePage() {
         </div>
 
         {/* Progress Bar */}
+        {session.setup.jobContext ? (
+          <div className="mt-4">
+            <JobPracticeContext setup={session.setup} />
+          </div>
+        ) : null}
         <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-slate-200" role="progressbar" aria-valuenow={session.index + 1} aria-valuemin={1} aria-valuemax={totalQuestions}>
           <div
             className="h-full rounded-full bg-navy-900 transition-[width] duration-300"
@@ -1099,6 +1187,13 @@ export function AiPracticePage() {
         title="AI Interview setup"
         subtitle="Choose your role, type, topics, and difficulty. You will see an introduction before the interview starts."
       />
+      {waitingForJob ? <p className="mt-4 text-sm text-slate-600">Loading saved job...</p> : null}
+      {jobNotice ? <p className="mt-4 text-sm text-slate-600">{jobNotice}</p> : null}
+      {session.setup.jobContext ? (
+        <div className="mt-4">
+          <JobPracticeContext setup={session.setup} />
+        </div>
+      ) : null}
       <div className="mt-6 rounded-xl border border-blue-100 bg-blue-50/70 px-4 py-3 text-sm text-slate-700 sm:flex sm:items-center sm:justify-between sm:gap-4">
         <p>
           Want questions based on your resume?{' '}

@@ -166,6 +166,9 @@ export function mapPracticeError(error: unknown, fallback: string) {
   if (error instanceof PracticeError) return error
   const message = error instanceof Error ? error.message : ''
   const lower = message.toLowerCase()
+  if (lower.includes('job_target_forbidden')) {
+    return new PracticeError('validation', 'That saved job is not available for this account.')
+  }
   if (lower.includes('not_authenticated') || lower.includes('jwt')) {
     return new PracticeError('unauthenticated', 'Please sign in to view your AI practice progress.')
   }
@@ -274,13 +277,17 @@ export function parsePracticeProgress(value: unknown): PracticeProgressSummary |
 }
 
 export function buildStartPracticePayload(setup: SavedPracticeSession['setup']) {
-  return {
+  const payload: Record<string, unknown> = {
     target_role: setup.targetRole.trim().slice(0, 80),
     interview_type: setup.interviewType.trim().slice(0, 60),
     difficulty: setup.difficulty,
     topics: setup.skills.map((skill) => skill.trim()).filter(Boolean).slice(0, 6),
     question_count: setup.questionCount,
   }
+  if (setup.jobTargetId && isUuid(setup.jobTargetId)) {
+    payload.job_target_id = setup.jobTargetId
+  }
+  return payload
 }
 
 export function buildPracticeTurnPayload(
