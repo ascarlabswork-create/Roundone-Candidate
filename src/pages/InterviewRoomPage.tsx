@@ -21,37 +21,6 @@ const InterviewCall = lazy(() =>
   import('../components/interview/InterviewCall.tsx').then((mod) => ({ default: mod.InterviewCall })),
 )
 
-const codingProblem = {
-  title: 'Design an LRU Cache',
-  prompt:
-    'Implement an LRU (Least Recently Used) cache with get and put in O(1). Follow-up: how would you shard this across machines?',
-  starter: `class LRUCache {
-  constructor(capacity) {
-    this.capacity = capacity
-    // TODO: hashmap + doubly linked list
-  }
-
-  get(key) {
-    return -1
-  }
-
-  put(key, value) {
-    
-  }
-}`,
-  tests: [
-    { name: 'get missing key', result: 'pass' },
-    { name: 'evicts least recently used', result: 'fail' },
-    { name: 'updates existing key', result: 'idle' },
-  ],
-}
-
-const designPrompt = {
-  title: 'Design a URL shortener',
-  question:
-    'Design a URL shortening service like bit.ly. Cover API, storage, unique ID generation, redirects, and scale to 100M new URLs per day.',
-}
-
 function remainingUntil(iso: string, now: Date) {
   const end = new Date(iso).getTime() - now.getTime()
   return Math.max(0, Math.floor(end / 1000))
@@ -74,9 +43,7 @@ export function InterviewRoomPage() {
   const [joined, setJoined] = useState(wantJoin)
   const [now, setNow] = useState(() => Date.now())
   const [notes, setNotes] = useState('')
-  const [code, setCode] = useState(codingProblem.starter)
-  const [ran, setRan] = useState(false)
-  const [mobileTab, setMobileTab] = useState<'video' | 'work' | 'notes'>('video')
+  const [mobileTab, setMobileTab] = useState<'video' | 'notes'>('video')
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000)
@@ -141,17 +108,13 @@ export function InterviewRoomPage() {
   }
 
   return (
-    <StubWorkspace
+    <InterviewWorkspace
       interview={interview}
       remaining={remaining}
       accepted={params.get('accepted') === '1'}
       notes={notes}
-      code={code}
-      ran={ran}
       mobileTab={mobileTab}
       onNotes={setNotes}
-      onCode={setCode}
-      onRun={() => setRan(true)}
       onMobileTab={setMobileTab}
       onLeave={() => navigate('/candidate/interviews')}
     />
@@ -291,17 +254,13 @@ function InterviewHeader({ interview }: { interview: CandidateInterview }) {
   )
 }
 
-function StubWorkspace({
+function InterviewWorkspace({
   interview,
   remaining,
   accepted,
   notes,
-  code,
-  ran,
   mobileTab,
   onNotes,
-  onCode,
-  onRun,
   onMobileTab,
   onLeave,
 }: {
@@ -309,17 +268,12 @@ function StubWorkspace({
   remaining: number
   accepted: boolean
   notes: string
-  code: string
-  ran: boolean
-  mobileTab: 'video' | 'work' | 'notes'
+  mobileTab: 'video' | 'notes'
   onNotes: (value: string) => void
-  onCode: (value: string) => void
-  onRun: () => void
-  onMobileTab: (value: 'video' | 'work' | 'notes') => void
+  onMobileTab: (value: 'video' | 'notes') => void
   onLeave: () => void
 }) {
   const clock = useMemo(() => formatClock(remaining), [remaining])
-  const isCoding = interview.interviewType === 'Coding'
   const zone = interview.displayTimezone
 
   return (
@@ -344,7 +298,7 @@ function StubWorkspace({
       </header>
 
       <div className="flex gap-2 border-b border-white/10 px-4 py-2 md:hidden">
-        {(['video', 'work', 'notes'] as const).map((item) => (
+        {(['video', 'notes'] as const).map((item) => (
           <button
             key={item}
             type="button"
@@ -357,80 +311,19 @@ function StubWorkspace({
       </div>
 
       <div className="grid flex-1 gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className={`space-y-4 ${mobileTab !== 'video' && mobileTab !== 'work' ? 'hidden md:block' : ''}`}>
+        <div className={mobileTab === 'notes' ? 'hidden md:block' : ''}>
           {interview.session ? (
-            <div className={mobileTab === 'work' ? 'hidden md:block' : ''}>
-              <Suspense fallback={<Skeleton className="h-64" />}>
-                <InterviewCall
-                  bookingId={interview.id}
-                  sessionId={interview.session.id}
-                  role="candidate"
-                  remoteName={interview.interviewerName}
-                  accepted={accepted}
-                  onLeave={onLeave}
-                />
-              </Suspense>
-            </div>
+            <Suspense fallback={<Skeleton className="h-64" />}>
+              <InterviewCall
+                bookingId={interview.id}
+                sessionId={interview.session.id}
+                role="candidate"
+                remoteName={interview.interviewerName}
+                accepted={accepted}
+                onLeave={onLeave}
+              />
+            </Suspense>
           ) : null}
-
-          <div className={`${mobileTab === 'video' ? 'hidden md:block' : ''}`}>
-            {isCoding ? (
-              <div className="grid gap-3 md:grid-cols-[240px_minmax(0,1fr)]">
-                <div className="rounded-xl bg-white p-4 text-slate-800">
-                  <p className="text-xs font-semibold uppercase text-slate-500">
-                    {interview.interviewType} · {interview.durationMin} min
-                  </p>
-                  <h2 className="mt-2 font-semibold text-navy-950">{codingProblem.title}</h2>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">{codingProblem.prompt}</p>
-                  <p className="mt-4 text-xs font-semibold uppercase text-slate-500">Test cases</p>
-                  <ul className="mt-2 space-y-1 text-sm">
-                    {codingProblem.tests.map((test) => (
-                      <li key={test.name}>
-                        {ran && test.result === 'pass' ? '✓' : ran && test.result === 'fail' ? '✕' : '○'} {test.name}
-                      </li>
-                    ))}
-                  </ul>
-                  <Button className="mt-4" size="sm" onClick={onRun}>
-                    Run Code
-                  </Button>
-                </div>
-                <textarea
-                  value={code}
-                  onChange={(event) => onCode(event.target.value)}
-                  className="min-h-72 rounded-xl bg-[#0f172a] p-4 font-mono text-sm text-slate-100 outline-none"
-                  spellCheck={false}
-                />
-              </div>
-            ) : (
-              <div className="grid gap-3 md:grid-cols-2">
-                <div className="rounded-xl bg-white p-4 text-slate-800">
-                  <p className="text-xs font-semibold uppercase text-slate-500">
-                    {interview.interviewType} · {interview.serviceName}
-                  </p>
-                  <h2 className="mt-2 font-semibold text-navy-950">{designPrompt.title}</h2>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">{designPrompt.question}</p>
-                  <label className="mt-4 block text-sm font-medium text-navy-950" htmlFor="arch-notes">
-                    Architecture notes
-                  </label>
-                  <textarea
-                    id="arch-notes"
-                    className="mt-2 min-h-32 w-full rounded-lg border border-slate-200 p-3 text-sm"
-                    placeholder="Clients → API → cache → DB..."
-                  />
-                </div>
-                <div className="min-h-72 rounded-xl border border-dashed border-white/20 bg-[linear-gradient(to_right,rgba(255,255,255,0.06)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.06)_1px,transparent_1px)] bg-[size:24px_24px] p-4">
-                  <p className="text-sm text-white/70">Whiteboard (stub)</p>
-                  <div className="mt-8 flex justify-center gap-6 text-xs text-white/80">
-                    <span className="rounded-md border border-white/30 px-4 py-3">Client</span>
-                    <span className="self-center">→</span>
-                    <span className="rounded-md border border-white/30 px-4 py-3">API</span>
-                    <span className="self-center">→</span>
-                    <span className="rounded-md border border-white/30 px-4 py-3">Store</span>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
         </div>
 
         <aside
