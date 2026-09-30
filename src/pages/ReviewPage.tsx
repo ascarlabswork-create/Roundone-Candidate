@@ -164,7 +164,7 @@ export function ReviewPage() {
         <Card className="border-emerald-200 bg-emerald-50 p-5">
           <p className="font-semibold text-emerald-800">Review submitted successfully</p>
           <p className="mt-1 text-sm text-emerald-800">
-            jobround.ai will moderate it before it can appear on the interviewer&apos;s public profile.
+            It is now on the interviewer&apos;s profile, under Reviews.
           </p>
         </Card>
       ) : null}
