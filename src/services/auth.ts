@@ -37,6 +37,12 @@ export function authErrorMessage(error: unknown): string {
   if (message.includes('failed to fetch') || message.includes('network')) {
     return 'Network error. Check your connection and try again.'
   }
+  if (message.includes('provider is not enabled') || message.includes('unsupported provider')) {
+    return 'Google sign-in is not enabled yet. Use email and password for now.'
+  }
+  if (message.includes('nonce')) {
+    return 'Google sign-in could not be verified. Please try again.'
+  }
   return raw || 'Something went wrong. Please try again.'
 }
 
@@ -113,50 +119,20 @@ export async function signInCandidate(input: SignInInput) {
 }
 
 /**
- * Start Google OAuth. Role is never set client-side: the database
- * `handle_new_user_before` trigger provisions new users as `candidate`.
+ * Start Google OAuth. The browser goes to Google’s account chooser, then
+ * returns to `/candidate/auth/callback`. Role is never set client-side: the
+ * database `handle_new_user_before` trigger provisions new users as `candidate`.
  */
-const GOOGLE_POPUP_NAME = 'jobround-google-sign-in'
-
-/** Keep the OAuth window on the right, beside the sign-in page. */
-function googlePopupFeatures() {
-  const width = 480
-  const height = 640
-  const left = Math.max(16, window.screenX + window.outerWidth - width - 16)
-  const top = Math.max(16, window.screenY + 16)
-  return `popup=yes,width=${width},height=${height},left=${Math.round(left)},top=${Math.round(top)}`
-}
-
-export async function signInWithGoogle(nextPath?: string, popup = false) {
+export async function signInWithGoogle(nextPath?: string) {
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
       redirectTo: buildOAuthRedirect(nextPath),
-      skipBrowserRedirect: popup,
       queryParams: { prompt: 'select_account' },
     },
   })
   if (error) throw new Error(authErrorMessage(error))
-  if (!popup) return data
-  if (!data.url) throw new Error('Google sign-in could not be started.')
-  const opened = window.open(data.url, GOOGLE_POPUP_NAME, googlePopupFeatures())
-  if (!opened) window.location.assign(data.url)
   return data
-}
-
-/** Public Google client id already configured on the Supabase Google provider. */
-export async function googleOAuthClientId(nextPath?: string) {
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: 'google',
-    options: {
-      redirectTo: buildOAuthRedirect(nextPath),
-      skipBrowserRedirect: true,
-    },
-  })
-  if (error) throw new Error(authErrorMessage(error))
-  const clientId = data.url ? new URL(data.url).searchParams.get('client_id') : null
-  if (!clientId) throw new Error('Google sign-in is not configured.')
-  return clientId
 }
 
 /** Finish Google One Tap. Role stays server-side via handle_new_user_before. */

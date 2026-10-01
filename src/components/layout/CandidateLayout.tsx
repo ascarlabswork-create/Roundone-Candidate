@@ -1,4 +1,5 @@
 import { Outlet } from 'react-router-dom'
+import { GoogleOneTap } from '../auth/GoogleOneTap.tsx'
 import { useToast } from '../../state/toast.tsx'
 import { Footer } from './Footer.tsx'
 import { Navbar } from './Navbar.tsx'
@@ -13,6 +14,7 @@ export function CandidateLayout() {
         <Outlet />
       </main>
       <Footer />
+      <GoogleOneTap />
       <div className="pointer-events-none fixed bottom-4 right-4 z-50 flex flex-col gap-2">
         {toasts.map((toast) => (
           <button
