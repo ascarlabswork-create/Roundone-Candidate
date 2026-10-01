@@ -89,18 +89,16 @@ export function InterviewRoomPage() {
     status: interview.status,
     hasSession: Boolean(interview.session),
     ended: Boolean(interview.session?.endedAt),
+    startsAt: interview.startsAtUtc,
     endsAt: interview.endsAtUtc,
     now: clockNow,
   })
-  const showWorkspace = live && Boolean(interview.session) && (joined || wantJoin || interview.status === 'confirmed' || interview.status === 'in_progress')
+  const showWorkspace =
+    live && Boolean(interview.session) && (joined || wantJoin || interview.status === 'in_progress')
   const remaining = remainingUntil(interview.endsAtUtc, clockNow)
 
   if (joinState === 'completed' || joinState === 'cancelled' || joinState === 'no_show' || joinState === 'no_session' || joinState === 'unavailable') {
     return <InterviewStatusScreen interview={interview} joinState={joinState} />
-  }
-
-  if (!showWorkspace && interview.session && (interview.status === 'confirmed' || interview.status === 'in_progress')) {
-    return <InterviewStatusScreen interview={interview} joinState="unavailable" />
   }
 
   if (!showWorkspace) {
@@ -186,7 +184,18 @@ function UpcomingInterviewScreen({
     <div className="mx-auto max-w-lg px-4 py-16">
       <InterviewHeader interview={interview} />
       <div className="mt-8 rounded-xl border border-slate-200 bg-white p-6">
-        <h1 className="text-xl font-semibold text-navy-950">Upcoming session</h1>
+        <h1 className="text-xl font-semibold text-navy-950">
+          {interview.status === 'confirmed' ? 'Interview confirmed' : 'Upcoming session'}
+        </h1>
+        {interview.status === 'confirmed' ? (
+          <p className="mt-2 text-sm text-slate-600">
+            Scheduled for {formatCivilDateWithYear(isoDateInZone(new Date(interview.startsAtUtc), zone))} at{' '}
+            {formatBookingTime(interview.startsAtUtc, zone)}.
+          </p>
+        ) : null}
+        {!joinable ? (
+          <p className="mt-2 text-sm font-medium text-navy-950">Your interview hasn't started yet.</p>
+        ) : null}
         <dl className="mt-4 space-y-2 text-sm">
           <div className="flex justify-between gap-4">
             <dt className="text-slate-500">Date</dt>

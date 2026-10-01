@@ -25,6 +25,9 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 export function interviewCallErrorMessage(code: string) {
   if (code === 'not_authenticated') return 'Please sign in to join this interview.'
   if (code === 'booking_not_confirmed') return 'This interview is not confirmed yet.'
+  if (code === 'INTERVIEW_NOT_STARTED' || code === 'interview_not_started') {
+    return "Your interview hasn't started yet."
+  }
   if (code === 'session_expired') return 'This interview session has ended.'
   if (code === 'session_not_found') return 'This interview session could not be found.'
   if (code === 'not_authorized') return 'You are not a participant in this interview.'
@@ -53,11 +56,13 @@ export async function requestInterviewToken(input: { bookingId?: string; session
 export async function beginInterviewCall(sessionId: string) {
   const { error } = await supabase.rpc('begin_interview_call', { p_session_id: sessionId })
   if (error) {
-    const code = error.message.includes('booking_not_confirmed')
-      ? 'booking_not_confirmed'
-      : error.message.includes('not_authorized')
-        ? 'not_authorized'
-        : 'connection'
+    const code = error.message.includes('interview_not_started') || error.message.includes('INTERVIEW_NOT_STARTED')
+      ? 'INTERVIEW_NOT_STARTED'
+      : error.message.includes('booking_not_confirmed')
+        ? 'booking_not_confirmed'
+        : error.message.includes('not_authorized')
+          ? 'not_authorized'
+          : 'connection'
     throw new InterviewCallError(code, interviewCallErrorMessage(code))
   }
 }
@@ -74,6 +79,9 @@ function readErrorCode(error: { message?: string; context?: unknown }, data: unk
   const body = asRecord(data)
   if (typeof body?.error === 'string') return body.error
   const message = error.message ?? ''
+  if (message.includes('INTERVIEW_NOT_STARTED') || message.includes('interview_not_started')) {
+    return 'INTERVIEW_NOT_STARTED'
+  }
   if (message.includes('booking_not_confirmed')) return 'booking_not_confirmed'
   if (message.includes('session_expired')) return 'session_expired'
   if (message.includes('session_not_found')) return 'session_not_found'

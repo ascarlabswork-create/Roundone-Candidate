@@ -86,7 +86,9 @@ Deno.serve(async (req) => {
     const message = error?.message ?? "not_authorized";
     const status = message.includes("not_authenticated") ? 401 : 403;
     console.log(JSON.stringify({ event: "interview_token_denied" }));
-    return json(status, { error: message.includes("booking_not_confirmed")
+    return json(status, { error: message.includes("interview_not_started")
+      ? "INTERVIEW_NOT_STARTED"
+      : message.includes("booking_not_confirmed")
       ? "booking_not_confirmed"
       : message.includes("session_expired")
       ? "session_expired"
