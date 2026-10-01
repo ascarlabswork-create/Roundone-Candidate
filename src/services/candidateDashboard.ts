@@ -74,9 +74,9 @@ export async function getCandidateDashboard(): Promise<CandidateDashboard> {
         countOrNull(() => countRows(CANDIDATE_FEEDBACK_VIEW)),
         countOrNull(() => countRows(CANDIDATE_REVIEWS_TABLE)),
         listCandidateBookingsWhere({
-          statuses: [...NEXT_INTERVIEW_STATUSES],
+          statuses: [...NEXT_INTERVIEW_STATUSES, 'requested'],
           ascending: true,
-          limit: 5,
+          limit: 8,
         }).catch((error: unknown) => {
           console.error('dashboard next interviews failed', error)
           return []
@@ -130,6 +130,7 @@ export async function getCandidateDashboard(): Promise<CandidateDashboard> {
         nextInterview,
         recentCompleted,
         pendingPayments: pendingPayRows,
+        requestedBookings: nextCandidates.filter((item) => item.status === 'requested'),
       }),
       missingProfileItems: profileGaps,
     }

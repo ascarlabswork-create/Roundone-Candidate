@@ -76,6 +76,21 @@ export function sortUpcomingInterviews<T extends { startsAtUtc: string }>(items:
   return [...items].sort((left, right) => left.startsAtUtc.localeCompare(right.startsAtUtc))
 }
 
+/** Bookings the candidate should see as upcoming. Requested rows have no session yet. */
+export function isCandidateUpcomingInterview(
+  booking: { status: string; endsAtUtc: string },
+  session: { endedAt: string | null } | null,
+  now = new Date(),
+) {
+  if (session?.endedAt) return false
+  const endsAt = new Date(booking.endsAtUtc).getTime()
+  if (Number.isNaN(endsAt) || endsAt < now.getTime()) return false
+  if (booking.status === 'requested') return true
+  if (booking.status === 'in_progress') return true
+  if (booking.status === 'confirmed') return session != null
+  return false
+}
+
 export function sortRecentInterviews<T extends { startsAtUtc: string }>(items: T[]) {
   return [...items].sort((left, right) => right.startsAtUtc.localeCompare(left.startsAtUtc))
 }

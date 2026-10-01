@@ -11,6 +11,7 @@ import { getCandidateReviewBookingIds } from './candidateReviews.ts'
 import { getPublicInterviewersByIds, getPublicServicesByIds } from './interviewerPublic.ts'
 import {
   parseInterviewSession,
+  isCandidateUpcomingInterview,
   sortUpcomingInterviews,
   type CandidateInterviewSession,
 } from './interviewSessionModel.ts'
@@ -25,6 +26,7 @@ export {
   interviewJoinState,
   interviewStatusLabel,
   parseInterviewSession,
+  isCandidateUpcomingInterview,
   sortRecentInterviews,
   sortUpcomingInterviews,
 } from './interviewSessionModel.ts'
@@ -148,14 +150,9 @@ export async function getCandidateInterviewSessions(): Promise<CandidateIntervie
 
 export async function getCandidateUpcomingInterviews(): Promise<CandidateInterview[]> {
   const interviews = await getCandidateInterviewSessions()
-  const now = Date.now()
+  const now = new Date()
   return sortUpcomingInterviews(
-    interviews.filter((item) => {
-      if (!item.session) return false
-      if (item.status === 'in_progress') return true
-      if (item.status !== 'confirmed') return false
-      return new Date(item.endsAtUtc).getTime() >= now
-    }),
+    interviews.filter((item) => isCandidateUpcomingInterview(item, item.session, now)),
   )
 }
 
