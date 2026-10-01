@@ -29,6 +29,12 @@ export function AuthCallbackPage() {
     return () => window.clearTimeout(id)
   }, [])
 
+  useEffect(() => {
+    if (status !== 'authenticated' || !account) return
+    if (!window.opener || window.opener === window) return
+    window.close()
+  }, [status, account])
+
   if (status === 'authenticated' && account) {
     return <Navigate to={nextPath} replace />
   }

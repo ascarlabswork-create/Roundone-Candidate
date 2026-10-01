@@ -116,14 +116,23 @@ export async function signInCandidate(input: SignInInput) {
  * Start Google OAuth. Role is never set client-side: the database
  * `handle_new_user_before` trigger provisions new users as `candidate`.
  */
-export async function signInWithGoogle(nextPath?: string) {
+const GOOGLE_POPUP_NAME = 'jobround-google-sign-in'
+const GOOGLE_POPUP_FEATURES = 'popup=yes,width=520,height=720,left=80,top=80'
+
+export async function signInWithGoogle(nextPath?: string, popup = false) {
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
       redirectTo: buildOAuthRedirect(nextPath),
+      skipBrowserRedirect: popup,
+      queryParams: { prompt: 'select_account' },
     },
   })
   if (error) throw new Error(authErrorMessage(error))
+  if (!popup) return data
+  if (!data.url) throw new Error('Google sign-in could not be started.')
+  const opened = window.open(data.url, GOOGLE_POPUP_NAME, GOOGLE_POPUP_FEATURES)
+  if (!opened) window.location.assign(data.url)
   return data
 }
 
