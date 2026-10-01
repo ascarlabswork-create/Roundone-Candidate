@@ -36,6 +36,20 @@ export function runCandidateDashboardChecks() {
   expect(pickNextInterview([{ ...confirmed, endsAtUtc: '2026-09-17T11:00:00.000Z' }], now) == null, 'Past confirmed interview is not next')
   const live = { ...confirmed, id: '00000000-0000-4000-8000-000000000024', status: 'in_progress' } as CandidateInterview
   expect(pickNextInterview([confirmed, live], now)?.id === live.id, 'In-progress interview is preferred over a later confirmed booking')
+  const requested = {
+    ...confirmed,
+    id: '00000000-0000-4000-8000-000000000025',
+    status: 'requested',
+    session: null,
+    startsAtUtc: '2026-09-19T10:00:00.000Z',
+    endsAtUtc: '2026-09-19T11:00:00.000Z',
+  } as CandidateInterview
+  expect(pickNextInterview([requested], now)?.id === requested.id, 'A requested booking is the next interview when nothing is confirmed')
+  expect(pickNextInterview([requested, confirmed], now)?.id === confirmed.id, 'A confirmed interview stays ahead of a booking request')
+  expect(
+    pickNextInterview([{ ...requested, endsAtUtc: '2026-09-17T11:00:00.000Z' }], now) == null,
+    'A requested booking that already ended is not next',
+  )
 
   const actions = buildDashboardPendingActions({
     nextInterview: confirmed,
@@ -52,6 +66,17 @@ export function runCandidateDashboardChecks() {
   expect(actions.some((item) => item.cta === 'View Feedback'), 'Latest feedback becomes a pending action')
   expect(actions.some((item) => item.cta === 'Review Interviewer'), 'Unreviewed completed interview is actionable')
   expect(actions.some((item) => item.cta === 'Complete payment'), 'Active payment hold is actionable')
+  const requestedActions = buildDashboardPendingActions({
+    nextInterview: null,
+    recentCompleted: [],
+    pendingPayments: [],
+    requestedBookings: [requested],
+    now,
+  })
+  expect(
+    requestedActions.some((item) => item.cta === 'View booking' && item.href === '/candidate/interviews'),
+    'A requested booking is visible from the dashboard',
+  )
   expect(!actions.some((item) => item.href.includes('join=1')), 'Confirmed interview outside join window is not a join action')
 
   return true

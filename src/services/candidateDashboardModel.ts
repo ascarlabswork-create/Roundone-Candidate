@@ -47,13 +47,13 @@ export function missingProfileItems(input: {
 
 export function pickNextInterview(interviews: CandidateInterview[], now = new Date()) {
   const nowMs = now.getTime()
+  const stillAhead = (item: CandidateInterview) => new Date(item.endsAtUtc).getTime() >= nowMs
   const inProgress = interviews.find((item) => item.status === 'in_progress')
   if (inProgress) return inProgress
   return (
-    interviews.find((item) => {
-      if (item.status !== 'confirmed') return false
-      return new Date(item.endsAtUtc).getTime() >= nowMs
-    }) ?? null
+    interviews.find((item) => item.status === 'confirmed' && stillAhead(item)) ??
+    interviews.find((item) => item.status === 'requested' && stillAhead(item)) ??
+    null
   )
 }
 
@@ -61,6 +61,7 @@ export function buildDashboardPendingActions(input: {
   nextInterview: CandidateInterview | null
   recentCompleted: CandidateInterview[]
   pendingPayments: CandidateBooking[]
+  requestedBookings?: CandidateInterview[]
   now?: Date
 }): DashboardPendingAction[] {
   const now = input.now ?? new Date()
@@ -84,6 +85,17 @@ export function buildDashboardPendingActions(input: {
       body: 'Finish payment to keep this interview hold.',
       href: `/candidate/booking/confirmation?bookingId=${booking.id}`,
       cta: 'Complete payment',
+    })
+  }
+
+  for (const interview of input.requestedBookings ?? []) {
+    if (new Date(interview.endsAtUtc).getTime() < now.getTime()) continue
+    actions.push({
+      id: `request-${interview.id}`,
+      title: 'Booking request sent',
+      body: `${interview.serviceName} with ${interview.interviewerName} is awaiting confirmation.`,
+      href: '/candidate/interviews',
+      cta: 'View booking',
     })
   }
 

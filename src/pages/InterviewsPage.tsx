@@ -22,7 +22,7 @@ function emptyCopy(tab: InterviewTab) {
   if (tab === 'upcoming') {
     return {
       title: 'No upcoming interviews',
-      body: 'When an interviewer confirms a booking, it will show up here.',
+      body: 'Booking requests and confirmed interviews show up here.',
     }
   }
   if (tab === 'completed') {

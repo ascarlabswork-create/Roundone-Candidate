@@ -5,6 +5,7 @@ import {
   interviewHistorySection,
   interviewJoinState,
   interviewStatusLabel,
+  isCandidateUpcomingInterview,
   parseInterviewSession,
 } from './interviewSessionModel.ts'
 
@@ -75,6 +76,31 @@ export function runInterviewSessionChecks() {
   expect(grouped.upcoming[0]?.startsAtUtc === '2026-09-18T13:00:00.000Z', 'Upcoming sorts nearest first')
   expect(grouped.completed[0]?.startsAtUtc === '2026-09-14T13:00:00.000Z', 'Completed sorts most recent first')
   expect(grouped.cancelled.length === 1 && grouped.cancelled[0]?.status === 'rescheduled', 'Rescheduled stays out of upcoming')
+
+  const requested = {
+    status: 'requested',
+    endsAtUtc: '2026-09-20T11:00:00.000Z',
+  }
+  expect(
+    isCandidateUpcomingInterview(requested, null, now),
+    'Requested bookings stay visible without an interview session',
+  )
+  expect(
+    !isCandidateUpcomingInterview({ status: 'requested', endsAtUtc: '2026-09-16T11:00:00.000Z' }, null, now),
+    'A requested booking that already ended is not upcoming',
+  )
+  expect(
+    !isCandidateUpcomingInterview(
+      { status: 'confirmed', endsAtUtc: confirmed.endsAtUtc },
+      null,
+      now,
+    ),
+    'Confirmed bookings still need a session before they count as upcoming',
+  )
+  expect(
+    isCandidateUpcomingInterview({ status: 'confirmed', endsAtUtc: confirmed.endsAtUtc }, session, now),
+    'Confirmed bookings with a session stay upcoming',
+  )
 
   return true
 }
