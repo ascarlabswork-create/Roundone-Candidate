@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
+import { GoogleSignInDialog } from '../components/auth/GoogleSignInDialog.tsx'
 import { Button } from '../components/ui/Button.tsx'
 import { Card, FieldLabel, PageHeader, SelectInput, TextInput } from '../components/ui/primitives.tsx'
 import { GoogleIcon } from '../components/ui/GoogleIcon.tsx'
@@ -30,6 +31,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
   const [timezone, setTimezone] = useState('Asia/Kolkata')
   const [submitting, setSubmitting] = useState(false)
   const [googleSubmitting, setGoogleSubmitting] = useState(false)
+  const [googlePromptOpen, setGooglePromptOpen] = useState(mode === 'login')
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
 
@@ -69,10 +71,10 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
     setInfo(null)
     setGoogleSubmitting(true)
     try {
-      // Redirects the browser to Google; execution usually stops here.
-      await signInWithGoogle(nextPath)
+      await signInWithGoogle(nextPath, true)
     } catch (caught) {
       setError(authErrorMessage(caught))
+    } finally {
       setGoogleSubmitting(false)
     }
   }
@@ -90,6 +92,13 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
 
   return (
     <div className="mx-auto max-w-md px-4 py-10 sm:px-6">
+      <GoogleSignInDialog
+        open={googlePromptOpen && !user}
+        busy={googleSubmitting}
+        error={error}
+        onGoogle={() => void continueWithGoogle()}
+        onClose={() => setGooglePromptOpen(false)}
+      />
       <PageHeader
         title={isRegister ? 'Create your candidate account' : 'Sign in'}
         subtitle={
