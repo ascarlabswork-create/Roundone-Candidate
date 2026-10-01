@@ -1,6 +1,5 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useState, type FormEvent } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
-import { GoogleSignInDialog } from '../components/auth/GoogleSignInDialog.tsx'
 import { Button } from '../components/ui/Button.tsx'
 import { Card, FieldLabel, PageHeader, SelectInput, TextInput } from '../components/ui/primitives.tsx'
 import { GoogleIcon } from '../components/ui/GoogleIcon.tsx'
@@ -12,12 +11,6 @@ import {
   signInWithGoogle,
   signUpCandidate,
 } from '../services/auth.ts'
-import {
-  GoogleOneTapDismissed,
-  GoogleOneTapUnavailable,
-  cancelGoogleOneTap,
-  promptGoogleOneTap,
-} from '../services/googleOneTap.ts'
 import { useSession } from '../state/session.tsx'
 
 function safeNextPath(value: string | null) {
@@ -37,28 +30,8 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
   const [timezone, setTimezone] = useState('Asia/Kolkata')
   const [submitting, setSubmitting] = useState(false)
   const [googleSubmitting, setGoogleSubmitting] = useState(false)
-  const [googlePromptOpen, setGooglePromptOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (mode !== 'login' || status !== 'anonymous') return
-    let cancelled = false
-    void promptGoogleOneTap(nextPath)
-      .then(() => {
-        if (!cancelled) void refreshAccount()
-      })
-      .catch((caught: unknown) => {
-        if (cancelled || caught instanceof GoogleOneTapDismissed) return
-        setGooglePromptOpen(true)
-        if (caught instanceof GoogleOneTapUnavailable) return
-        setError(authErrorMessage(caught))
-      })
-    return () => {
-      cancelled = true
-      cancelGoogleOneTap()
-    }
-  }, [mode, status, nextPath, refreshAccount])
 
   if (status === 'authenticated' && user) {
     return <Navigate to={nextPath} replace />
@@ -96,20 +69,9 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
     setInfo(null)
     setGoogleSubmitting(true)
     try {
-      await promptGoogleOneTap(nextPath)
-      await refreshAccount()
+      await signInWithGoogle(nextPath)
     } catch (caught) {
-      if (caught instanceof GoogleOneTapDismissed) return
-      if (!(caught instanceof GoogleOneTapUnavailable)) {
-        setError(authErrorMessage(caught))
-        return
-      }
-      try {
-        await signInWithGoogle(nextPath, true)
-      } catch (popupError) {
-        setError(authErrorMessage(popupError))
-      }
-    } finally {
+      setError(authErrorMessage(caught))
       setGoogleSubmitting(false)
     }
   }
@@ -127,13 +89,6 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
 
   return (
     <div className="mx-auto max-w-md px-4 py-10 sm:px-6">
-      <GoogleSignInDialog
-        open={googlePromptOpen && !user}
-        busy={googleSubmitting}
-        error={error}
-        onGoogle={() => void continueWithGoogle()}
-        onClose={() => setGooglePromptOpen(false)}
-      />
       <PageHeader
         title={isRegister ? 'Create your candidate account' : 'Sign in'}
         subtitle={
