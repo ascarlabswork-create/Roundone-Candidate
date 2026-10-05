@@ -1,8 +1,14 @@
 import { PhoneOff } from 'lucide-react'
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { formatBookingTime, formatCivilDateWithYear, isoDateInZone } from '../availability/index.ts'
-import { shouldEnterCall } from '../interview/callModel.ts'
+import { InterviewLobby } from '../components/interview/InterviewLobby.tsx'
+import {
+  endInterviewRoom,
+  loadInterviewTiming,
+  recordInterviewCallEvent,
+  type InterviewServerTiming,
+} from '../services/interviewCall.ts'
 import { Logo } from '../components/layout/Logo.tsx'
 import { CandidateFeedbackAction } from '../components/interviews/CandidateFeedbackAction.tsx'
 import { CandidateReviewAction } from '../components/interviews/CandidateReviewAction.tsx'
@@ -10,7 +16,6 @@ import { Button } from '../components/ui/Button.tsx'
 import { ErrorState, Skeleton } from '../components/ui/primitives.tsx'
 import { useAsync } from '../lib/useAsync.ts'
 import {
-  canJoinInterview,
   getCandidateInterviewByBooking,
   interviewJoinState,
   interviewStatusLabel,
@@ -40,15 +45,56 @@ export function InterviewRoomPage() {
   const navigate = useNavigate()
   const wantJoin = params.get('join') === '1'
   const interviewState = useAsync(() => getCandidateInterviewByBooking(id), [id])
-  const [joined, setJoined] = useState(wantJoin)
+  const [joined, setJoined] = useState(false)
+  const [timing, setTiming] = useState<InterviewServerTiming | null>(null)
+  const [clockAnchor, setClockAnchor] = useState<{ serverMs: number; perf: number } | null>(null)
   const [now, setNow] = useState(() => Date.now())
+  const joinRequest = useRef(wantJoin)
+  const lobbyRecorded = useRef(false)
+  const roomClosed = useRef(false)
   const [notes, setNotes] = useState('')
   const [mobileTab, setMobileTab] = useState<'video' | 'notes'>('video')
+
+  const sessionId =
+    interviewState.status === 'success' ? (interviewState.data.session?.id ?? '') : ''
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000)
     return () => window.clearInterval(timer)
   }, [])
+
+  useEffect(() => {
+    if (!sessionId) return
+    let cancelled = false
+    async function pull() {
+      const next = await loadInterviewTiming(sessionId)
+      if (cancelled || !next) return
+      setTiming(next)
+      setClockAnchor({ serverMs: new Date(next.serverNow).getTime(), perf: performance.now() })
+    }
+    void pull()
+    const timer = window.setInterval(() => void pull(), 15000)
+    return () => {
+      cancelled = true
+      window.clearInterval(timer)
+    }
+  }, [sessionId])
+
+  useEffect(() => {
+    if (!timing || !sessionId) return
+    if (joinRequest.current) {
+      joinRequest.current = false
+      if (timing.canJoin) setJoined(true)
+    }
+    if (timing.phase === 'lobby' && !lobbyRecorded.current) {
+      lobbyRecorded.current = true
+      void recordInterviewCallEvent(sessionId, 'lobby_entered').catch(() => undefined)
+    }
+    if ((timing.phase === 'ended' || timing.phase === 'closed') && !roomClosed.current) {
+      roomClosed.current = true
+      void endInterviewRoom(sessionId)
+    }
+  }, [timing, sessionId])
 
   if (interviewState.status === 'loading') {
     return (
@@ -82,27 +128,42 @@ export function InterviewRoomPage() {
   }
 
   const interview = interviewState.data
-  const clockNow = new Date(now)
-  const joinable = canJoinInterview(interview, interview.session, clockNow)
-  const joinState = interviewJoinState(interview, interview.session, clockNow)
-  const live = shouldEnterCall({
-    status: interview.status,
-    hasSession: Boolean(interview.session),
-    ended: Boolean(interview.session?.endedAt),
-    startsAt: interview.startsAtUtc,
-    endsAt: interview.endsAtUtc,
-    now: clockNow,
-  })
+  const clockNow = clockAnchor
+    ? new Date(clockAnchor.serverMs + (performance.now() - clockAnchor.perf))
+    : new Date(now)
+  const joinState = timing
+    ? serverJoinState(interview.status, timing)
+    : interviewJoinState(interview, interview.session, clockNow)
+  const joinable = timing?.canJoin === true
   const showWorkspace =
-    live && Boolean(interview.session) && (joined || wantJoin || interview.status === 'in_progress')
-  const remaining = remainingUntil(interview.endsAtUtc, clockNow)
+    joinable && Boolean(interview.session) && (joined || interview.status === 'in_progress')
+  const remaining = remainingUntil(timing?.endsAt ?? interview.endsAtUtc, clockNow)
 
-  if (joinState === 'completed' || joinState === 'cancelled' || joinState === 'no_show' || joinState === 'no_session' || joinState === 'unavailable') {
+  if (
+    joinState === 'completed' ||
+    joinState === 'cancelled' ||
+    joinState === 'no_show' ||
+    joinState === 'closed' ||
+    joinState === 'no_session' ||
+    joinState === 'unavailable'
+  ) {
     return <InterviewStatusScreen interview={interview} joinState={joinState} />
   }
 
+  if (joinState === 'lobby' || (joinState === 'joinable' && !showWorkspace)) {
+    return (
+      <InterviewLobby
+        interview={interview}
+        now={clockNow}
+        canJoin={joinable}
+        interviewerJoined={timing?.interviewerJoined === true}
+        onJoin={() => setJoined(true)}
+      />
+    )
+  }
+
   if (!showWorkspace) {
-    return <UpcomingInterviewScreen interview={interview} joinable={joinable} onJoin={() => setJoined(true)} />
+    return <UpcomingInterviewScreen interview={interview} onBack={() => navigate('/candidate/interviews')} />
   }
 
   return (
@@ -119,6 +180,21 @@ export function InterviewRoomPage() {
   )
 }
 
+function serverJoinState(
+  status: string,
+  timing: InterviewServerTiming,
+): ReturnType<typeof interviewJoinState> {
+  if (status === 'cancelled' || status === 'rescheduled') return 'cancelled'
+  if (status === 'no_show') return 'no_show'
+  if (status === 'completed' || timing.phase === 'ended') return 'completed'
+  if (timing.phase === 'closed') return 'closed'
+  if (timing.phase === 'scheduled') return 'upcoming'
+  if (timing.phase === 'lobby') return 'lobby'
+  if (timing.canJoin && status === 'in_progress') return 'in_progress'
+  if (timing.canJoin) return 'joinable'
+  return 'closed'
+}
+
 function InterviewStatusScreen({
   interview,
   joinState,
@@ -130,19 +206,25 @@ function InterviewStatusScreen({
   const title =
     joinState === 'completed'
       ? 'Interview Completed'
-      : joinState === 'cancelled'
-        ? 'Interview Cancelled'
-        : joinState === 'no_show'
-          ? 'Interview marked as no-show'
-          : joinState === 'no_session'
-            ? 'Interview session is not ready yet'
-            : 'This interview cannot be joined'
+      : joinState === 'closed'
+        ? 'Interview join window has closed.'
+        : joinState === 'cancelled'
+          ? 'Interview Cancelled'
+          : joinState === 'no_show'
+            ? 'Interview marked as no-show'
+            : joinState === 'no_session'
+              ? 'Interview session is not ready yet'
+              : 'This interview cannot be joined'
   return (
     <div className="mx-auto max-w-lg px-4 py-16">
       <InterviewHeader interview={interview} />
       <div className="mt-8 rounded-xl border border-slate-200 bg-white p-6 text-center">
         <h1 className="text-xl font-semibold text-navy-950">{title}</h1>
-        <p className="mt-2 text-sm text-slate-600">Join is unavailable for this booking.</p>
+        <p className="mt-2 text-sm text-slate-600">
+          {joinState === 'closed'
+            ? 'A new join is no longer available. The scheduled end time did not change.'
+            : 'Join is unavailable for this booking.'}
+        </p>
         <div className="mt-6 flex flex-col items-center gap-3">
           {joinState === 'completed' ? (
             <>
@@ -171,31 +253,22 @@ function InterviewStatusScreen({
 
 function UpcomingInterviewScreen({
   interview,
-  joinable,
-  onJoin,
+  onBack,
 }: {
   interview: CandidateInterview
-  joinable: boolean
-  onJoin: () => void
+  onBack: () => void
 }) {
-  const navigate = useNavigate()
   const zone = interview.displayTimezone
   return (
     <div className="mx-auto max-w-lg px-4 py-16">
       <InterviewHeader interview={interview} />
       <div className="mt-8 rounded-xl border border-slate-200 bg-white p-6">
         <h1 className="text-xl font-semibold text-navy-950">
-          {interview.status === 'confirmed' ? 'Interview confirmed' : 'Upcoming session'}
+          Interview starts at {formatBookingTime(interview.startsAtUtc, zone)}
         </h1>
-        {interview.status === 'confirmed' ? (
-          <p className="mt-2 text-sm text-slate-600">
-            Scheduled for {formatCivilDateWithYear(isoDateInZone(new Date(interview.startsAtUtc), zone))} at{' '}
-            {formatBookingTime(interview.startsAtUtc, zone)}.
-          </p>
-        ) : null}
-        {!joinable ? (
-          <p className="mt-2 text-sm font-medium text-navy-950">Your interview hasn't started yet.</p>
-        ) : null}
+        <p className="mt-2 text-sm text-slate-600">
+          The lobby opens 30 minutes before the start. Accepting this booking does not start the call.
+        </p>
         <dl className="mt-4 space-y-2 text-sm">
           <div className="flex justify-between gap-4">
             <dt className="text-slate-500">Date</dt>
@@ -219,15 +292,7 @@ function UpcomingInterviewScreen({
           </div>
         </dl>
         <div className="mt-6 flex flex-col gap-2">
-          <Button disabled={!joinable} onClick={onJoin}>
-            Join Interview
-          </Button>
-          {!joinable ? (
-            <p className="text-center text-xs text-slate-500">
-              Join opens 15 minutes before the scheduled start.
-            </p>
-          ) : null}
-          <Button variant="outline" onClick={() => navigate('/candidate/interviews')}>
+          <Button variant="outline" onClick={onBack}>
             Back to My Interviews
           </Button>
         </div>

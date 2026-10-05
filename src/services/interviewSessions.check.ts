@@ -32,7 +32,32 @@ export function runInterviewSessionChecks() {
     startsAtUtc: '2026-09-17T13:10:00.000Z',
     endsAtUtc: '2026-09-17T14:10:00.000Z',
   }
-  expect(canJoinInterview(confirmed, session, now), 'C: confirmed session in the join window is joinable')
+  expect(interviewJoinState(confirmed, session, now) === 'lobby', 'C: 10 minutes early is the lobby, not the call')
+  expect(!canJoinInterview(confirmed, session, now), 'C: the lobby does not join LiveKit')
+  expect(
+    canJoinInterview(
+      { ...confirmed, startsAtUtc: '2026-09-17T13:00:00.000Z', endsAtUtc: '2026-09-17T13:30:00.000Z' },
+      session,
+      now,
+    ),
+    'C: the call is joinable at the scheduled start',
+  )
+  expect(
+    canJoinInterview(
+      { ...confirmed, startsAtUtc: '2026-09-17T12:50:00.000Z', endsAtUtc: '2026-09-17T13:20:00.000Z' },
+      session,
+      now,
+    ),
+    'C: a candidate can still join 10 minutes late',
+  )
+  expect(
+    interviewJoinState(
+      { ...confirmed, startsAtUtc: '2026-09-17T12:40:00.000Z', endsAtUtc: '2026-09-17T13:10:00.000Z' },
+      session,
+      now,
+    ) === 'closed',
+    'C: a new join closes 15 minutes after the start',
+  )
   expect(
     !canJoinInterview(
       { ...confirmed, startsAtUtc: '2026-09-17T14:00:00.000Z', endsAtUtc: '2026-09-17T15:00:00.000Z' },

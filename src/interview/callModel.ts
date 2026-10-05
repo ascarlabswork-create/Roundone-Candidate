@@ -1,10 +1,9 @@
-import { JOIN_WINDOW_BEFORE_MS } from '../services/interviewSessionModel.ts'
+import { LATE_JOIN_AFTER_MS, LOBBY_OPENS_BEFORE_MS } from '../services/interviewSessionModel.ts'
 
 const ROOM_PREFIX = 'roundone-interview-'
-const CALL_GRACE_MS = 30 * 60_000
 
-/** Existing join window: 15 minutes before `bookings.starts_at`. */
-export const INTERVIEW_JOIN_EARLY_MS = JOIN_WINDOW_BEFORE_MS
+export const INTERVIEW_LOBBY_BEFORE_MS = LOBBY_OPENS_BEFORE_MS
+export const INTERVIEW_LATE_JOIN_MS = LATE_JOIN_AFTER_MS
 
 export type CallRole = 'candidate' | 'interviewer'
 
@@ -26,11 +25,21 @@ export function shouldOpenCallOnConfirmation(previousStatus: string, nextStatus:
   return previousStatus !== 'confirmed' && previousStatus !== 'in_progress' && nextStatus === 'confirmed'
 }
 
+/** LiveKit may start at `starts_at` and a new join stays open for 15 minutes after that. */
 export function isInsideJoinWindow(startsAt: string | null | undefined, now = new Date()) {
   if (!startsAt) return false
   const start = new Date(startsAt).getTime()
   if (Number.isNaN(start)) return false
-  return now.getTime() >= start - INTERVIEW_JOIN_EARLY_MS
+  const t = now.getTime()
+  return t >= start && t <= start + INTERVIEW_LATE_JOIN_MS
+}
+
+export function isLobbyOpen(startsAt: string | null | undefined, now = new Date()) {
+  if (!startsAt) return false
+  const start = new Date(startsAt).getTime()
+  if (Number.isNaN(start)) return false
+  const t = now.getTime()
+  return t >= start - INTERVIEW_LOBBY_BEFORE_MS && t < start
 }
 
 export function confirmationCallTarget(input: {
@@ -60,8 +69,9 @@ export function shouldEnterCall(input: {
   if (!input.hasSession || input.ended) return false
   if (input.status !== 'confirmed' && input.status !== 'in_progress') return false
   const now = input.now ?? new Date()
+  const start = new Date(input.startsAt).getTime()
   const end = new Date(input.endsAt).getTime()
-  if (Number.isNaN(end) || now.getTime() > end + CALL_GRACE_MS) return false
+  if (Number.isNaN(start) || Number.isNaN(end) || now.getTime() < start || now.getTime() >= end) return false
   if (input.status === 'in_progress') return true
   return isInsideJoinWindow(input.startsAt, now)
 }
@@ -77,13 +87,15 @@ export function interviewTokenGate(input: {
   endsAt: string
   ended: boolean
   now?: Date
-}): 'ok' | 'not_authorized' | 'booking_not_confirmed' | 'INTERVIEW_NOT_STARTED' | 'session_expired' {
+}): 'ok' | 'not_authorized' | 'booking_not_confirmed' | 'INTERVIEW_NOT_STARTED' | 'JOIN_WINDOW_CLOSED' | 'session_expired' {
   if (input.role !== 'candidate' && input.role !== 'interviewer') return 'not_authorized'
   if (input.status !== 'confirmed' && input.status !== 'in_progress') return 'booking_not_confirmed'
   const now = input.now ?? new Date()
+  const start = new Date(input.startsAt).getTime()
   const end = new Date(input.endsAt).getTime()
-  if (input.ended || Number.isNaN(end) || now.getTime() > end + CALL_GRACE_MS) return 'session_expired'
-  if (input.status === 'confirmed' && !isInsideJoinWindow(input.startsAt, now)) return 'INTERVIEW_NOT_STARTED'
+  if (input.ended || Number.isNaN(start) || Number.isNaN(end) || now.getTime() >= end) return 'session_expired'
+  if (now.getTime() < start) return 'INTERVIEW_NOT_STARTED'
+  if (input.status === 'confirmed' && now.getTime() > start + INTERVIEW_LATE_JOIN_MS) return 'JOIN_WINDOW_CLOSED'
   return 'ok'
 }
 

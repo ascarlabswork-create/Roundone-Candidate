@@ -28,6 +28,9 @@ export function interviewCallErrorMessage(code: string) {
   if (code === 'INTERVIEW_NOT_STARTED' || code === 'interview_not_started') {
     return "Your interview hasn't started yet."
   }
+  if (code === 'JOIN_WINDOW_CLOSED' || code === 'join_window_closed') {
+    return 'Interview join window has closed.'
+  }
   if (code === 'session_expired') return 'This interview session has ended.'
   if (code === 'session_not_found') return 'This interview session could not be found.'
   if (code === 'not_authorized') return 'You are not a participant in this interview.'
@@ -56,18 +59,66 @@ export async function requestInterviewToken(input: { bookingId?: string; session
 export async function beginInterviewCall(sessionId: string) {
   const { error } = await supabase.rpc('begin_interview_call', { p_session_id: sessionId })
   if (error) {
-    const code = error.message.includes('interview_not_started') || error.message.includes('INTERVIEW_NOT_STARTED')
-      ? 'INTERVIEW_NOT_STARTED'
-      : error.message.includes('booking_not_confirmed')
-        ? 'booking_not_confirmed'
-        : error.message.includes('not_authorized')
-          ? 'not_authorized'
-          : 'connection'
+    const code = error.message.includes('join_window_closed') || error.message.includes('JOIN_WINDOW_CLOSED')
+      ? 'JOIN_WINDOW_CLOSED'
+      : error.message.includes('interview_not_started') || error.message.includes('INTERVIEW_NOT_STARTED')
+        ? 'INTERVIEW_NOT_STARTED'
+        : error.message.includes('session_expired')
+          ? 'session_expired'
+          : error.message.includes('booking_not_confirmed')
+            ? 'booking_not_confirmed'
+            : error.message.includes('not_authorized')
+              ? 'not_authorized'
+              : 'connection'
     throw new InterviewCallError(code, interviewCallErrorMessage(code))
   }
 }
 
-export async function recordInterviewCallEvent(sessionId: string, event: 'participant_left' | 'call_ended') {
+export type InterviewServerTiming = {
+  phase: 'scheduled' | 'lobby' | 'live' | 'ended' | 'closed'
+  canJoin: boolean
+  serverNow: string
+  startsAt: string
+  endsAt: string
+  interviewerJoined: boolean
+}
+
+export async function loadInterviewTiming(sessionId: string): Promise<InterviewServerTiming | null> {
+  const { data, error } = await supabase.rpc('get_interview_timing', { p_session_id: sessionId })
+  if (error) return null
+  const row = asRecord(data)
+  const phase = row?.phase
+  const serverNow = row?.server_now
+  const startsAt = row?.starts_at
+  const endsAt = row?.ends_at
+  if (
+    (phase !== 'scheduled' && phase !== 'lobby' && phase !== 'live' && phase !== 'ended' && phase !== 'closed') ||
+    typeof serverNow !== 'string' ||
+    typeof startsAt !== 'string' ||
+    typeof endsAt !== 'string'
+  ) {
+    return null
+  }
+  return {
+    phase,
+    canJoin: row?.can_join === true,
+    serverNow,
+    startsAt,
+    endsAt,
+    interviewerJoined: row?.interviewer_joined === true,
+  }
+}
+
+export async function endInterviewRoom(sessionId: string) {
+  await supabase.functions.invoke('end-interview-call', {
+    body: { interview_session_id: sessionId },
+  })
+}
+
+export async function recordInterviewCallEvent(
+  sessionId: string,
+  event: 'participant_left' | 'call_ended' | 'lobby_entered',
+) {
   const { error } = await supabase.rpc('record_interview_call_event', {
     p_session_id: sessionId,
     p_event: event,
@@ -79,6 +130,9 @@ function readErrorCode(error: { message?: string; context?: unknown }, data: unk
   const body = asRecord(data)
   if (typeof body?.error === 'string') return body.error
   const message = error.message ?? ''
+  if (message.includes('JOIN_WINDOW_CLOSED') || message.includes('join_window_closed')) {
+    return 'JOIN_WINDOW_CLOSED'
+  }
   if (message.includes('INTERVIEW_NOT_STARTED') || message.includes('interview_not_started')) {
     return 'INTERVIEW_NOT_STARTED'
   }

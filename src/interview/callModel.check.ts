@@ -1,8 +1,11 @@
+import { candidateFeedbackAction } from '../services/candidateFeedbackModel.ts'
+import { interviewJoinState } from '../services/interviewSessionModel.ts'
 import {
   confirmationCallTarget,
   interviewCallHref,
   interviewRoomName,
   interviewTokenGate,
+  isLobbyOpen,
   parseInterviewToken,
   participantIdentity,
   reduceCallPresence,
@@ -31,10 +34,19 @@ expect(participantIdentity('interviewer', interviewerUser) === `interviewer:${in
 expect(participantIdentity('candidate', candidateUser) !== participantIdentity('interviewer', interviewerUser), 'Identities stay distinct')
 
 const now = new Date('2026-09-30T12:00:00.000Z')
-const liveStart = '2026-09-30T12:10:00.000Z'
-const liveEnd = '2026-09-30T13:10:00.000Z'
+const atStart = '2026-09-30T12:00:00.000Z'
+const atEnd = '2026-09-30T12:30:00.000Z'
+const tenEarly = '2026-09-30T12:10:00.000Z'
+const lobbyStart = '2026-09-30T12:20:00.000Z'
+const tenLate = '2026-09-30T11:50:00.000Z'
+const twentyLate = '2026-09-30T11:40:00.000Z'
 const futureStart = '2026-10-01T02:30:00.000Z'
 const futureEnd = '2026-10-01T03:30:00.000Z'
+const sessionRow = { endedAt: null }
+
+function plusMinutes(iso: string, minutes: number) {
+  return new Date(new Date(iso).getTime() + minutes * 60_000).toISOString()
+}
 
 const candidateHref = confirmationCallTarget({
   role: 'candidate',
@@ -42,7 +54,7 @@ const candidateHref = confirmationCallTarget({
   nextStatus: 'confirmed',
   bookingId,
   currentPath: '/candidate/interviews',
-  startsAt: liveStart,
+  startsAt: atStart,
   now,
 })
 const interviewerHref = confirmationCallTarget({
@@ -51,12 +63,36 @@ const interviewerHref = confirmationCallTarget({
   nextStatus: 'confirmed',
   bookingId,
   currentPath: '/interviewer/bookings',
-  startsAt: liveStart,
+  startsAt: atStart,
   now,
 })
-expect(candidateHref === interviewCallHref(bookingId, true), 'Candidate confirmation opens the call inside the join window')
-expect(interviewerHref === interviewCallHref(bookingId, true), 'Interviewer confirmation opens the same call inside the join window')
+expect(candidateHref === interviewCallHref(bookingId, true), 'Confirmation at the scheduled start can open the call')
+expect(interviewerHref === interviewCallHref(bookingId, true), 'Interviewer confirmation at the start uses the same call')
 expect(candidateHref === interviewerHref, 'Both participants receive the same interview route')
+expect(
+  confirmationCallTarget({
+    role: 'candidate',
+    previousStatus: 'requested',
+    nextStatus: 'confirmed',
+    bookingId,
+    currentPath: '/candidate/interviews',
+    startsAt: tenEarly,
+    now,
+  }) == null,
+  '1. Acceptance 10 minutes early does not start the call',
+)
+expect(
+  confirmationCallTarget({
+    role: 'candidate',
+    previousStatus: 'requested',
+    nextStatus: 'confirmed',
+    bookingId,
+    currentPath: '/candidate/interviews',
+    startsAt: futureStart,
+    now,
+  }) == null,
+  '1. Acceptance one day early does not start the call',
+)
 expect(
   confirmationCallTarget({
     role: 'candidate',
@@ -88,7 +124,7 @@ expect(
     nextStatus: 'confirmed',
     bookingId,
     currentPath: '/candidate/interviews',
-    startsAt: liveStart,
+    startsAt: atStart,
     now,
   }) == null,
   'A repeated confirmation does not navigate again',
@@ -100,10 +136,52 @@ expect(
     nextStatus: 'confirmed',
     bookingId,
     currentPath: `/candidate/interview/${bookingId}`,
-    startsAt: liveStart,
+    startsAt: atStart,
     now,
   }) == null,
   'Staying on the call does not navigate again',
+)
+
+expect(isLobbyOpen(lobbyStart, now), '2. The lobby is open 20 minutes before the start')
+expect(isLobbyOpen(tenEarly, now), '2. The lobby is open 10 minutes before the start')
+expect(!isLobbyOpen(atStart, now), 'The lobby closes when the interview starts')
+expect(
+  interviewJoinState({ status: 'confirmed', startsAtUtc: lobbyStart, endsAtUtc: plusMinutes(lobbyStart, 30) }, sessionRow, now) ===
+    'lobby',
+  '2. A candidate can open the lobby 20 minutes before the start',
+)
+expect(
+  !shouldEnterCall({
+    status: 'confirmed',
+    hasSession: true,
+    ended: false,
+    startsAt: lobbyStart,
+    endsAt: plusMinutes(lobbyStart, 30),
+    now,
+  }),
+  '3. The candidate cannot enter LiveKit from the lobby',
+)
+expect(
+  interviewTokenGate({
+    role: 'candidate',
+    status: 'confirmed',
+    startsAt: lobbyStart,
+    endsAt: plusMinutes(lobbyStart, 30),
+    ended: false,
+    now,
+  }) === 'INTERVIEW_NOT_STARTED',
+  '3. A token is refused before the scheduled start',
+)
+expect(
+  interviewTokenGate({
+    role: 'candidate',
+    status: 'confirmed',
+    startsAt: atStart,
+    endsAt: atEnd,
+    ended: false,
+    now: new Date(new Date(atStart).getTime() + 15 * 60_000 + 1),
+  }) === 'JOIN_WINDOW_CLOSED',
+  '10. A direct request after the deadline is refused from the schedule, not the browser clock',
 )
 
 expect(
@@ -111,11 +189,90 @@ expect(
     status: 'confirmed',
     hasSession: true,
     ended: false,
-    startsAt: liveStart,
-    endsAt: liveEnd,
+    startsAt: atStart,
+    endsAt: atEnd,
     now,
   }),
-  'A confirmed session inside the join window can be entered',
+  '4. A candidate can join at the scheduled start',
+)
+expect(
+  interviewTokenGate({ role: 'candidate', status: 'confirmed', startsAt: atStart, endsAt: atEnd, ended: false, now }) === 'ok',
+  '4. A token is allowed at the scheduled start',
+)
+expect(
+  shouldEnterCall({
+    status: 'confirmed',
+    hasSession: true,
+    ended: false,
+    startsAt: tenLate,
+    endsAt: plusMinutes(tenLate, 30),
+    now,
+  }),
+  '5. A candidate can join 10 minutes late',
+)
+expect(
+  interviewTokenGate({
+    role: 'candidate',
+    status: 'confirmed',
+    startsAt: tenLate,
+    endsAt: plusMinutes(tenLate, 30),
+    ended: false,
+    now,
+  }) === 'ok',
+  '5. A token is allowed 10 minutes late',
+)
+expect(
+  !shouldEnterCall({
+    status: 'confirmed',
+    hasSession: true,
+    ended: false,
+    startsAt: twentyLate,
+    endsAt: plusMinutes(twentyLate, 30),
+    now,
+  }),
+  '6. A new join is refused after the 15-minute deadline',
+)
+expect(
+  interviewTokenGate({
+    role: 'candidate',
+    status: 'confirmed',
+    startsAt: twentyLate,
+    endsAt: plusMinutes(twentyLate, 30),
+    ended: false,
+    now,
+  }) === 'JOIN_WINDOW_CLOSED',
+  '6. A token is refused after the late-join deadline',
+)
+expect(
+  interviewJoinState(
+    { status: 'confirmed', startsAtUtc: twentyLate, endsAtUtc: plusMinutes(twentyLate, 30) },
+    sessionRow,
+    now,
+  ) === 'closed',
+  '6. The page shows the join window as closed',
+)
+expect(plusMinutes(tenLate, 30) === '2026-09-30T12:20:00.000Z', '7. A 10-minute-late join keeps the original 30-minute end')
+expect(
+  !shouldEnterCall({
+    status: 'in_progress',
+    hasSession: true,
+    ended: false,
+    startsAt: tenLate,
+    endsAt: plusMinutes(tenLate, 30),
+    now: new Date(plusMinutes(tenLate, 30)),
+  }),
+  '7. The call stops at the original scheduled end',
+)
+expect(
+  shouldEnterCall({
+    status: 'in_progress',
+    hasSession: true,
+    ended: false,
+    startsAt: tenLate,
+    endsAt: plusMinutes(tenLate, 30),
+    now: new Date('2026-09-30T12:19:00.000Z'),
+  }),
+  '7. An interview already in progress can continue until the original end',
 )
 expect(
   !shouldEnterCall({
@@ -129,34 +286,23 @@ expect(
   'A confirmed future session cannot be entered yet',
 )
 expect(
-  shouldEnterCall({
-    status: 'confirmed',
-    hasSession: true,
-    ended: false,
-    startsAt: '2026-09-30T11:00:00.000Z',
-    endsAt: liveEnd,
-    now,
-  }),
-  'A confirmed session whose start time has passed can be entered',
-)
-expect(
-  shouldEnterCall({
+  !shouldEnterCall({
     status: 'in_progress',
     hasSession: true,
     ended: false,
-    startsAt: liveStart,
-    endsAt: liveEnd,
+    startsAt: tenEarly,
+    endsAt: plusMinutes(tenEarly, 60),
     now,
   }),
-  'An in-progress call can still be entered',
+  'An in-progress flag before the start does not open LiveKit',
 )
 expect(
   !shouldEnterCall({
     status: 'requested',
     hasSession: false,
     ended: false,
-    startsAt: liveStart,
-    endsAt: liveEnd,
+    startsAt: atStart,
+    endsAt: atEnd,
     now,
   }),
   'An unconfirmed booking cannot enter the call',
@@ -166,19 +312,19 @@ expect(
     status: 'cancelled',
     hasSession: true,
     ended: false,
-    startsAt: liveStart,
-    endsAt: liveEnd,
+    startsAt: atStart,
+    endsAt: atEnd,
     now,
   }),
-  'A cancelled booking cannot enter the call',
+  '8. A cancelled booking cannot enter the call',
 )
 expect(
   !shouldEnterCall({
     status: 'rejected',
     hasSession: true,
     ended: false,
-    startsAt: liveStart,
-    endsAt: liveEnd,
+    startsAt: atStart,
+    endsAt: atEnd,
     now,
   }),
   'A rejected booking cannot enter the call',
@@ -192,15 +338,26 @@ expect(
     endsAt: '2026-10-02T03:30:00.000Z',
     now,
   }),
-  'A rescheduled booking uses the new start time',
+  '9. A rescheduled booking uses the new start time',
+)
+expect(
+  shouldEnterCall({
+    status: 'confirmed',
+    hasSession: true,
+    ended: false,
+    startsAt: atStart,
+    endsAt: atEnd,
+    now,
+  }),
+  '9. The replacement schedule can be joined at its new start',
 )
 expect(
   !shouldEnterCall({
     status: 'confirmed',
     hasSession: true,
     ended: true,
-    startsAt: liveStart,
-    endsAt: liveEnd,
+    startsAt: atStart,
+    endsAt: atEnd,
     now,
   }),
   'An ended session cannot be entered',
@@ -210,29 +367,34 @@ const gateBase = { startsAt: futureStart, endsAt: futureEnd, ended: false, now }
 expect(interviewTokenGate({ ...gateBase, role: 'candidate', status: 'confirmed' }) === 'INTERVIEW_NOT_STARTED', 'Candidate token is refused before the join window')
 expect(interviewTokenGate({ ...gateBase, role: 'interviewer', status: 'confirmed' }) === 'INTERVIEW_NOT_STARTED', 'Interviewer token is refused before the join window')
 expect(
-  interviewTokenGate({ role: 'candidate', status: 'confirmed', startsAt: liveStart, endsAt: liveEnd, ended: false, now }) === 'ok',
-  'Candidate token is allowed inside the join window',
+  interviewTokenGate({ role: 'candidate', status: 'confirmed', startsAt: atStart, endsAt: atEnd, ended: false, now }) === 'ok',
+  '11. The shared room token is still issued at the start',
 )
 expect(
-  interviewTokenGate({ role: 'interviewer', status: 'confirmed', startsAt: liveStart, endsAt: liveEnd, ended: false, now }) === 'ok',
-  'Interviewer token is allowed inside the join window',
+  interviewTokenGate({ role: 'interviewer', status: 'confirmed', startsAt: atStart, endsAt: atEnd, ended: false, now }) === 'ok',
+  '11. The interviewer uses the same start rule',
 )
 expect(
-  interviewTokenGate({ role: 'candidate', status: 'confirmed', startsAt: liveStart, endsAt: liveEnd, ended: false, now }) ===
-    interviewTokenGate({ role: 'interviewer', status: 'confirmed', startsAt: liveStart, endsAt: liveEnd, ended: false, now }),
+  interviewTokenGate({ role: 'candidate', status: 'confirmed', startsAt: atStart, endsAt: atEnd, ended: false, now }) ===
+    interviewTokenGate({ role: 'interviewer', status: 'confirmed', startsAt: atStart, endsAt: atEnd, ended: false, now }),
   'Both roles are admitted to the same session',
 )
 expect(
-  interviewTokenGate({ role: 'candidate', status: 'cancelled', startsAt: liveStart, endsAt: liveEnd, ended: false, now }) === 'booking_not_confirmed',
-  'A cancelled booking cannot receive a token',
+  interviewTokenGate({ role: 'candidate', status: 'cancelled', startsAt: atStart, endsAt: atEnd, ended: false, now }) === 'booking_not_confirmed',
+  '8. A cancelled booking cannot receive a token',
 )
 expect(
-  interviewTokenGate({ role: 'interviewer', status: 'rejected', startsAt: liveStart, endsAt: liveEnd, ended: false, now }) === 'booking_not_confirmed',
+  interviewTokenGate({ role: 'candidate', status: 'rescheduled', startsAt: atStart, endsAt: atEnd, ended: false, now }) ===
+    'booking_not_confirmed',
+  '9. A retired rescheduled booking cannot receive a token',
+)
+expect(
+  interviewTokenGate({ role: 'interviewer', status: 'rejected', startsAt: atStart, endsAt: atEnd, ended: false, now }) === 'booking_not_confirmed',
   'A rejected booking cannot receive a token',
 )
 expect(
-  interviewTokenGate({ role: 'other', status: 'confirmed', startsAt: liveStart, endsAt: liveEnd, ended: false, now }) === 'not_authorized',
-  'An unauthorized user cannot receive a token',
+  interviewTokenGate({ role: 'other', status: 'confirmed', startsAt: atStart, endsAt: atEnd, ended: false, now }) === 'not_authorized',
+  '10. A direct request from a non-participant cannot receive a token',
 )
 expect(
   interviewTokenGate({
@@ -243,8 +405,12 @@ expect(
     ended: false,
     now,
   }) === 'INTERVIEW_NOT_STARTED',
-  'A rescheduled future time blocks the token',
+  '9. A rescheduled future time blocks the token',
 )
+expect(candidateFeedbackAction('completed', true) === 'view', '12. Completed interviews can still open feedback')
+expect(candidateFeedbackAction('completed', false) === 'pending', '12. Completed interviews still show pending feedback')
+expect(candidateFeedbackAction('in_progress', true) === null, '12. Feedback stays gated on a completed booking')
+expect(candidateFeedbackAction('confirmed', false) === null, '12. Confirmation does not open feedback')
 expect(waitingLabel('candidate') === 'Waiting for interviewer', 'Candidate waits for the interviewer')
 expect(waitingLabel('interviewer') === 'Waiting for candidate', 'Interviewer waits for the candidate')
 expect(remoteLeftLabel('candidate') === 'Interviewer has left the call', 'Candidate sees the interviewer leave')
