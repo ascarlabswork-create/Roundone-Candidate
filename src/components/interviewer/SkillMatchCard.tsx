@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { bookingStatusMessage, type BookingReadiness } from '../../matching/bookingReadiness.ts'
 import type { MatchingCatalogPerson } from '../../matching/catalog.ts'
 import type { SkillMatchDetail } from '../../types.ts'
 import { Button } from '../ui/Button.tsx'
@@ -91,9 +92,11 @@ export function SkillMatchPanel({ skillMatch }: { skillMatch: SkillMatchDetail }
 export function SkillMatchCard({
   interviewer,
   skillMatch,
+  booking,
 }: {
   interviewer: MatchingCatalogPerson
   skillMatch: SkillMatchDetail
+  booking: BookingReadiness
 }) {
   const percentLabel = formatSkillPercentLabel(skillMatch.percent)
   const roleLine = [interviewer.currentRole, interviewer.company].filter(Boolean).join(' @ ')
@@ -123,9 +126,14 @@ export function SkillMatchCard({
 
       <SkillMatchPanel skillMatch={skillMatch} />
 
-      <p className="mt-3 text-xs text-slate-500">
-        Skill overlap only — not a booking or availability guarantee.
-      </p>
+      {booking === 'ready' ? (
+        <p className="mt-3 text-xs text-slate-500">Matched by skills. A bookable time is open.</p>
+      ) : (
+        <div className="mt-3">
+          <p className="text-sm font-medium text-navy-950">{bookingStatusMessage(booking)?.headline}</p>
+          <p className="text-sm text-slate-600">{bookingStatusMessage(booking)?.detail}</p>
+        </div>
+      )}
 
       <div className="mt-4 flex flex-col gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:justify-end">
         <Link to={profileTo} className="sm:w-auto">
@@ -133,11 +141,13 @@ export function SkillMatchCard({
             View Profile
           </Button>
         </Link>
-        <Link to={`/candidate/interviewers/${interviewer.id}/book`} className="sm:w-auto">
-          <Button size="sm" fullWidth>
-            Book
-          </Button>
-        </Link>
+        {booking === 'ready' ? (
+          <Link to={`/candidate/interviewers/${interviewer.id}/book`} className="sm:w-auto">
+            <Button size="sm" fullWidth>
+              Book
+            </Button>
+          </Link>
+        ) : null}
       </div>
     </article>
   )

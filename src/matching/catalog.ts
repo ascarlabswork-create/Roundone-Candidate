@@ -94,6 +94,19 @@ export function toMatchingInterviewer(
   }
 }
 
+/** Attach services for booking display. Does not change skills or match score. */
+export function applyPublicServices(
+  person: MatchingCatalogPerson,
+  services: PublicInterviewerService[],
+): MatchingCatalogPerson {
+  const mappedServices = services.map(toService)
+  return {
+    ...person,
+    services: mappedServices,
+    interviewTypes: [...new Set(mappedServices.map((service) => service.interviewType))],
+  }
+}
+
 export async function loadMatchingCatalog(): Promise<MatchingCatalogPerson[]> {
   const directory = await listPublicDirectory()
   const ids = directory.map((person) => person.id)

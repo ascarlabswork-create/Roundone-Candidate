@@ -51,6 +51,16 @@ export function weekdayName(isoDate: string) {
   return WEEKDAYS[date.getDay()]
 }
 
+/** Date-only YYYY-MM-DD comparison. An empty range is valid. End may be omitted. */
+export function preferredDateRangeError(startDate: string, endDate: string): string | null {
+  if (!startDate && !endDate) return null
+  if (!startDate && endDate) return 'Choose a start date for your preferred range.'
+  if (startDate && endDate && endDate < startDate) {
+    return 'Preferred end date must be on or after the start date.'
+  }
+  return null
+}
+
 /** Inclusive end of a preferred date range; falls back to the start date. */
 export function preferredRangeEnd(startDate: string, endDate?: string | null) {
   if (!startDate) return ''

@@ -211,10 +211,12 @@ export async function getPublicBookingContext(interviewerProfileId: string): Pro
 }
 
 export async function listPublicDirectory(limit = MATCHING_CATALOG_LIMIT): Promise<PublicInterviewer[]> {
+  // The directory view already limits anonymous browse to is_listed profiles and
+  // lets a signed-in candidate see active interviewers who have skills, listed or not.
+  // A client is_listed filter hid those skill matches.
   const { data, error } = await supabase
     .from('interviewer_public_directory')
     .select(PUBLIC_DIRECTORY_SELECT)
-    .eq('is_listed', true)
     .limit(limit)
   fail(error)
   if (!Array.isArray(data)) return []

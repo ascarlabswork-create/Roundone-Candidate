@@ -1,25 +1,18 @@
-import { isoDateInZone } from '../availability/timezone.ts'
-import { dateInPreferredRange } from '../lib/dates.ts'
 import { getBookableSlots, getBookableWindow } from '../services/availability.ts'
 import type { MatchingPreferences } from '../types.ts'
+import { classifyBookingReadiness, type BookingReadiness } from './bookingReadiness.ts'
 import type { MatchingCatalogPerson } from './catalog.ts'
 import { pickServiceForAvailability } from './liveAvailabilityPick.ts'
 
 const AVAILABILITY_CHECK_CONCURRENCY = 6
 
-function slotMatchesPreferredDate(
-  startsAtUtc: string,
-  timezone: string,
-  preferredDate: string,
-  preferredDateEnd?: string,
-) {
-  const date = isoDateInZone(new Date(startsAtUtc), timezone)
-  return dateInPreferredRange(date, preferredDate, preferredDateEnd)
-}
-
-async function hasLiveBookableSlot(person: MatchingCatalogPerson, prefs: MatchingPreferences) {
+export async function describeBookingReadiness(
+  person: MatchingCatalogPerson,
+  prefs: MatchingPreferences,
+): Promise<BookingReadiness> {
+  if (person.services.length === 0) return 'no_service'
   const service = pickServiceForAvailability(person, prefs.interviewType)
-  if (!service) return false
+  if (!service) return 'no_service'
   const { from, to } = getBookableWindow(0)
   try {
     const slots = await getBookableSlots({
@@ -28,15 +21,22 @@ async function hasLiveBookableSlot(person: MatchingCatalogPerson, prefs: Matchin
       from,
       to,
     })
-    if (slots.length === 0) return false
-    if (!prefs.preferredDate) return true
-    return slots.some((slot) =>
-      slotMatchesPreferredDate(slot.startsAtUtc, person.timezone, prefs.preferredDate, prefs.preferredDateEnd),
-    )
+    return classifyBookingReadiness({
+      serviceCount: person.services.length,
+      slots,
+      timezone: person.timezone,
+      preferredDate: prefs.preferredDate,
+      preferredDateEnd: prefs.preferredDateEnd,
+    })
   } catch (error) {
     console.error('matching availability check failed', person.id, error)
-    return false
+    return 'no_availability'
   }
+}
+
+async function hasLiveBookableSlot(person: MatchingCatalogPerson, prefs: MatchingPreferences) {
+  const readiness = await describeBookingReadiness(person, prefs)
+  return readiness === 'ready'
 }
 
 async function mapPool<T, R>(items: T[], limit: number, mapper: (item: T) => Promise<R>) {

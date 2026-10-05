@@ -33,6 +33,8 @@ import {
   type PublicInterviewer,
   type PublicInterviewerService,
 } from '../services/interviewerPublic.ts'
+import { getCandidatePreferencesIfPresent } from '../services/candidateProfile.ts'
+import { filterSlotsByPreferredRange } from '../services/bookableSlots.ts'
 import { useBookingDraft } from '../state/booking.tsx'
 import { useSession } from '../state/session.tsx'
 
@@ -169,19 +171,34 @@ export function BookPage() {
     return { serviceId: service.id, windowIndex, slots: nextSlots }
   }, [service?.id, service?.interviewerProfileId, step, windowIndex, retryNonce])
 
+  const preferenceState = useAsync(() => getCandidatePreferencesIfPresent(), [])
   const availabilityReady =
     availabilityState.status === 'success' &&
     Boolean(service) &&
     availabilityState.data.serviceId === service?.id &&
     availabilityState.data.windowIndex === windowIndex
   const availabilityLoading =
-    step === 2 && Boolean(service) && (availabilityState.status === 'loading' || (!availabilityReady && availabilityState.status !== 'error'))
-
+    step === 2 &&
+    Boolean(service) &&
+    (availabilityState.status === 'loading' ||
+      preferenceState.status === 'loading' ||
+      (!availabilityReady && availabilityState.status !== 'error'))
+  const preferredStart =
+    preferenceState.status === 'success' ? (preferenceState.data?.preferred_date ?? '') : ''
+  const preferredEnd =
+    preferenceState.status === 'success' ? (preferenceState.data?.preferred_end_date ?? '') : ''
   const slots =
     availabilityReady && availabilityState.data ? availabilityState.data.slots : EMPTY_SLOTS
+  const rangedSlots = useMemo(
+    () =>
+      preferenceState.status === 'loading'
+        ? EMPTY_SLOTS
+        : filterSlotsByPreferredRange(slots, displayTimeZone, preferredStart, preferredEnd),
+    [displayTimeZone, preferenceState.status, preferredEnd, preferredStart, slots],
+  )
   const days = useMemo(
-    () => groupSlotsByDisplayDate(slots, displayTimeZone),
-    [slots, displayTimeZone],
+    () => groupSlotsByDisplayDate(rangedSlots, displayTimeZone),
+    [rangedSlots, displayTimeZone],
   )
 
   const selectedSlot: UtcBookableSlot | null =
@@ -593,7 +610,11 @@ export function BookPage() {
                   <div className="mt-6">
                     <EmptyState
                       title="No available interview slots in the selected period."
-                      body="Try a later period, or view another interviewer."
+                      body={
+                        preferredStart && slots.length > 0
+                          ? 'None of the open times fall in your preferred dates. Update those dates on your profile, or try another period.'
+                          : 'Try a later period, or view another interviewer.'
+                      }
                       action={
                         <div className="flex flex-wrap justify-center gap-3">
                           <Button
