@@ -8,7 +8,6 @@ import {
   FieldLabel,
   PageHeader,
   SelectInput,
-  TextArea,
   TextInput,
 } from '../components/ui/primitives.tsx'
 import { INTERVIEW_TYPES, SKILLS, TARGET_ROLES } from '../data/catalogs.ts'
@@ -48,7 +47,8 @@ import {
   writePracticeSession,
   type SavedPracticeSession,
 } from '../practice/session.ts'
-import { microphoneFailureMessage, microphoneStatusLabel, requestPracticeMicrophone } from '../practice/microphoneAccess.ts'
+import { microphoneFailureMessage, requestPracticeMicrophone } from '../practice/microphoneAccess.ts'
+import { PracticeConversation } from '../components/practice/PracticeConversation.tsx'
 import { VoiceClient, type VoiceState } from '../practice/voiceClient.ts'
 import { getCandidatePreferencesIfPresent, getCandidateSkills } from '../services/candidateProfile.ts'
 import { getJobTarget } from '../services/jobTargets.ts'
@@ -83,54 +83,6 @@ function JobPracticeContext({ setup }: { setup: PracticeSetup }) {
       {job.skills.length > 0 ? <p className="mt-1 text-sm text-slate-600">{job.skills.slice(0, 6).join(', ')}</p> : null}
       <p className="mt-1 text-xs text-slate-500">Practice questions for this role. Not the company's real interview.</p>
     </div>
-  )
-}
-
-function MicIcon({ className = 'h-5 w-5' }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" aria-hidden="true">
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15a3 3 0 003-3V6a3 3 0 00-3-3 3 3 0 00-3 3v6a3 3 0 003 3z"
-      />
-    </svg>
-  )
-}
-
-function MicOffIcon({ className = 'h-5 w-5' }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" aria-hidden="true">
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636M12 15a3 3 0 01-3-3V6a3 3 0 014.243-2.757M12 18.75v3.75m-3.75 0h7.5"
-      />
-    </svg>
-  )
-}
-
-function VolumeIcon({ className = 'h-5 w-5' }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" aria-hidden="true">
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.757 3.63 8.25 4.51 8.25H6.75z"
-      />
-    </svg>
-  )
-}
-
-function ReplayIcon({ className = 'h-4 w-4' }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" aria-hidden="true">
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"
-      />
-    </svg>
   )
 }
 
@@ -678,7 +630,6 @@ export function AiPracticePage() {
     session.setup.skills.length > 0 &&
     !waitingForJob
   const totalQuestions = session.setup.questionCount
-  const progressDenom = Math.max(totalQuestions, 1)
 
   // Resumption prompt modal
   if (resumePrompt) {
@@ -910,19 +861,12 @@ export function AiPracticePage() {
             <h3 className="text-sm font-semibold text-navy-950">Voice Interview Guidelines</h3>
             <ul className="mt-2 list-disc space-y-1.5 pl-5 text-xs text-slate-600">
               <li>
-                Your interviewer <strong>{interviewer.name}</strong> will speak each question aloud in their{' '}
-                <strong>{interviewer.voice}</strong> voice.
+                This is a one-to-one conversation. <strong>{interviewer.name}</strong> speaks, you answer, and the thread
+                keeps both sides.
               </li>
-              <li>Speak your answer into the microphone naturally.</li>
-              <li>
-                <strong>Comfortable pacing:</strong> If you pause for 2–3 seconds to think, your words won't disappear and
-                it will not immediately auto-submit.
-              </li>
-              <li>
-                <strong>Auto-submit countdown:</strong> After extended silence, a 5-second countdown will appear with a
-                &ldquo;Keep Speaking&rdquo; button if you need more time.
-              </li>
-              <li>You can also type or edit your answer directly in the text area at any moment.</li>
+              <li>Talk into the microphone, or type in the bar at the bottom and send.</li>
+              <li>A short pause will not erase what you already said.</li>
+              <li>After a longer silence, you can keep speaking or send the reply.</li>
             </ul>
           </div>
 
@@ -941,248 +885,39 @@ export function AiPracticePage() {
     )
   }
 
-  // Phase: Question (Voice Interview Workspace)
   if (session.phase === 'question' && question) {
     const interviewer = getInterviewerPersona(session.setup.interviewerId)
 
     return (
-      <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
-        {/* Header Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <button
-            type="button"
-            className="text-sm font-medium text-red-600 hover:text-red-700"
-            onClick={() => setConfirmEndOpen(true)}
-          >
-            End Interview
-          </button>
-          <span className="text-sm font-medium text-slate-600">
-            Question {session.index + 1} of {totalQuestions}
-          </span>
-        </div>
-
-        {/* Progress Bar */}
-        {session.setup.jobContext ? (
-          <div className="mt-4">
-            <JobPracticeContext setup={session.setup} />
-          </div>
-        ) : null}
-        <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-slate-200" role="progressbar" aria-valuenow={session.index + 1} aria-valuemin={1} aria-valuemax={totalQuestions}>
-          <div
-            className="h-full rounded-full bg-navy-900 transition-[width] duration-300"
-            style={{
-              width: `${((session.index + 1) / progressDenom) * 100}%`,
-            }}
-          />
-        </div>
-
-        {/* Voice Interview Workspace Card */}
-        <Card className="mt-6 p-5 sm:p-6">
-          {/* Interviewer Identity & Status */}
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-700">
-                <VolumeIcon className="h-5 w-5" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">AI Interviewer</p>
-                  <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
-                    Voice: {interviewer.voice}
-                  </span>
-                </div>
-                <h2 className="text-base font-semibold text-navy-950">
-                  {interviewer.name}{' '}
-                  <span className="text-xs font-normal text-slate-500">({interviewer.title})</span>
-                </h2>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Badge tone="slate">{question.topic}</Badge>
-              <Badge tone="slate">{difficultyLabel(question.difficulty)}</Badge>
-              {/* Dynamic Status Badges */}
-              {voiceState === 'speaking' && (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
-                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-600" />
-                  Speaking…
-                </span>
-              )}
-              {voiceState === 'listening' && (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-600/20">
-                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-blue-600" />
-                  Listening…
-                </span>
-              )}
-              {voiceState === 'thinking' && (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700 ring-1 ring-inset ring-amber-600/20">
-                  <span className="h-1.5 w-1.5 animate-spin rounded-full border border-amber-600 border-t-transparent" />
-                  Processing answer…
-                </span>
-              )}
-              {voiceState === 'evaluating' && (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-purple-50 px-2.5 py-1 text-xs font-medium text-purple-700 ring-1 ring-inset ring-purple-600/20">
-                  <span className="h-1.5 w-1.5 animate-spin rounded-full border border-purple-600 border-t-transparent" />
-                  Evaluating turn…
-                </span>
-              )}
-              {voiceState === 'connecting' && (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
-                  Connecting voice…
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* Spoken Question */}
-          <div className="mt-5">
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Question</p>
-                <h1 className="mt-1 text-xl font-semibold leading-relaxed text-navy-950 sm:text-2xl">
-                  &ldquo;{question.question}&rdquo;
-                </h1>
-              </div>
-              <button
-                type="button"
-                onClick={handleReplayQuestion}
-                aria-label="Replay Question Audio"
-                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 shadow-sm hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <ReplayIcon className="h-3.5 w-3.5" />
-                Replay
-              </button>
-            </div>
-            <p className="mt-2 text-xs text-slate-500">
-              Focus: {question.expectedFocus.join(' · ')}
-            </p>
-          </div>
-
-          {/* Voice Controls & Mic State */}
-          <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50/70 p-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={handleMuteToggle}
-                  aria-label={micMuted ? 'Unmute microphone' : 'Mute microphone'}
-                  className={`flex h-10 w-10 items-center justify-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    voiceState === 'error' || micMuted
-                      ? 'bg-red-100 text-red-700 hover:bg-red-200'
-                      : 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
-                  }`}
-                >
-                  {voiceState === 'error' || micMuted ? <MicOffIcon className="h-5 w-5" /> : <MicIcon className="h-5 w-5" />}
-                </button>
-                <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Microphone</p>
-                  <p className="text-xs font-semibold text-navy-900">{microphoneStatusLabel(voiceState, micMuted)}</p>
-                </div>
-              </div>
-              {voiceState === 'error' ? (
-                <Button type="button" onClick={() => void enableMicrophone()}>
-                  Enable microphone
-                </Button>
-              ) : null}
-
-              {voiceState === 'speaking' && (
-                <button
-                  type="button"
-                  onClick={() => voiceClientRef.current?.interruptAiSpeech()}
-                  className="text-xs font-medium text-blue-700 hover:underline"
-                >
-                  Interrupt AI & Speak
-                </button>
-              )}
-            </div>
-
-            {/* Recognized Candidate Speech / Transcript */}
-            <div className="mt-4">
-              <div className="flex items-center justify-between">
-                <FieldLabel htmlFor="live-answer-transcript">Your Response (Voice Transcript)</FieldLabel>
-                <span className="text-xs text-slate-400">
-                  {session.currentAnswer.length}/{PRACTICE_ANSWER_MAX}
-                </span>
-              </div>
-              <TextArea
-                id="live-answer-transcript"
-                value={session.currentAnswer}
-                disabled={busy || voiceState === 'evaluating'}
-                onChange={(e) => {
-                  const val = e.target.value.slice(0, PRACTICE_ANSWER_MAX)
-                  setSession((current) => ({
-                    ...current,
-                    currentAnswer: val,
-                  }))
-                  voiceClientRef.current?.setAccumulatedTranscript(val)
-                }}
-                placeholder={
-                  voiceState === 'error'
-                    ? 'Type your answer here, or allow the microphone to transcribe it.'
-                    : 'Speak your answer into the microphone. Your words will be transcribed here live.'
-                }
-                className="mt-1 min-h-32 text-sm sm:min-h-36"
-              />
-              <p className="mt-1.5 text-xs text-slate-500">
-                Speak naturally. Pausing for a few seconds to think won't erase your words. After extended silence, you'll see a countdown before auto-submitting.
-              </p>
-
-              {/* Pause / Auto-submit Countdown Banner */}
-              {autoSubmitCountdown !== null && autoSubmitCountdown > 0 && (
-                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3.5 py-2.5 text-xs text-amber-900 shadow-sm">
-                  <div className="flex items-center gap-2">
-                    <span className="flex h-2.5 w-2.5 animate-pulse rounded-full bg-amber-500" />
-                    <span>
-                      Pause detected. Auto-submitting in <strong>{autoSubmitCountdown}s</strong>...
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={handleKeepSpeaking}
-                      className="rounded bg-white px-2.5 py-1 text-xs font-semibold text-amber-900 border border-amber-300 shadow-xs hover:bg-amber-100"
-                    >
-                      Keep Speaking (Wait)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void handleTurnAnswer(session.currentAnswer.trim())}
-                      className="rounded bg-navy-900 px-2.5 py-1 text-xs font-semibold text-white hover:bg-navy-800"
-                    >
-                      Submit Now
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {error ? <p className="mt-4 text-sm text-red-700">{error}</p> : null}
-          {persistError ? <p className="mt-4 text-sm text-red-700">{persistError}</p> : null}
-
-          {/* Action Buttons */}
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <Button
-              variant="outline"
-              onClick={() => setConfirmEndOpen(true)}
-              disabled={busy}
-            >
-              End Interview
-            </Button>
-            <div className="flex gap-2">
-              <Button
-                onClick={() => void handleTurnAnswer(session.currentAnswer.trim())}
-                disabled={busy || session.currentAnswer.trim().length < 8}
-              >
-                {busy || voiceState === 'evaluating'
-                  ? 'Evaluating Answer…'
-                  : session.index >= totalQuestions - 1
-                  ? 'Submit & Finish'
-                  : 'Submit Answer'}
-              </Button>
-            </div>
-          </div>
-        </Card>
+      <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
+        {session.setup.jobContext ? <JobPracticeContext setup={session.setup} /> : null}
+        <PracticeConversation
+          interviewerName={interviewer.name}
+          questionNumber={session.index + 1}
+          totalQuestions={totalQuestions}
+          turns={session.turns}
+          currentQuestionId={question.id}
+          currentQuestion={question.question}
+          currentAnswer={session.currentAnswer}
+          voiceState={voiceState}
+          micMuted={micMuted}
+          busy={busy}
+          error={error}
+          persistError={persistError}
+          autoSubmitCountdown={autoSubmitCountdown}
+          answerMax={PRACTICE_ANSWER_MAX}
+          onAnswerChange={(value) => {
+            setSession((current) => ({ ...current, currentAnswer: value }))
+            voiceClientRef.current?.setAccumulatedTranscript(value)
+          }}
+          onSubmit={() => void handleTurnAnswer(session.currentAnswer.trim())}
+          onMuteToggle={handleMuteToggle}
+          onReplay={handleReplayQuestion}
+          onInterrupt={() => voiceClientRef.current?.interruptAiSpeech()}
+          onKeepSpeaking={handleKeepSpeaking}
+          onEnd={() => setConfirmEndOpen(true)}
+          onEnableMicrophone={() => void enableMicrophone()}
+        />
 
         {/* End Interview Confirmation Modal */}
         {confirmEndOpen && (
