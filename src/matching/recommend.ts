@@ -27,7 +27,10 @@ export type RecommendedMatch = {
  * Skill-only recommendations via secure match_interviewers_by_skills RPC.
  * Does not use is_listed, availability, services, or other non-skill factors.
  */
-export async function recommendMatchedInterviewers(prefs: MatchingPreferences): Promise<RecommendedMatch[]> {
+export async function recommendMatchedInterviewers(
+  prefs: MatchingPreferences,
+  displayTimezone?: string | null,
+): Promise<RecommendedMatch[]> {
   const candidateSkills = await resolveMatchingCandidateSkills(prefs.skills)
   if (candidateSkills.length === 0) return []
 
@@ -60,7 +63,7 @@ export async function recommendMatchedInterviewers(prefs: MatchingPreferences): 
   })
 
   const booking = await Promise.all(
-    recommended.map((item) => describeBookingReadiness(item.interviewer, prefs)),
+    recommended.map((item) => describeBookingReadiness(item.interviewer, prefs, displayTimezone)),
   )
 
   return recommended.map((item, index) => ({

@@ -33,6 +33,15 @@ export function runBookableSlotChecks() {
   expect(nycDays.length === 1, 'NYC should still have a date card')
   expect(nycDays[0]?.date === '2026-09-12', 'NYC civil date should remain 12 September for 00:30 local')
   expect(formatBookingTime(saturdayMorningUtc, 'America/New_York') === '12:30 AM', 'NYC display should change')
+  const chicagoEvening = '2026-10-05T23:00:00.000Z'
+  expect(formatBookingTime(chicagoEvening, 'America/Chicago') === '6:00 PM', 'Central Time keeps the interviewer clock')
+  expect(formatBookingTime(chicagoEvening, 'Asia/Kolkata') === '4:30 AM', 'India sees the same opening the next morning')
+  const indiaDay = groupSlotsByDisplayDate(
+    [{ startsAtUtc: chicagoEvening, endsAtUtc: '2026-10-06T00:00:00.000Z' }],
+    'Asia/Kolkata',
+    new Date('2026-10-05T00:00:00.000Z'),
+  )
+  expect(indiaDay[0]?.date === '2026-10-06', 'India groups that opening on 6 October')
   expect(nycDays[0]?.slots[0]?.startsAtUtc === saturdayMorningUtc, 'H: stored UTC must not change with timezone')
 
   const past = groupSlotsByDisplayDate(slots, 'Asia/Kolkata', new Date('2026-09-13T00:00:00.000Z'))

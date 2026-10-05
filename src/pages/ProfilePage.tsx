@@ -12,7 +12,9 @@ import { useAsync, type AsyncState } from '../lib/useAsync.ts'
 import { loadMatchingInterviewer, scoreInterviewer } from '../matching/index.ts'
 import { getPublicCandidateReviews } from '../services/candidateReviews.ts'
 import { ApiError } from '../api/client.ts'
+import { candidateDisplayTimezone, formatTimezoneLabel } from '../lib/candidateTimezone.ts'
 import { useBookingDraft } from '../state/booking.tsx'
+import { useSession } from '../state/session.tsx'
 import { useMatching } from '../state/matching.tsx'
 import { useSavedInterviewers } from '../state/saved.tsx'
 import { useToast } from '../state/toast.tsx'
@@ -272,12 +274,16 @@ function ExpertiseTab({ interviewer }: { interviewer: Interviewer }) {
 }
 
 function AvailabilityTab({ interviewer }: { interviewer: Interviewer }) {
-  const tz = interviewer.timezone || interviewer.availability.timezone
+  const { account } = useSession()
+  const yours = candidateDisplayTimezone(account?.profile.timezone)
+  const interviewerZone = interviewer.timezone || interviewer.availability.timezone
 
   return (
     <div className="space-y-6">
       <p className="text-sm text-slate-600">
-        Live bookable times come from secure server slots in the booking flow. Interviewer timezone: {tz}.
+        This profile stays available in any timezone. Booking times are shown in your timezone,{' '}
+        {formatTimezoneLabel(yours)}
+        {interviewerZone ? `, converted from ${formatTimezoneLabel(interviewerZone)}` : ''}.
       </p>
       {interviewer.services.length > 0 ? (
         <Link to={`/candidate/interviewers/${interviewer.id}/book`}>

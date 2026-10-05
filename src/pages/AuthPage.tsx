@@ -3,7 +3,7 @@ import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { Button } from '../components/ui/Button.tsx'
 import { Card, FieldLabel, PageHeader, SelectInput, TextInput } from '../components/ui/primitives.tsx'
 import { GoogleIcon } from '../components/ui/GoogleIcon.tsx'
-import { TIMEZONES } from '../data/catalogs.ts'
+import { timezoneSelectOptions } from '../lib/candidateTimezone.ts'
 import {
   authErrorMessage,
   sendPasswordReset,
@@ -155,9 +155,9 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
                 value={timezone}
                 onChange={(event) => setTimezone(event.target.value)}
               >
-                {TIMEZONES.map((zone) => (
-                  <option key={zone} value={zone}>
-                    {zone}
+                {timezoneSelectOptions(timezone).map((zone) => (
+                  <option key={zone.id} value={zone.id}>
+                    {zone.label}
                   </option>
                 ))}
               </SelectInput>

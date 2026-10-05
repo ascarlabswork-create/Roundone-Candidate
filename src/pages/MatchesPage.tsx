@@ -3,15 +3,19 @@ import { SkillMatchCard, SkillMatchCardSkeleton } from '../components/interviewe
 import { Button } from '../components/ui/Button.tsx'
 import { EmptyState, ErrorState, PageHeader } from '../components/ui/primitives.tsx'
 import { useAsync } from '../lib/useAsync.ts'
+import { candidateDisplayTimezone } from '../lib/candidateTimezone.ts'
 import { recommendMatchedInterviewers } from '../matching/index.ts'
 import { useMatching } from '../state/matching.tsx'
+import { useSession } from '../state/session.tsx'
 
 export function MatchesPage() {
   const { preferences } = useMatching()
+  const { account } = useSession()
+  const displayTimezone = candidateDisplayTimezone(account?.profile.timezone)
   const ready = Boolean(preferences)
   const state = useAsync(
-    () => (preferences ? recommendMatchedInterviewers(preferences) : Promise.resolve([])),
-    [JSON.stringify(preferences)],
+    () => (preferences ? recommendMatchedInterviewers(preferences, displayTimezone) : Promise.resolve([])),
+    [JSON.stringify(preferences), displayTimezone],
   )
 
   return (
