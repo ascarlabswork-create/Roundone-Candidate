@@ -38,7 +38,7 @@ import { filterSlotsByPreferredRange } from '../services/bookableSlots.ts'
 import { useBookingDraft } from '../state/booking.tsx'
 import { useSession } from '../state/session.tsx'
 
-const steps = ['Select Service', 'Choose Date & Time', 'Review & Confirm'] as const
+const steps = ['Choose Date & Time', 'Review & Confirm'] as const
 const STALE_SLOT_MESSAGE = 'This slot was just taken'
 
 type BookingHeader = {
@@ -106,7 +106,8 @@ export function BookPage() {
   const timezoneTouched = useRef(false)
   const creatingRef = useRef(false)
 
-  const step = Number(params.get('step') ?? '1') as 1 | 2 | 3
+  const requestedStep = Number(params.get('step') ?? '1')
+  const step: 1 | 2 = requestedStep >= 2 && draft.startsAtUtc ? 2 : 1
   const preselectedService = params.get('service')
 
   const publicState = useAsync(() => {
@@ -147,18 +148,31 @@ export function BookPage() {
   const service = services.find((item) => item.id === draft.serviceId) ?? null
 
   useEffect(() => {
-    if (!preselectedService || publicState.status !== 'success') return
-    const exists = (publicState.data?.services ?? EMPTY_SERVICES).some((item) => item.id === preselectedService)
-    if (exists && draft.serviceId !== preselectedService) {
-      updateDraft({ serviceId: preselectedService, ...emptySlotPatch() })
-    }
+    if (publicState.status !== 'success') return
+    const available = publicState.data?.services ?? EMPTY_SERVICES
+    if (available.length === 0) return
+    const preferred = preselectedService
+      ? available.find((item) => item.id === preselectedService)
+      : null
+    const picked =
+      preferred ??
+      available.reduce((shortest, item) => (item.durationMin < shortest.durationMin ? item : shortest))
+    if (draft.serviceId === picked.id) return
+    setWindowIndex(0)
+    setSelectedDay('')
+    updateDraft({
+      serviceId: picked.id,
+      interviewerId: picked.interviewerProfileId,
+      interviewerProfileId: picked.interviewerProfileId,
+      ...emptySlotPatch(),
+    })
   }, [draft.serviceId, preselectedService, publicState.data?.services, publicState.status, updateDraft])
 
   const displayTimeZone =
     draft.displayTimezone || draft.timezone || account?.profile.timezone || 'Asia/Kolkata'
 
   const availabilityState = useAsync(async (): Promise<AvailabilityQueryResult> => {
-    if (step !== 2 || !service) {
+    if (step !== 1 || !service) {
       return { serviceId: '', windowIndex, slots: EMPTY_SLOTS }
     }
     const { from, to } = getBookableWindow(windowIndex)
@@ -178,7 +192,7 @@ export function BookPage() {
     availabilityState.data.serviceId === service?.id &&
     availabilityState.data.windowIndex === windowIndex
   const availabilityLoading =
-    step === 2 &&
+    step === 1 &&
     Boolean(service) &&
     (availabilityState.status === 'loading' ||
       preferenceState.status === 'loading' ||
@@ -222,18 +236,6 @@ export function BookPage() {
     const copy = new URLSearchParams(params)
     copy.set('step', String(next))
     setParams(copy)
-  }
-
-  function chooseService(item: PublicInterviewerService) {
-    setStaleMessage('')
-    setWindowIndex(0)
-    setSelectedDay('')
-    updateDraft({
-      serviceId: item.id,
-      interviewerId: item.interviewerProfileId,
-      interviewerProfileId: item.interviewerProfileId,
-      ...emptySlotPatch(),
-    })
   }
 
   function chooseSlot(slot: UtcBookableSlot, date: string) {
@@ -287,7 +289,7 @@ export function BookPage() {
         timezone: displayTimeZone,
         displayTimezone: displayTimeZone,
       })
-      go(3)
+      go(2)
     } catch {
       setStaleMessage('')
       setRetryNonce((value) => value + 1)
@@ -367,7 +369,7 @@ export function BookPage() {
         setStaleMessage('This slot was just taken.')
         updateDraft(emptySlotPatch())
         setRetryNonce((value) => value + 1)
-        go(2)
+        go(1)
         return
       }
       setError(err instanceof BookingError ? err.message : 'Unable to create your booking. Please try again.')
@@ -412,7 +414,7 @@ export function BookPage() {
       </Link>
       <h1 className="mt-4 text-2xl font-semibold text-navy-950">Book your interview</h1>
 
-      <ol className="mt-6 grid grid-cols-3 gap-2 text-sm">
+      <ol className="mt-6 grid grid-cols-2 gap-2 text-sm">
         {steps.map((label, index) => {
           const n = index + 1
           const active = step === n
@@ -438,50 +440,6 @@ export function BookPage() {
       <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
         <Card className="p-5 sm:p-6">
           {step === 1 ? (
-            <div className="space-y-3">
-              <h2 className="text-lg font-semibold text-navy-950">Select a service</h2>
-              {services.length ? (
-                services.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => chooseService(item)}
-                    className={`w-full rounded-xl border p-4 text-left ${
-                      draft.serviceId === item.id ? 'border-navy-950 bg-slate-50' : 'border-slate-200'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="font-semibold text-navy-950">{item.name}</p>
-                        <p className="mt-1 text-sm text-slate-600">
-                          {item.durationMin} min · {item.interviewType}
-                        </p>
-                        {item.description ? <p className="mt-2 text-sm text-slate-600">{item.description}</p> : null}
-                      </div>
-                      <p className="font-semibold text-navy-950">
-                        {formatMoneyFromPaise(item.pricePaise, item.currency)}
-                      </p>
-                    </div>
-                  </button>
-                ))
-              ) : (
-                <EmptyState
-                  title="This interviewer has no bookable services."
-                  body="Live services come from the interviewer directory. Choose another interviewer to continue."
-                  action={
-                    <Link to="/candidate/interviewers">
-                      <Button variant="outline">View another interviewer</Button>
-                    </Link>
-                  }
-                />
-              )}
-              <Button className="mt-4" disabled={!service} onClick={() => go(2)} fullWidth>
-                Continue
-              </Button>
-            </div>
-          ) : null}
-
-          {step === 2 ? (
             <div>
               <h2 className="text-lg font-semibold text-navy-950">Choose date & time</h2>
               <p className="mt-1 text-sm text-slate-600">
@@ -513,12 +471,12 @@ export function BookPage() {
               {!service ? (
                 <div className="mt-6">
                   <EmptyState
-                    title="Select a service first."
-                    body="Availability depends on the selected service duration."
+                    title="Booking not available yet"
+                    body="This interviewer has not configured a session yet. You can still view their profile."
                     action={
-                      <Button variant="outline" onClick={() => go(1)}>
-                        Select service
-                      </Button>
+                      <Link to={`/candidate/interviewers/${header.id}`}>
+                        <Button variant="outline">Back to profile</Button>
+                      </Link>
                     }
                   />
                 </div>
@@ -647,9 +605,6 @@ export function BookPage() {
               {error ? <p className="mt-3 text-sm text-red-700">{error}</p> : null}
 
               <div className="mt-6 flex gap-3">
-                <Button variant="outline" onClick={() => go(1)}>
-                  Back
-                </Button>
                 <Button
                   disabled={!draft.startsAtUtc || rechecking}
                   onClick={() => void continueToReview()}
@@ -661,17 +616,13 @@ export function BookPage() {
             </div>
           ) : null}
 
-          {step === 3 ? (
+          {step === 2 ? (
             <div>
               <h2 className="text-lg font-semibold text-navy-950">Review your booking</h2>
               <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
                 <div>
                   <dt className="text-slate-500">Interviewer</dt>
                   <dd className="font-medium text-navy-950">{header.name}</dd>
-                </div>
-                <div>
-                  <dt className="text-slate-500">Service</dt>
-                  <dd className="font-medium text-navy-950">{service?.name}</dd>
                 </div>
                 <div>
                   <dt className="text-slate-500">Duration</dt>
@@ -717,7 +668,7 @@ export function BookPage() {
               </p>
               {error ? <p className="mt-3 text-sm text-red-700">{error}</p> : null}
               <div className="mt-6 flex gap-3">
-                <Button variant="outline" onClick={() => go(2)} disabled={creating}>
+                <Button variant="outline" onClick={() => go(1)} disabled={creating}>
                   Back
                 </Button>
                 <Button
@@ -748,10 +699,6 @@ export function BookPage() {
             </div>
           </div>
           <dl className="mt-4 space-y-2 text-sm text-slate-600">
-            <div className="flex justify-between">
-              <dt>Service</dt>
-              <dd className="font-medium text-navy-950">{service?.name ?? '—'}</dd>
-            </div>
             <div className="flex justify-between">
               <dt>When</dt>
               <dd className="font-medium text-navy-950">

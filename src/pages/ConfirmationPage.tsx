@@ -54,7 +54,6 @@ function BookingSummary({ booking }: { booking: CandidateBookingView }) {
         <Avatar src={booking.interviewerPhoto ?? ''} name={booking.interviewerName} size="lg" />
       </div>
       <p className="mt-4 text-lg font-semibold text-navy-950">{booking.interviewerName}</p>
-      <p className="mt-1 text-slate-600">{booking.serviceName}</p>
       <p className="mt-4 text-base font-medium text-navy-950">{civilDateLabel(booking.startsAtUtc, zone)}</p>
       <p className="text-slate-700">{timeRangeLabel(booking)}</p>
       <p className="mt-1 text-sm text-slate-600">{booking.durationMin} min</p>
@@ -267,10 +266,6 @@ export function ConfirmationPage() {
             <div className="flex justify-between">
               <dt className="text-slate-500">Interviewer</dt>
               <dd className="font-medium text-navy-950">{booking.interviewerName}</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-slate-500">Service</dt>
-              <dd className="font-medium text-navy-950">{booking.serviceName}</dd>
             </div>
             <div className="flex justify-between">
               <dt className="text-slate-500">Date</dt>

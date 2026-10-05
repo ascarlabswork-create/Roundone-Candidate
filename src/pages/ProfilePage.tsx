@@ -6,7 +6,7 @@ import { Button } from '../components/ui/Button.tsx'
 import { Badge, Card, EmptyState, ErrorState, Skeleton } from '../components/ui/primitives.tsx'
 import { Avatar, MatchScore, StarRating, VerifiedBadge } from '../components/ui/identity.tsx'
 import { isVerified } from '../data/interviewers.ts'
-import { formatCount, formatINR } from '../lib/format.ts'
+import { formatCount } from '../lib/format.ts'
 import { isUuid } from '../lib/uuid.ts'
 import { useAsync, type AsyncState } from '../lib/useAsync.ts'
 import { loadMatchingInterviewer, scoreInterviewer } from '../matching/index.ts'
@@ -18,7 +18,7 @@ import { useSavedInterviewers } from '../state/saved.tsx'
 import { useToast } from '../state/toast.tsx'
 import type { Interviewer, PublicCandidateReview } from '../types.ts'
 
-const tabs = ['About', 'Expertise', 'Services', 'Availability', 'Reviews'] as const
+const tabs = ['About', 'Expertise', 'Availability', 'Reviews'] as const
 
 async function loadProfileInterviewer(id: string) {
   if (!isUuid(id)) throw new ApiError('Interviewer not found', 404)
@@ -164,7 +164,6 @@ export function ProfilePage() {
       <div className="py-6">
         {tab === 'About' ? <AboutTab interviewer={interviewer} /> : null}
         {tab === 'Expertise' ? <ExpertiseTab interviewer={interviewer} /> : null}
-        {tab === 'Services' ? <ServicesTab interviewer={interviewer} /> : null}
         {tab === 'Availability' ? <AvailabilityTab interviewer={interviewer} /> : null}
         {tab === 'Reviews' ? <ReviewsRatings interviewer={interviewer} reviewsState={reviewsState} /> : null}
       </div>
@@ -268,33 +267,6 @@ function ExpertiseTab({ interviewer }: { interviewer: Interviewer }) {
           ))}
         </div>
       </section>
-    </div>
-  )
-}
-
-function ServicesTab({ interviewer }: { interviewer: Interviewer }) {
-  if (interviewer.services.length === 0) {
-    return <p className="text-sm text-slate-600">Booking not available yet. This interviewer has not configured a service.</p>
-  }
-  return (
-    <div className="grid gap-4 md:grid-cols-2">
-      {interviewer.services.map((service) => (
-        <Card key={service.id} className="p-5">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h3 className="font-semibold text-navy-950">{service.name}</h3>
-              <p className="mt-1 text-sm text-slate-600">
-                {service.durationMin} min · {service.interviewType}
-              </p>
-            </div>
-            <p className="font-semibold text-navy-950">{formatINR(service.price)}</p>
-          </div>
-          <p className="mt-3 text-sm text-slate-600">{service.description}</p>
-          <Link to={`/candidate/interviewers/${interviewer.id}/book?service=${service.id}`} className="mt-4 inline-block">
-            <Button size="sm">Select</Button>
-          </Link>
-        </Card>
-      ))}
     </div>
   )
 }
