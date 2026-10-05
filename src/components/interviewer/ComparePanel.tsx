@@ -2,6 +2,7 @@ import { GitCompare, X } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { formatDateTimeInZone } from '../../availability/index.ts'
+import { candidateDisplayTimezone } from '../../lib/candidateTimezone.ts'
 import { getNextSlot, isVerified } from '../../data/interviewers.ts'
 import { formatCount, formatINR } from '../../lib/format.ts'
 import type { Interviewer } from '../../types.ts'
@@ -41,7 +42,7 @@ function AvailabilityCell({ person }: { person: Interviewer }) {
   const next = person.availability.recurring.length > 0 || person.availability.custom.length > 0
     ? getNextSlot(person)
     : null
-  return <span>{next ? formatDateTimeInZone(next.start, person.availability.timezone) : 'See booking for live times'}</span>
+  return <span>{next ? formatDateTimeInZone(next.start, candidateDisplayTimezone()) : 'See booking for live times'}</span>
 }
 
 function SkillBadges({ person }: { person: Interviewer }) {

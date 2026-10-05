@@ -20,8 +20,8 @@ import {
   COMPANIES,
   SKILLS,
   TIME_WINDOWS,
-  TIMEZONES,
 } from '../data/catalogs.ts'
+import { timezoneSelectOptions } from '../lib/candidateTimezone.ts'
 import { preferredDateRangeError } from '../lib/dates.ts'
 import { isUuid } from '../lib/uuid.ts'
 import { useAsync } from '../lib/useAsync.ts'
@@ -339,9 +339,7 @@ export function CandidateProfilePage() {
 
   const isEmpty = !form.targetCompany && form.skills.length === 0 && !form.headline
 
-  const timezoneOptions = (TIMEZONES as readonly string[]).includes(form.timezone)
-    ? [...TIMEZONES]
-    : [form.timezone, ...TIMEZONES]
+  const timezoneOptions = timezoneSelectOptions(form.timezone)
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
@@ -394,8 +392,8 @@ export function CandidateProfilePage() {
                 onChange={(event) => setForm({ ...form, timezone: event.target.value })}
               >
                 {timezoneOptions.map((zone) => (
-                  <option key={zone} value={zone}>
-                    {zone}
+                  <option key={zone.id} value={zone.id}>
+                    {zone.label}
                   </option>
                 ))}
               </SelectInput>

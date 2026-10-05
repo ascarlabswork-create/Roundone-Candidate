@@ -1,3 +1,4 @@
+import { candidateDisplayTimezone } from '../lib/candidateTimezone.ts'
 import { getBookableSlots, getBookableWindow } from '../services/availability.ts'
 import type { MatchingPreferences } from '../types.ts'
 import { classifyBookingReadiness, type BookingReadiness } from './bookingReadiness.ts'
@@ -9,6 +10,7 @@ const AVAILABILITY_CHECK_CONCURRENCY = 6
 export async function describeBookingReadiness(
   person: MatchingCatalogPerson,
   prefs: MatchingPreferences,
+  displayTimezone?: string | null,
 ): Promise<BookingReadiness> {
   if (person.services.length === 0) return 'no_service'
   const service = pickServiceForAvailability(person, prefs.interviewType)
@@ -24,7 +26,7 @@ export async function describeBookingReadiness(
     return classifyBookingReadiness({
       serviceCount: person.services.length,
       slots,
-      timezone: person.timezone,
+      timezone: candidateDisplayTimezone(displayTimezone),
       preferredDate: prefs.preferredDate,
       preferredDateEnd: prefs.preferredDateEnd,
     })
@@ -34,8 +36,12 @@ export async function describeBookingReadiness(
   }
 }
 
-async function hasLiveBookableSlot(person: MatchingCatalogPerson, prefs: MatchingPreferences) {
-  const readiness = await describeBookingReadiness(person, prefs)
+async function hasLiveBookableSlot(
+  person: MatchingCatalogPerson,
+  prefs: MatchingPreferences,
+  displayTimezone?: string | null,
+) {
+  const readiness = await describeBookingReadiness(person, prefs, displayTimezone)
   return readiness === 'ready'
 }
 
@@ -57,11 +63,12 @@ async function mapPool<T, R>(items: T[], limit: number, mapper: (item: T) => Pro
 export async function flagInterviewersWithBookableSlots(
   catalog: MatchingCatalogPerson[],
   prefs: MatchingPreferences,
+  displayTimezone?: string | null,
 ): Promise<Map<string, boolean>> {
   const flags = new Map<string, boolean>()
   if (catalog.length === 0) return flags
   const results = await mapPool(catalog, AVAILABILITY_CHECK_CONCURRENCY, (person) =>
-    hasLiveBookableSlot(person, prefs),
+    hasLiveBookableSlot(person, prefs, displayTimezone),
   )
   catalog.forEach((person, index) => {
     flags.set(person.id, results[index])

@@ -50,6 +50,33 @@ expect(
   'a slot outside the preferred range is hidden from booking',
 )
 
+const chicagoEvening = {
+  startsAtUtc: '2026-10-05T23:00:00.000Z',
+  endsAtUtc: '2026-10-06T00:00:00.000Z',
+}
+
+expect(
+  classifyBookingReadiness({
+    serviceCount: 1,
+    slots: [chicagoEvening],
+    timezone: 'Asia/Kolkata',
+    preferredDate: '2026-10-06',
+    preferredDateEnd: '2026-10-06',
+  }) === 'ready',
+  'a Central Time evening is the next morning in India and stays bookable',
+)
+
+expect(
+  classifyBookingReadiness({
+    serviceCount: 1,
+    slots: [chicagoEvening],
+    timezone: 'America/Chicago',
+    preferredDate: '2026-10-06',
+    preferredDateEnd: '2026-10-06',
+  }) === 'outside_range',
+  'the same instant is still 5 October in Central Time',
+)
+
 expect(bookingStatusMessage('no_service')?.detail === 'Booking not available yet', 'no-service copy')
 expect(bookingStatusMessage('no_availability')?.detail === 'Availability not configured', 'no-availability copy')
 expect(bookingStatusMessage('no_service')?.headline === 'Matched by skills', 'skill match stays visible')

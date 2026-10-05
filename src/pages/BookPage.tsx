@@ -9,7 +9,7 @@ import {
 import { Button } from '../components/ui/Button.tsx'
 import { Card, EmptyState, ErrorState, FieldLabel, SelectInput, Skeleton } from '../components/ui/primitives.tsx'
 import { Avatar, VerifiedBadge } from '../components/ui/identity.tsx'
-import { TIMEZONES } from '../data/catalogs.ts'
+import { formatTimezoneLabel, timezoneSelectOptions } from '../lib/candidateTimezone.ts'
 import { formatMoneyFromPaise } from '../lib/format.ts'
 import { useAsync } from '../lib/useAsync.ts'
 import { isUuid } from '../lib/uuid.ts'
@@ -72,11 +72,6 @@ function emptySlotPatch() {
     endsAtUtc: '',
     createdBookingId: '',
   }
-}
-
-function timezoneOptions(current: string) {
-  if ((TIMEZONES as readonly string[]).includes(current)) return TIMEZONES
-  return [current, ...TIMEZONES]
 }
 
 const EMPTY_SERVICES: PublicInterviewerService[] = []
@@ -447,21 +442,22 @@ export function BookPage() {
                 cannot enter a custom time.
               </p>
               <div className="mt-4">
-                <FieldLabel htmlFor="timezone">Timezone</FieldLabel>
+                <FieldLabel htmlFor="timezone">Your timezone</FieldLabel>
                 <SelectInput
                   id="timezone"
                   value={displayTimeZone}
                   onChange={(event) => changeTimezone(event.target.value)}
                 >
-                  {timezoneOptions(displayTimeZone).map((zone) => (
-                    <option key={zone} value={zone}>
-                      {zone}
+                  {timezoneSelectOptions(displayTimeZone).map((zone) => (
+                    <option key={zone.id} value={zone.id}>
+                      {zone.label}
                     </option>
                   ))}
                 </SelectInput>
-                {header.timezone ? (
-                  <p className="mt-2 text-xs text-slate-500">Interviewer timezone: {header.timezone}</p>
-                ) : null}
+                <p className="mt-2 text-xs text-slate-500">
+                  Open times are shown in {formatTimezoneLabel(displayTimeZone)}
+                  {header.timezone ? `, converted from the interviewer’s ${formatTimezoneLabel(header.timezone)}` : ''}.
+                </p>
               </div>
               <p className="mt-4 text-sm text-slate-600">
                 Duration: {service?.durationMin ?? '—'} min
