@@ -1,5 +1,9 @@
 /** Playback rules for a remote LiveKit microphone. Independent of video. */
 
+export function logCallAudio(event: string, detail?: Record<string, unknown>) {
+  if (import.meta.env.DEV) console.info(`[call-audio] ${event}`, detail ?? '')
+}
+
 export const REMOTE_AUDIO_VOLUME = 1
 
 export function isRemoteAudioKind(kind: string): boolean {

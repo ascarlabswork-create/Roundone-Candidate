@@ -1,14 +1,13 @@
-import { ConnectionState, Room, RoomEvent, Track, type RemoteAudioTrack, type RemoteTrack, type RemoteTrackPublication } from 'livekit-client'
+import { ConnectionState, Room, RoomEvent, Track, TrackEvent, type RemoteAudioTrack, type RemoteTrack, type RemoteTrackPublication } from 'livekit-client'
 import { Mic, MicOff, PhoneOff, Video, VideoOff } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { CallRole } from '../../interview/callModel.ts'
 import { reduceCallPresence, remoteLeftLabel, waitingLabel, type CallPresence } from '../../interview/callModel.ts'
 import {
   applyRemoteAudioElement,
-  forgetRemoteAudioTrack,
+  logCallAudio,
   needsAudioSubscription,
   playbackNeedsUserGesture,
-  rememberRemoteAudioTrack,
 } from '../../interview/remoteAudioPlayback.ts'
 import { Button } from '../ui/Button.tsx'
 import {
@@ -39,17 +38,7 @@ export function InterviewCall({ bookingId, sessionId, role, remoteName, accepted
   const [cameraOn, setCameraOn] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)
-  const [remoteAudioTracks, setRemoteAudioTracks] = useState<RemoteTrack[]>([])
-  const [canPlaybackAudio, setCanPlaybackAudio] = useState(true)
-
-  const unlockAudio = useCallback(() => {
-    const room = roomRef.current
-    if (!room) return
-    void room.startAudio().then(
-      () => setCanPlaybackAudio(true),
-      () => setCanPlaybackAudio(room.canPlaybackAudio),
-    )
-  }, [])
+  const [playbackBlocked, setPlaybackBlocked] = useState(false)
 
   useEffect(() => {
     const room = new Room({ adaptiveStream: true, dynacast: true })
@@ -57,15 +46,63 @@ export function InterviewCall({ bookingId, sessionId, role, remoteName, accepted
     leftRef.current = false
     let cancelled = false
     let started = false
-    setRemoteAudioTracks([])
-    setCanPlaybackAudio(true)
+    const audioElements = new Map<string, HTMLAudioElement>()
+    setPlaybackBlocked(false)
+
+    const onPlaybackStarted = () => {
+      logCallAudio('playback started')
+      if (!cancelled) setPlaybackBlocked(false)
+    }
+    const onPlaybackFailed = () => {
+      logCallAudio('playback blocked')
+      if (!cancelled) setPlaybackBlocked(true)
+    }
+
+    const attachAudio = (track: RemoteTrack) => {
+      const id = track.sid ?? track.mediaStreamID
+      const host = document.body
+      let element = audioElements.get(id)
+      if (!element) {
+        element = document.createElement('audio')
+        element.autoplay = true
+        host.appendChild(element)
+        audioElements.set(id, element)
+      }
+      applyRemoteAudioElement(element)
+      track.attach(element)
+      applyRemoteAudioElement(element)
+      if (isRemoteAudioTrack(track)) track.setVolume(1)
+      element.muted = false
+      element.volume = 1
+      logCallAudio('remote audio attached', {
+        id,
+        muted: element.muted,
+        volume: element.volume,
+        trackMuted: track.isMuted,
+      })
+      track.off(TrackEvent.AudioPlaybackStarted, onPlaybackStarted)
+      track.off(TrackEvent.AudioPlaybackFailed, onPlaybackFailed)
+      track.on(TrackEvent.AudioPlaybackStarted, onPlaybackStarted)
+      track.on(TrackEvent.AudioPlaybackFailed, onPlaybackFailed)
+      void element.play().then(onPlaybackStarted, onPlaybackFailed)
+    }
+
+    const detachAudio = (track: RemoteTrack) => {
+      const id = track.sid ?? track.mediaStreamID
+      const element = id ? audioElements.get(id) : undefined
+      track.off(TrackEvent.AudioPlaybackStarted, onPlaybackStarted)
+      track.off(TrackEvent.AudioPlaybackFailed, onPlaybackFailed)
+      if (element) track.detach(element)
+      else track.detach()
+      element?.remove()
+      if (id) audioElements.delete(id)
+      logCallAudio('remote audio removed', { id })
+    }
 
     const attachRemote = (track: RemoteTrack) => {
       if (cancelled) return
       if (track.kind === Track.Kind.Video && remoteVideoRef.current) track.attach(remoteVideoRef.current)
-      if (track.kind === Track.Kind.Audio) {
-        setRemoteAudioTracks((current) => rememberRemoteAudioTrack(current, track))
-      }
+      if (track.kind === Track.Kind.Audio) attachAudio(track)
     }
 
     const subscribeRemoteAudio = (publication: RemoteTrackPublication) => {
@@ -82,26 +119,47 @@ export function InterviewCall({ bookingId, sessionId, role, remoteName, accepted
     room.on(RoomEvent.ConnectionStateChanged, (state) => {
       if (!cancelled) setConnection(state)
     })
-    room.on(RoomEvent.TrackSubscribed, (track) => {
+    room.on(RoomEvent.TrackSubscribed, (track, publication) => {
+      if (track.kind === Track.Kind.Audio) {
+        logCallAudio('remote audio subscribed', {
+          source: publication.source,
+          muted: publication.isMuted,
+          sid: publication.trackSid,
+        })
+      }
       attachRemote(track)
       if (!cancelled) setPresence((current) => reduceCallPresence(current, 'remote_joined'))
     })
-    room.on(RoomEvent.TrackPublished, (publication) => {
+    room.on(RoomEvent.TrackPublished, (publication, participant) => {
+      logCallAudio('remote track published', {
+        identity: participant.identity,
+        kind: publication.kind,
+        source: publication.source,
+        muted: publication.isMuted,
+      })
       subscribeRemoteAudio(publication)
     })
     room.on(RoomEvent.TrackUnsubscribed, (track) => {
-      if (!cancelled && track.kind === Track.Kind.Audio) {
-        setRemoteAudioTracks((current) =>
-          track.sid ? forgetRemoteAudioTrack(current, track.sid) : current.filter((item) => item !== track),
-        )
+      if (track.kind === Track.Kind.Audio) detachAudio(track)
+      else track.detach()
+    })
+    room.on(RoomEvent.TrackMuted, (publication, participant) => {
+      if (publication.kind === Track.Kind.Audio) {
+        logCallAudio('remote audio muted', { identity: participant.identity })
       }
-      track.detach()
+    })
+    room.on(RoomEvent.TrackUnmuted, (publication, participant) => {
+      if (publication.kind === Track.Kind.Audio) {
+        logCallAudio('remote audio unmuted', { identity: participant.identity })
+      }
     })
     room.on(RoomEvent.AudioPlaybackStatusChanged, (allowed) => {
-      if (!cancelled) setCanPlaybackAudio(allowed)
+      logCallAudio(allowed ? 'playback started' : 'playback blocked', { room: true })
+      if (!cancelled && !allowed) setPlaybackBlocked(true)
     })
     room.on(RoomEvent.LocalTrackPublished, () => attachLocal())
-    room.on(RoomEvent.ParticipantConnected, () => {
+    room.on(RoomEvent.ParticipantConnected, (participant) => {
+      logCallAudio('participant joined', { identity: participant.identity })
       if (!cancelled) setPresence((current) => reduceCallPresence(current, 'remote_joined'))
     })
     room.on(RoomEvent.ParticipantDisconnected, () => {
@@ -149,15 +207,9 @@ export function InterviewCall({ bookingId, sessionId, role, remoteName, accepted
             if (publication.track) attachRemote(publication.track)
           })
         })
-        if (!cancelled) setCanPlaybackAudio(room.canPlaybackAudio)
-        void room.startAudio().then(
-          () => {
-            if (!cancelled) setCanPlaybackAudio(true)
-          },
-          () => {
-            if (!cancelled) setCanPlaybackAudio(room.canPlaybackAudio)
-          },
-        )
+        if (audioElements.size > 0) {
+          void room.startAudio().then(onPlaybackStarted, onPlaybackFailed)
+        }
         if (room.remoteParticipants.size > 0) {
           if (!cancelled) setPresence('live')
         } else if (!cancelled) {
@@ -183,9 +235,12 @@ export function InterviewCall({ bookingId, sessionId, role, remoteName, accepted
       }
       room.remoteParticipants.forEach((participant) => {
         participant.trackPublications.forEach((publication) => {
-          publication.track?.detach()
+          if (publication.track?.kind === Track.Kind.Audio) detachAudio(publication.track)
+          else publication.track?.detach()
         })
       })
+      audioElements.forEach((element) => element.remove())
+      audioElements.clear()
       room.removeAllListeners()
       room.disconnect()
       roomRef.current = null
@@ -225,9 +280,9 @@ export function InterviewCall({ bookingId, sessionId, role, remoteName, accepted
     if (!room) return
     try {
       await room.startAudio()
-      setCanPlaybackAudio(true)
+      setPlaybackBlocked(false)
     } catch {
-      setCanPlaybackAudio(room.canPlaybackAudio)
+      setPlaybackBlocked(true)
     }
   }
 
@@ -283,12 +338,7 @@ export function InterviewCall({ bookingId, sessionId, role, remoteName, accepted
           <p className="absolute bottom-3 left-3 rounded-md bg-black/40 px-2 py-1 text-xs text-white">You</p>
         </div>
       </div>
-      <div>
-        {remoteAudioTracks.map((track) => (
-          <RemoteAudioPlayback key={track.sid ?? track.mediaStreamID} track={track} onAttached={unlockAudio} />
-        ))}
-      </div>
-      {playbackNeedsUserGesture(canPlaybackAudio) ? (
+      {playbackNeedsUserGesture(!playbackBlocked) ? (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950">
           <p>Enable audio to hear the other person.</p>
           <Button type="button" size="sm" onClick={() => void enableAudio()}>
@@ -318,26 +368,6 @@ export function InterviewCall({ bookingId, sessionId, role, remoteName, accepted
       </div>
     </div>
   )
-}
-
-function RemoteAudioPlayback({ track, onAttached }: { track: RemoteTrack; onAttached: () => void }) {
-  const ref = useRef<HTMLAudioElement>(null)
-
-  useEffect(() => {
-    const element = ref.current
-    if (!element) return
-    applyRemoteAudioElement(element)
-    track.attach(element)
-    applyRemoteAudioElement(element)
-    if (isRemoteAudioTrack(track)) track.setVolume(1)
-    onAttached()
-    return () => {
-      track.detach(element)
-      element.srcObject = null
-    }
-  }, [onAttached, track])
-
-  return <audio ref={ref} autoPlay />
 }
 
 function isRemoteAudioTrack(track: RemoteTrack): track is RemoteAudioTrack {
