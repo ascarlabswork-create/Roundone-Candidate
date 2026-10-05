@@ -2,7 +2,11 @@ import { asRecord, readNullableString, readString } from '../lib/rows.ts'
 import { toUtcIso } from './bookableSlots.ts'
 import type { CandidateBooking } from './bookingModel.ts'
 
-export const JOIN_WINDOW_BEFORE_MS = 15 * 60_000
+/** Device lobby opens this long before `bookings.starts_at`. No LiveKit room yet. */
+export const LOBBY_OPENS_BEFORE_MS = 30 * 60_000
+
+/** A new participant may join until this long after `bookings.starts_at`. */
+export const LATE_JOIN_AFTER_MS = 15 * 60_000
 
 export type CandidateInterviewSession = {
   id: string
@@ -15,8 +19,10 @@ export type CandidateInterviewSession = {
 export type InterviewJoinState =
   | 'no_session'
   | 'upcoming'
+  | 'lobby'
   | 'joinable'
   | 'in_progress'
+  | 'closed'
   | 'completed'
   | 'cancelled'
   | 'no_show'
@@ -112,6 +118,12 @@ export function groupInterviewHistory<T extends { status: string; startsAtUtc: s
   }
 }
 
+export function interviewSchedule(startsAtUtc: string, endsAtUtc: string) {
+  const start = new Date(startsAtUtc).getTime()
+  const end = new Date(endsAtUtc).getTime()
+  return { start, end }
+}
+
 export function interviewJoinState(
   booking: Pick<CandidateBooking, 'status' | 'startsAtUtc' | 'endsAtUtc'>,
   session: Pick<CandidateInterviewSession, 'endedAt'> | null,
@@ -119,19 +131,24 @@ export function interviewJoinState(
 ): InterviewJoinState {
   const status = booking.status
   if (status === 'completed') return 'completed'
-  if (status === 'cancelled') return 'cancelled'
+  if (status === 'cancelled' || status === 'rescheduled') return 'cancelled'
   if (status === 'no_show') return 'no_show'
   if (!session) return 'no_session'
   if (session.endedAt) return 'completed'
-  if (status === 'in_progress') return 'in_progress'
-  if (status !== 'confirmed') return 'unavailable'
 
-  const start = new Date(booking.startsAtUtc).getTime()
-  const end = new Date(booking.endsAtUtc).getTime()
+  const { start, end } = interviewSchedule(booking.startsAtUtc, booking.endsAtUtc)
   const t = now.getTime()
   if (Number.isNaN(start) || Number.isNaN(end)) return 'unavailable'
-  if (t > end) return 'upcoming'
-  if (t >= start - JOIN_WINDOW_BEFORE_MS) return 'joinable'
+  if (t >= end) return status === 'in_progress' || status === 'confirmed' ? 'completed' : 'unavailable'
+  if (status === 'in_progress') {
+    if (t >= start) return 'in_progress'
+    if (t >= start - LOBBY_OPENS_BEFORE_MS) return 'lobby'
+    return 'upcoming'
+  }
+  if (status !== 'confirmed') return 'unavailable'
+  if (t > start + LATE_JOIN_AFTER_MS) return 'closed'
+  if (t >= start) return 'joinable'
+  if (t >= start - LOBBY_OPENS_BEFORE_MS) return 'lobby'
   return 'upcoming'
 }
 
