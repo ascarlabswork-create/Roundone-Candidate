@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { formatBookingTime, formatCivilDateWithYear, isoDateInZone } from '../../availability/index.ts'
+import { interviewLobbyStatusCopy } from '../../interview/callModel.ts'
 import { Button } from '../ui/Button.tsx'
-import type { CandidateInterview } from '../../services/interviewSessions.ts'
+import { interviewRoomOpensAtUtc, type CandidateInterview } from '../../services/interviewSessions.ts'
 
 type CheckState = 'idle' | 'ready' | 'blocked'
 
@@ -32,6 +33,8 @@ export function InterviewLobby({
 }) {
   const zone = interview.displayTimezone
   const startLabel = formatBookingTime(interview.startsAtUtc, zone)
+  const roomOpensAt = interviewRoomOpensAtUtc(interview.startsAtUtc)
+  const roomOpenLabel = formatBookingTime(roomOpensAt, zone)
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const [camera, setCamera] = useState<CheckState>('idle')
@@ -39,6 +42,13 @@ export function InterviewLobby({
   const [speaker, setSpeaker] = useState<CheckState>('idle')
   const [online, setOnline] = useState(() => (typeof navigator === 'undefined' ? true : navigator.onLine))
   const countdown = formatClock(remainingUntil(interview.startsAtUtc, now))
+  const started = now.getTime() >= new Date(interview.startsAtUtc).getTime()
+  const statusCopy = interviewLobbyStatusCopy({
+    startsAtMs: new Date(interview.startsAtUtc).getTime(),
+    nowMs: now.getTime(),
+    roomOpensAtLabel: roomOpenLabel,
+    canJoin,
+  })
 
   useEffect(() => {
     const onOnline = () => setOnline(true)
@@ -98,12 +108,8 @@ export function InterviewLobby({
           {interview.interviewType || 'Interview'}
         </h1>
         <p className="mt-2 text-sm text-slate-600">Interview starts at {startLabel}</p>
-        <p className="mt-1 text-sm text-slate-600">
-          {canJoin
-            ? 'You can join the interview now.'
-            : "You're early. You can test your camera and microphone."}
-        </p>
-        <p className="mt-4 font-mono text-3xl font-semibold text-navy-950">{canJoin ? '00:00' : countdown}</p>
+        <p className="mt-1 text-sm text-slate-600">{statusCopy}</p>
+        <p className="mt-4 font-mono text-3xl font-semibold text-navy-950">{started ? '00:00' : countdown}</p>
         <dl className="mt-4 space-y-2 text-sm">
           <div className="flex justify-between gap-4">
             <dt className="text-slate-500">Date</dt>
@@ -148,9 +154,7 @@ export function InterviewLobby({
           Join Interview
         </Button>
         {!canJoin ? (
-          <p className="mt-2 text-center text-xs text-slate-500">
-            The interview room opens at {startLabel}. This lobby does not connect you yet.
-          </p>
+          <p className="mt-2 text-center text-xs text-slate-500">{statusCopy}</p>
         ) : null}
       </div>
     </div>

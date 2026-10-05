@@ -18,6 +18,7 @@ import { useAsync } from '../lib/useAsync.ts'
 import {
   getCandidateInterviewByBooking,
   interviewJoinState,
+  interviewRoomOpensAtUtc,
   interviewStatusLabel,
   type CandidateInterview,
 } from '../services/interviewSessions.ts'
@@ -207,7 +208,7 @@ function InterviewStatusScreen({
     joinState === 'completed'
       ? 'Interview Completed'
       : joinState === 'closed'
-        ? 'Interview join window has closed.'
+        ? 'No new participants can join.'
         : joinState === 'cancelled'
           ? 'Interview Cancelled'
           : joinState === 'no_show'
@@ -222,7 +223,7 @@ function InterviewStatusScreen({
         <h1 className="text-xl font-semibold text-navy-950">{title}</h1>
         <p className="mt-2 text-sm text-slate-600">
           {joinState === 'closed'
-            ? 'A new join is no longer available. The scheduled end time did not change.'
+            ? 'No new participants can join.'
             : 'Join is unavailable for this booking.'}
         </p>
         <div className="mt-6 flex flex-col items-center gap-3">
@@ -259,15 +260,17 @@ function UpcomingInterviewScreen({
   onBack: () => void
 }) {
   const zone = interview.displayTimezone
+  const roomOpenLabel = formatBookingTime(interviewRoomOpensAtUtc(interview.startsAtUtc), zone)
   return (
     <div className="mx-auto max-w-lg px-4 py-16">
       <InterviewHeader interview={interview} />
       <div className="mt-8 rounded-xl border border-slate-200 bg-white p-6">
         <h1 className="text-xl font-semibold text-navy-950">
-          Interview starts at {formatBookingTime(interview.startsAtUtc, zone)}
+          Interview room opens at {roomOpenLabel}.
         </h1>
         <p className="mt-2 text-sm text-slate-600">
-          The lobby opens 30 minutes before the start. Accepting this booking does not start the call.
+          Interview starts at {formatBookingTime(interview.startsAtUtc, zone)}. You can join 15 minutes
+          early and wait for the other participant.
         </p>
         <dl className="mt-4 space-y-2 text-sm">
           <div className="flex justify-between gap-4">

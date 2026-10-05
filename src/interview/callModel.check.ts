@@ -6,6 +6,7 @@ import {
   interviewRoomName,
   interviewTokenGate,
   isLobbyOpen,
+  interviewLobbyStatusCopy,
   parseInterviewToken,
   participantIdentity,
   reduceCallPresence,
@@ -78,8 +79,8 @@ expect(
     currentPath: '/candidate/interviews',
     startsAt: tenEarly,
     now,
-  }) == null,
-  '1. Acceptance 10 minutes early does not start the call',
+  }) === interviewCallHref(bookingId, true),
+  '1. Acceptance 10 minutes early can open the same LiveKit room',
 )
 expect(
   confirmationCallTarget({
@@ -142,13 +143,29 @@ expect(
   'Staying on the call does not navigate again',
 )
 
-expect(isLobbyOpen(lobbyStart, now), '2. The lobby is open 20 minutes before the start')
-expect(isLobbyOpen(tenEarly, now), '2. The lobby is open 10 minutes before the start')
-expect(!isLobbyOpen(atStart, now), 'The lobby closes when the interview starts')
+expect(!isLobbyOpen(lobbyStart, now), '2. Twenty minutes before the start the room is still closed')
+expect(isLobbyOpen(tenEarly, now), '2. The room is open 10 minutes before the start')
+expect(!isLobbyOpen(atStart, now), 'The early-join lobby ends when the interview starts')
 expect(
   interviewJoinState({ status: 'confirmed', startsAtUtc: lobbyStart, endsAtUtc: plusMinutes(lobbyStart, 30) }, sessionRow, now) ===
+    'upcoming',
+  '2. Twenty minutes early is still waiting, not the call',
+)
+expect(
+  interviewJoinState({ status: 'confirmed', startsAtUtc: tenEarly, endsAtUtc: plusMinutes(tenEarly, 30) }, sessionRow, now) ===
     'lobby',
-  '2. A candidate can open the lobby 20 minutes before the start',
+  '2. A candidate can open the room 10 minutes before the start',
+)
+expect(
+  shouldEnterCall({
+    status: 'confirmed',
+    hasSession: true,
+    ended: false,
+    startsAt: tenEarly,
+    endsAt: plusMinutes(tenEarly, 30),
+    now,
+  }),
+  '3. The candidate can enter LiveKit 10 minutes before the start',
 )
 expect(
   !shouldEnterCall({
@@ -159,7 +176,18 @@ expect(
     endsAt: plusMinutes(lobbyStart, 30),
     now,
   }),
-  '3. The candidate cannot enter LiveKit from the lobby',
+  '3. The candidate cannot enter LiveKit 20 minutes before the start',
+)
+expect(
+  interviewTokenGate({
+    role: 'candidate',
+    status: 'confirmed',
+    startsAt: tenEarly,
+    endsAt: plusMinutes(tenEarly, 30),
+    ended: false,
+    now,
+  }) === 'ok',
+  '3. A token is allowed 10 minutes before the scheduled start',
 )
 expect(
   interviewTokenGate({
@@ -170,7 +198,7 @@ expect(
     ended: false,
     now,
   }) === 'INTERVIEW_NOT_STARTED',
-  '3. A token is refused before the scheduled start',
+  '3. A token is refused more than 15 minutes before the scheduled start',
 )
 expect(
   interviewTokenGate({
@@ -286,7 +314,7 @@ expect(
   'A confirmed future session cannot be entered yet',
 )
 expect(
-  !shouldEnterCall({
+  shouldEnterCall({
     status: 'in_progress',
     hasSession: true,
     ended: false,
@@ -294,7 +322,18 @@ expect(
     endsAt: plusMinutes(tenEarly, 60),
     now,
   }),
-  'An in-progress flag before the start does not open LiveKit',
+  'An in-progress flag inside the early-join window opens LiveKit',
+)
+expect(
+  !shouldEnterCall({
+    status: 'in_progress',
+    hasSession: true,
+    ended: false,
+    startsAt: lobbyStart,
+    endsAt: plusMinutes(lobbyStart, 60),
+    now,
+  }),
+  'An in-progress flag before the 15-minute window does not open LiveKit',
 )
 expect(
   !shouldEnterCall({
@@ -411,6 +450,42 @@ expect(candidateFeedbackAction('completed', true) === 'view', '12. Completed int
 expect(candidateFeedbackAction('completed', false) === 'pending', '12. Completed interviews still show pending feedback')
 expect(candidateFeedbackAction('in_progress', true) === null, '12. Feedback stays gated on a completed booking')
 expect(candidateFeedbackAction('confirmed', false) === null, '12. Confirmation does not open feedback')
+expect(
+  interviewLobbyStatusCopy({
+    startsAtMs: new Date(atStart).getTime(),
+    nowMs: new Date(atStart).getTime() - 16 * 60_000,
+    roomOpensAtLabel: '2:15 AM',
+    canJoin: false,
+  }) === 'Interview room opens at 2:15 AM.',
+  'Lobby copy before the room opens names the open time',
+)
+expect(
+  interviewLobbyStatusCopy({
+    startsAtMs: new Date(atStart).getTime(),
+    nowMs: new Date(atStart).getTime() - 10 * 60_000,
+    roomOpensAtLabel: '2:15 AM',
+    canJoin: true,
+  }) === 'Interview room is open. You can join early and wait for the other participant.',
+  'Lobby copy after the room opens allows early wait',
+)
+expect(
+  interviewLobbyStatusCopy({
+    startsAtMs: new Date(atStart).getTime(),
+    nowMs: new Date(atStart).getTime(),
+    roomOpensAtLabel: '2:15 AM',
+    canJoin: true,
+  }) === 'Interview has started.',
+  'Lobby copy at the scheduled start says the interview has started',
+)
+expect(
+  interviewLobbyStatusCopy({
+    startsAtMs: new Date(atStart).getTime(),
+    nowMs: new Date(atStart).getTime() + 16 * 60_000,
+    roomOpensAtLabel: '2:15 AM',
+    canJoin: false,
+  }) === 'No new participants can join.',
+  'Lobby copy after the late-join cutoff blocks new participants',
+)
 expect(waitingLabel('candidate') === 'Waiting for interviewer', 'Candidate waits for the interviewer')
 expect(waitingLabel('interviewer') === 'Waiting for candidate', 'Interviewer waits for the candidate')
 expect(remoteLeftLabel('candidate') === 'Interviewer has left the call', 'Candidate sees the interviewer leave')

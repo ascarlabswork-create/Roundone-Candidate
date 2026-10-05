@@ -1,8 +1,12 @@
-import { LATE_JOIN_AFTER_MS, LOBBY_OPENS_BEFORE_MS } from '../services/interviewSessionModel.ts'
+import {
+  LATE_JOIN_AFTER_MS,
+  ROOM_OPENS_BEFORE_MS,
+} from '../services/interviewSessionModel.ts'
 
 const ROOM_PREFIX = 'roundone-interview-'
 
-export const INTERVIEW_LOBBY_BEFORE_MS = LOBBY_OPENS_BEFORE_MS
+export const INTERVIEW_ROOM_OPENS_BEFORE_MS = ROOM_OPENS_BEFORE_MS
+export const INTERVIEW_LOBBY_BEFORE_MS = ROOM_OPENS_BEFORE_MS
 export const INTERVIEW_LATE_JOIN_MS = LATE_JOIN_AFTER_MS
 
 export type CallRole = 'candidate' | 'interviewer'
@@ -25,13 +29,13 @@ export function shouldOpenCallOnConfirmation(previousStatus: string, nextStatus:
   return previousStatus !== 'confirmed' && previousStatus !== 'in_progress' && nextStatus === 'confirmed'
 }
 
-/** LiveKit may start at `starts_at` and a new join stays open for 15 minutes after that. */
+/** LiveKit opens 15 minutes before `starts_at` and a new join stays open for 15 minutes after that. */
 export function isInsideJoinWindow(startsAt: string | null | undefined, now = new Date()) {
   if (!startsAt) return false
   const start = new Date(startsAt).getTime()
   if (Number.isNaN(start)) return false
   const t = now.getTime()
-  return t >= start && t <= start + INTERVIEW_LATE_JOIN_MS
+  return t >= start - INTERVIEW_ROOM_OPENS_BEFORE_MS && t <= start + INTERVIEW_LATE_JOIN_MS
 }
 
 export function isLobbyOpen(startsAt: string | null | undefined, now = new Date()) {
@@ -39,7 +43,23 @@ export function isLobbyOpen(startsAt: string | null | undefined, now = new Date(
   const start = new Date(startsAt).getTime()
   if (Number.isNaN(start)) return false
   const t = now.getTime()
-  return t >= start - INTERVIEW_LOBBY_BEFORE_MS && t < start
+  return t >= start - INTERVIEW_ROOM_OPENS_BEFORE_MS && t < start
+}
+
+export function interviewLobbyStatusCopy(input: {
+  startsAtMs: number
+  nowMs: number
+  roomOpensAtLabel: string
+  canJoin: boolean
+}) {
+  if (input.nowMs < input.startsAtMs - INTERVIEW_ROOM_OPENS_BEFORE_MS) {
+    return `Interview room opens at ${input.roomOpensAtLabel}.`
+  }
+  if (input.nowMs < input.startsAtMs) {
+    return 'Interview room is open. You can join early and wait for the other participant.'
+  }
+  if (input.canJoin) return 'Interview has started.'
+  return 'No new participants can join.'
 }
 
 export function confirmationCallTarget(input: {
@@ -71,7 +91,8 @@ export function shouldEnterCall(input: {
   const now = input.now ?? new Date()
   const start = new Date(input.startsAt).getTime()
   const end = new Date(input.endsAt).getTime()
-  if (Number.isNaN(start) || Number.isNaN(end) || now.getTime() < start || now.getTime() >= end) return false
+  if (Number.isNaN(start) || Number.isNaN(end) || now.getTime() >= end) return false
+  if (now.getTime() < start - INTERVIEW_ROOM_OPENS_BEFORE_MS) return false
   if (input.status === 'in_progress') return true
   return isInsideJoinWindow(input.startsAt, now)
 }
@@ -94,7 +115,7 @@ export function interviewTokenGate(input: {
   const start = new Date(input.startsAt).getTime()
   const end = new Date(input.endsAt).getTime()
   if (input.ended || Number.isNaN(start) || Number.isNaN(end) || now.getTime() >= end) return 'session_expired'
-  if (now.getTime() < start) return 'INTERVIEW_NOT_STARTED'
+  if (now.getTime() < start - INTERVIEW_ROOM_OPENS_BEFORE_MS) return 'INTERVIEW_NOT_STARTED'
   if (input.status === 'confirmed' && now.getTime() > start + INTERVIEW_LATE_JOIN_MS) return 'JOIN_WINDOW_CLOSED'
   return 'ok'
 }

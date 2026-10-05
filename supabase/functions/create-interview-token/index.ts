@@ -82,6 +82,8 @@ Deno.serve(async (req) => {
     p_booking_id: bookingId,
     p_session_id: sessionId,
   });
+  // Server clock: now() must be in [starts_at - 15 minutes, starts_at + 15 minutes],
+  // the booking confirmed or in progress, and this auth user a participant.
   if (error || !data) {
     const message = error?.message ?? "not_authorized";
     const status = message.includes("not_authenticated") ? 401 : 403;

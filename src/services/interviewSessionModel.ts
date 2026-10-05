@@ -2,11 +2,18 @@ import { asRecord, readNullableString, readString } from '../lib/rows.ts'
 import { toUtcIso } from './bookableSlots.ts'
 import type { CandidateBooking } from './bookingModel.ts'
 
-/** Device lobby opens this long before `bookings.starts_at`. No LiveKit room yet. */
-export const LOBBY_OPENS_BEFORE_MS = 30 * 60_000
+/** LiveKit room opens this long before `bookings.starts_at`. */
+export const ROOM_OPENS_BEFORE_MS = 15 * 60_000
+
+/** Alias for the same early-join window used by lobby copy and countdowns. */
+export const LOBBY_OPENS_BEFORE_MS = ROOM_OPENS_BEFORE_MS
 
 /** A new participant may join until this long after `bookings.starts_at`. */
 export const LATE_JOIN_AFTER_MS = 15 * 60_000
+
+export function interviewRoomOpensAtUtc(startsAtUtc: string) {
+  return new Date(new Date(startsAtUtc).getTime() - ROOM_OPENS_BEFORE_MS).toISOString()
+}
 
 export type CandidateInterviewSession = {
   id: string
@@ -141,14 +148,13 @@ export function interviewJoinState(
   if (Number.isNaN(start) || Number.isNaN(end)) return 'unavailable'
   if (t >= end) return status === 'in_progress' || status === 'confirmed' ? 'completed' : 'unavailable'
   if (status === 'in_progress') {
-    if (t >= start) return 'in_progress'
-    if (t >= start - LOBBY_OPENS_BEFORE_MS) return 'lobby'
+    if (t >= start - ROOM_OPENS_BEFORE_MS) return 'in_progress'
     return 'upcoming'
   }
   if (status !== 'confirmed') return 'unavailable'
   if (t > start + LATE_JOIN_AFTER_MS) return 'closed'
   if (t >= start) return 'joinable'
-  if (t >= start - LOBBY_OPENS_BEFORE_MS) return 'lobby'
+  if (t >= start - ROOM_OPENS_BEFORE_MS) return 'lobby'
   return 'upcoming'
 }
 
@@ -158,7 +164,7 @@ export function canJoinInterview(
   now = new Date(),
 ) {
   const state = interviewJoinState(booking, session, now)
-  return state === 'joinable' || state === 'in_progress'
+  return state === 'lobby' || state === 'joinable' || state === 'in_progress'
 }
 
 export function canViewInterview(
