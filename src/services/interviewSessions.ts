@@ -24,6 +24,7 @@ export {
   groupInterviewHistory,
   interviewHistorySection,
   interviewJoinState,
+  interviewRoomOpensAtUtc,
   interviewStatusLabel,
   parseInterviewSession,
   isCandidateUpcomingInterview,

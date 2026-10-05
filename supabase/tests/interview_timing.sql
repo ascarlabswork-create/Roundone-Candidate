@@ -22,9 +22,9 @@ DECLARE
 BEGIN
   v_def := pg_get_functiondef('private.interview_call_context(uuid,uuid)'::regprocedure)
     || pg_get_functiondef('private.interview_call_access(uuid,uuid)'::regprocedure);
-  IF position('starts_at - interval ''15 minutes''' IN v_def) <> 0
+  IF position('starts_at - interval ''15 minutes''' IN v_def) = 0
      OR position('ends_at + interval ''30 minutes''' IN v_def) <> 0
-     OR position('starts_at - interval ''30 minutes''' IN v_def) = 0
+     OR position('starts_at - interval ''30 minutes''' IN v_def) <> 0
      OR position('starts_at + interval ''15 minutes''' IN v_def) = 0
      OR position('join_window_closed' IN v_def) = 0
      OR position('join_deadline' IN v_def) = 0 THEN
@@ -132,6 +132,20 @@ BEGIN
         RAISE;
       END IF;
   END;
+
+  UPDATE public.bookings
+  SET starts_at = now() + interval '10 minutes',
+      ends_at = now() + interval '40 minutes'
+  WHERE id = v_booking;
+
+  v_access := private.interview_call_context(v_booking, NULL);
+  IF (v_access->>'session_id')::uuid IS DISTINCT FROM v_session
+     OR v_access->>'role' IS DISTINCT FROM 'candidate' THEN
+    RAISE EXCEPTION 'probe_early_join_denied';
+  END IF;
+  IF (SELECT ends_at - starts_at FROM public.bookings WHERE id = v_booking) IS DISTINCT FROM interval '30 minutes' THEN
+    RAISE EXCEPTION 'probe_early_join_moved_end';
+  END IF;
 
   UPDATE public.bookings
   SET starts_at = now() - interval '1 second',

@@ -32,8 +32,24 @@ export function runInterviewSessionChecks() {
     startsAtUtc: '2026-09-17T13:10:00.000Z',
     endsAtUtc: '2026-09-17T14:10:00.000Z',
   }
-  expect(interviewJoinState(confirmed, session, now) === 'lobby', 'C: 10 minutes early is the lobby, not the call')
-  expect(!canJoinInterview(confirmed, session, now), 'C: the lobby does not join LiveKit')
+  expect(interviewJoinState(confirmed, session, now) === 'lobby', 'C: 10 minutes early opens the LiveKit lobby')
+  expect(canJoinInterview(confirmed, session, now), 'C: 10 minutes early can join the same LiveKit room')
+  expect(
+    interviewJoinState(
+      { ...confirmed, startsAtUtc: '2026-09-17T13:20:00.000Z', endsAtUtc: '2026-09-17T14:20:00.000Z' },
+      session,
+      now,
+    ) === 'upcoming',
+    'C: 20 minutes early is still waiting',
+  )
+  expect(
+    !canJoinInterview(
+      { ...confirmed, startsAtUtc: '2026-09-17T13:20:00.000Z', endsAtUtc: '2026-09-17T14:20:00.000Z' },
+      session,
+      now,
+    ),
+    'C: 20 minutes early cannot join LiveKit',
+  )
   expect(
     canJoinInterview(
       { ...confirmed, startsAtUtc: '2026-09-17T13:00:00.000Z', endsAtUtc: '2026-09-17T13:30:00.000Z' },
