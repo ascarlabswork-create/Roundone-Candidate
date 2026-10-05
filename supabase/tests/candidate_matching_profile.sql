@@ -19,6 +19,9 @@ DECLARE
   v_service_hit integer;
   v_min_ratio numeric;
   v_max_ratio numeric;
+  v_comma_ratio numeric;
+  v_comma_matched text[];
+  v_comma_missing text[];
   v_create_booking text;
 BEGIN
   SELECT COALESCE(
@@ -163,6 +166,26 @@ BEGIN
 
   IF v_match_count < 2 THEN
     RAISE EXCEPTION 'probe_match_count';
+  END IF;
+
+  INSERT INTO public.interviewer_skills (interviewer_profile_id, skill)
+  VALUES (v_plain_profile, 'Machine Learning, Deep Learning, Pandas');
+
+  SELECT skill_ratio, matched_skills, missing_candidate_skills
+  INTO v_comma_ratio, v_comma_matched, v_comma_missing
+  FROM public.match_interviewers_by_skills(ARRAY['Machine Learning', 'Deep Learning', 'Pandas'])
+  WHERE interviewer_profile_id = v_plain_profile;
+
+  IF v_comma_ratio IS DISTINCT FROM 1
+    OR v_comma_matched IS DISTINCT FROM ARRAY['Machine Learning', 'Deep Learning', 'Pandas']::text[]
+    OR cardinality(v_comma_missing) IS DISTINCT FROM 0 THEN
+    RAISE EXCEPTION 'probe_comma_skill_mismatch';
+  END IF;
+
+  IF position('skill_phrases' IN pg_get_functiondef('public.match_interviewers_by_skills(text[])'::regprocedure)) = 0
+    OR position('interviewer_services' IN pg_get_functiondef('public.match_interviewers_by_skills(text[])'::regprocedure)) <> 0
+    OR position('interviewer_availability' IN pg_get_functiondef('public.match_interviewers_by_skills(text[])'::regprocedure)) <> 0 THEN
+    RAISE EXCEPTION 'probe_match_definition';
   END IF;
 
   UPDATE public.candidate_preferences
