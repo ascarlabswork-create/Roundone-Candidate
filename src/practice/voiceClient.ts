@@ -1,6 +1,7 @@
 import { requestRealtimeSession, requestSpeechAudio } from './aiAssist.ts'
 import type { PracticeSetup } from './aiModel.ts'
 import { microphoneFailureMessage, requestPracticeMicrophone } from './microphoneAccess.ts'
+import { ANSWER_HOLD_MS, ANSWER_MIN_CHARS } from './voiceTurn.ts'
 
 export type VoiceState =
   | 'idle'
@@ -17,7 +18,6 @@ export type VoiceClientCallbacks = {
   onAiSpeakingProgress?: (transcriptDelta: string) => void
   onError: (error: string) => void
   onTurnComplete?: (finalCandidateText: string) => void
-  onAutoSubmitCountdown?: (secondsRemaining: number | null) => void
 }
 
 export class VoiceClient {
@@ -35,13 +35,11 @@ export class VoiceClient {
   private isUsingFallback = false
   private sessionActive = false
 
-  // Accumulated speech transcript for current turn
+  // Accumulated speech transcript for the current answer.
   private accumulatedTranscript = ''
 
-  // Silence auto-submit timer (5 seconds of sustained silence)
-  private autoSubmitSeconds = 5
-  private silenceCountdownTimer: number | null = null
-  private countdownInterval: number | null = null
+  // A thinking pause must not finish the answer. This fires only after a long silence.
+  private silenceHoldTimer: number | null = null
 
   // Active voice for TTS
   private currentVoice = 'echo'
@@ -61,11 +59,8 @@ export class VoiceClient {
 
   public setAccumulatedTranscript(text: string) {
     this.accumulatedTranscript = text
-    // A manual edit means the candidate is in control: stop any pending
-    // auto-submit countdown so edits/deletions are never auto-sent, and drop
-    // any pending speech buffer so old/removed words never re-appear.
-    this.cancelSilenceTimer()
     this.flushRecognitionBuffer()
+    this.startSilenceHold()
   }
 
   public getAccumulatedTranscript(): string {
@@ -90,49 +85,25 @@ export class VoiceClient {
   }
 
   public cancelSilenceTimer() {
-    if (this.silenceCountdownTimer) {
-      window.clearTimeout(this.silenceCountdownTimer)
-      this.silenceCountdownTimer = null
+    if (this.silenceHoldTimer) {
+      window.clearTimeout(this.silenceHoldTimer)
+      this.silenceHoldTimer = null
     }
-    if (this.countdownInterval) {
-      window.clearInterval(this.countdownInterval)
-      this.countdownInterval = null
-    }
-    this.callbacks.onAutoSubmitCountdown?.(null)
   }
 
-  private startSilenceTimer() {
+  private startSilenceHold() {
     this.cancelSilenceTimer()
-    // Never count down while the interviewer is speaking.
-    if (this.aiSpeaking) return
-    const cleanText = this.accumulatedTranscript.trim()
-    if (cleanText.length < 8) return
+    if (this.aiSpeaking || this.state === 'evaluating') return
+    if (this.accumulatedTranscript.trim().length < ANSWER_MIN_CHARS) return
 
-    let remaining = this.autoSubmitSeconds
-    this.callbacks.onAutoSubmitCountdown?.(remaining)
-
-    this.countdownInterval = window.setInterval(() => {
-      remaining -= 1
-      if (remaining > 0) {
-        this.callbacks.onAutoSubmitCountdown?.(remaining)
-      } else {
-        if (this.countdownInterval) {
-          window.clearInterval(this.countdownInterval)
-          this.countdownInterval = null
-        }
-      }
-    }, 1000)
-
-    this.silenceCountdownTimer = window.setTimeout(() => {
-      this.cancelSilenceTimer()
+    this.silenceHoldTimer = window.setTimeout(() => {
+      this.silenceHoldTimer = null
       const textToSubmit = this.accumulatedTranscript.trim()
-      if (textToSubmit.length >= 8 && this.state !== 'evaluating') {
+      if (textToSubmit.length >= ANSWER_MIN_CHARS && this.state !== 'evaluating' && !this.aiSpeaking) {
         this.setState('thinking')
-        if (this.callbacks.onTurnComplete) {
-          this.callbacks.onTurnComplete(textToSubmit)
-        }
+        this.callbacks.onTurnComplete?.(textToSubmit)
       }
-    }, this.autoSubmitSeconds * 1000)
+    }, ANSWER_HOLD_MS)
   }
 
   public appendTranscriptChunk(chunk: string) {
@@ -263,22 +234,21 @@ export class VoiceClient {
         // AI interviewer finished -> hand the floor back to the candidate.
         this.endAiSpeaking()
       } else if (type === 'input_audio_buffer.speech_started') {
-        // Candidate is actively speaking -> cancel any auto-submit countdown.
+        // Candidate continued after a pause. Keep the same answer.
         this.cancelSilenceTimer()
         if (!this.aiSpeaking) {
           this.setState('listening')
         }
       } else if (type === 'input_audio_buffer.speech_stopped') {
-        // Candidate paused -> start the 5-second silence auto-submit countdown.
+        // A pause starts the wait. Speaking again cancels it and keeps this answer.
         if (!this.aiSpeaking) {
-          this.startSilenceTimer()
+          this.startSilenceHold()
         }
       } else if (type === 'conversation.item.input_audio_transcription.completed') {
         const transcript = event.transcript?.trim()
         if (transcript && !this.aiSpeaking) {
-          // Append the transcript chunk so prior sentences are preserved!
           this.appendTranscriptChunk(transcript)
-          this.startSilenceTimer()
+          this.startSilenceHold()
         }
       } else if (type === 'response.audio_transcript.delta') {
         if (this.callbacks.onAiSpeakingProgress && event.delta) {
@@ -338,8 +308,8 @@ export class VoiceClient {
             if (this.state !== 'evaluating') {
               this.setState('listening')
             }
-            // Reset the silence countdown on every fresh speech event.
-            this.startSilenceTimer()
+            // Fresh speech cancels the wait and keeps this same answer.
+            this.startSilenceHold()
           }
         }
 

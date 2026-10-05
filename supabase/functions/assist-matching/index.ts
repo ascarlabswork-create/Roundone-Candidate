@@ -703,7 +703,7 @@ async function handleRealtimeSession(
   const instructions = [
     `You are ${interviewerName}, an experienced, professional AI interviewer at jobround.ai conducting a ${type} interview for a ${role} position.`,
     "Speak in a clear, natural, professional, and concise interviewer tone (1-3 sentences max).",
-    "Listen attentively to the candidate's spoken responses.",
+    "Listen attentively. A short pause means the candidate is thinking. Do not treat it as the end of their answer.",
     "Do not lecture, preach, or give long speeches.",
     "Do not mention hiring decisions, job guarantees, or real company claims.",
   ].join(" ");
@@ -722,7 +722,7 @@ async function handleRealtimeSession(
         type: "server_vad",
         threshold: 0.5,
         prefix_padding_ms: 300,
-        silence_duration_ms: 800,
+        silence_duration_ms: 2500,
         create_response: false,
       },
     },

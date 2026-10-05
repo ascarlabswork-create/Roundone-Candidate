@@ -21,8 +21,8 @@ export function microphoneFailureMessage(error: unknown) {
 
 export function microphoneStatusLabel(state: string, muted: boolean) {
   if (state === 'error') return 'Blocked — allow microphone access'
-  if (state === 'speaking') return 'Paused — interviewer is speaking'
-  if (state === 'evaluating') return 'Paused — evaluating your answer'
+  if (state === 'speaking') return 'Interviewer is asking the question'
+  if (state === 'evaluating') return 'Interviewer is moving to the next question'
   if (state === 'connecting') return 'Requesting microphone…'
   if (muted) return 'Muted (Audio paused)'
   if (state === 'listening' || state === 'idle') return 'Active (Listening for answer)'
