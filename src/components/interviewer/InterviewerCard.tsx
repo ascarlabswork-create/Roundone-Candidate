@@ -76,7 +76,16 @@ export function InterviewerCard({
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
         <div>
-          <p className="text-lg font-semibold text-navy-950">{formatINR(interviewer.price)} / session</p>
+          {interviewer.services.length > 0 ? (
+            <p className="text-lg font-semibold text-navy-950">{formatINR(interviewer.price)} / session</p>
+          ) : (
+            <div>
+              {typeof matchScore === 'number' ? (
+                <p className="text-sm font-medium text-navy-950">Matched by skills</p>
+              ) : null}
+              <p className="text-sm text-slate-600">Booking not available yet</p>
+            </div>
+          )}
         </div>
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
           {onToggleCompare ? (
@@ -98,11 +107,13 @@ export function InterviewerCard({
               View Profile
             </Button>
           </Link>
-          <Link to={`/candidate/interviewers/${interviewer.id}/book`} className="sm:w-auto">
-            <Button size="sm" fullWidth>
-              Book
-            </Button>
-          </Link>
+          {interviewer.services.length > 0 ? (
+            <Link to={`/candidate/interviewers/${interviewer.id}/book`} className="sm:w-auto">
+              <Button size="sm" fullWidth>
+                Book
+              </Button>
+            </Link>
+          ) : null}
         </div>
       </div>
     </article>

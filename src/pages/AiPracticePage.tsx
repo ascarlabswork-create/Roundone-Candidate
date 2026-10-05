@@ -97,10 +97,8 @@ export function AiPracticePage() {
   const [persistError, setPersistError] = useState<string | null>(null)
   const [prefilled, setPrefilled] = useState(false)
   const [voiceState, setVoiceState] = useState<VoiceState>('idle')
-  const [micMuted, setMicMuted] = useState(false)
   const [confirmEndOpen, setConfirmEndOpen] = useState(false)
   const [resumePrompt, setResumePrompt] = useState(false)
-  const [autoSubmitCountdown, setAutoSubmitCountdown] = useState<number | null>(null)
   const [jobNotice, setJobNotice] = useState<string | null>(null)
 
   const submittingRef = useRef(false)
@@ -434,13 +432,9 @@ export function AiPracticePage() {
         setError(errMsg)
       },
       onTurnComplete: (transcript) => {
-        setAutoSubmitCountdown(null)
         if (transcript.trim().length >= 8 && !submittingRef.current) {
           void handleTurnAnswer(transcript.trim())
         }
-      },
-      onAutoSubmitCountdown: (secondsRemaining) => {
-        setAutoSubmitCountdown(secondsRemaining)
       },
     })
 
@@ -457,7 +451,6 @@ export function AiPracticePage() {
     const question = curSession.questions[curSession.index]
     if (!question || busy || submittingRef.current || answerText.length < 8) return
 
-    setAutoSubmitCountdown(null)
     voiceClientRef.current?.cancelSilenceTimer()
     submittingRef.current = true
     setBusy(true)
@@ -550,7 +543,6 @@ export function AiPracticePage() {
 
       const nextQuestions = [...curSession.questions, nextQuestion]
       voiceClientRef.current?.resetTurnTranscript()
-      setAutoSubmitCountdown(null)
 
       setSession({
         ...curSession,
@@ -573,27 +565,6 @@ export function AiPracticePage() {
       setBusy(false)
       setVoiceState('listening')
       setError(err instanceof Error ? err.message : UNAVAILABLE)
-    }
-  }
-
-  function handleKeepSpeaking() {
-    setAutoSubmitCountdown(null)
-    voiceClientRef.current?.cancelSilenceTimer()
-  }
-
-  function handleMuteToggle() {
-    if (voiceClientRef.current) {
-      const nextMuted = !micMuted
-      voiceClientRef.current.muteMicrophone(nextMuted)
-      setMicMuted(nextMuted)
-    }
-  }
-
-  function handleReplayQuestion() {
-    const q = session.questions[session.index]
-    if (q && voiceClientRef.current) {
-      const persona = getInterviewerPersona(session.setup.interviewerId)
-      void voiceClientRef.current.speakQuestion(q.question, persona.voice)
     }
   }
 
@@ -861,12 +832,10 @@ export function AiPracticePage() {
             <h3 className="text-sm font-semibold text-navy-950">Voice Interview Guidelines</h3>
             <ul className="mt-2 list-disc space-y-1.5 pl-5 text-xs text-slate-600">
               <li>
-                This is a one-to-one conversation. <strong>{interviewer.name}</strong> speaks, you answer, and the thread
-                keeps both sides.
+                <strong>{interviewer.name}</strong> asks one question at a time, the way a real interview works.
               </li>
-              <li>Talk into the microphone, or type in the bar at the bottom and send.</li>
-              <li>A short pause will not erase what you already said.</li>
-              <li>After a longer silence, you can keep speaking or send the reply.</li>
+              <li>Answer out loud. If you pause to think and then continue, it is still the same answer.</li>
+              <li>There is no pause or stop control during the question. The interviewer waits, then moves on.</li>
             </ul>
           </div>
 
@@ -893,29 +862,22 @@ export function AiPracticePage() {
         {session.setup.jobContext ? <JobPracticeContext setup={session.setup} /> : null}
         <PracticeConversation
           interviewerName={interviewer.name}
+          interviewerTitle={interviewer.title}
           questionNumber={session.index + 1}
           totalQuestions={totalQuestions}
-          turns={session.turns}
-          currentQuestionId={question.id}
           currentQuestion={question.question}
           currentAnswer={session.currentAnswer}
           voiceState={voiceState}
-          micMuted={micMuted}
+          micMuted={false}
           busy={busy}
           error={error}
           persistError={persistError}
-          autoSubmitCountdown={autoSubmitCountdown}
           answerMax={PRACTICE_ANSWER_MAX}
           onAnswerChange={(value) => {
             setSession((current) => ({ ...current, currentAnswer: value }))
             voiceClientRef.current?.setAccumulatedTranscript(value)
           }}
-          onSubmit={() => void handleTurnAnswer(session.currentAnswer.trim())}
-          onMuteToggle={handleMuteToggle}
-          onReplay={handleReplayQuestion}
-          onInterrupt={() => voiceClientRef.current?.interruptAiSpeech()}
-          onKeepSpeaking={handleKeepSpeaking}
-          onEnd={() => setConfirmEndOpen(true)}
+          onLeave={() => setConfirmEndOpen(true)}
           onEnableMicrophone={() => void enableMicrophone()}
         />
 

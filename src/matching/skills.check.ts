@@ -1,6 +1,6 @@
 import type { Interviewer, MatchingPreferences } from '../types.ts'
 import { rankInterviewers, scoreInterviewer } from './score.ts'
-import { compareSkillSets, dedupeSkills, normalizeSkill } from './skills.ts'
+import { compareSkillSets, dedupeSkills, isCanonicalSkillDuplicate, normalizeSkill, uniqueCandidateSkillWording } from './skills.ts'
 
 function expect(condition: boolean, message: string) {
   if (!condition) throw new Error(message)
@@ -159,6 +159,29 @@ expect(
   const detail = compareSkillSets([], ['Python'])
   expect(detail.percent === null, 'empty candidate → percent null')
   expect(detail.ratio === 0, 'empty candidate → ratio 0')
+}
+
+// TEST 8 — no service does not change the skill score
+{
+  const prefs = emptyPrefs(['Python', 'ML'])
+  const withService = scoreInterviewer(fakeInterviewer('with-service', ['Python', 'Machine Learning']), prefs)
+  const withoutService = scoreInterviewer(
+    { ...fakeInterviewer('no-service', ['Python', 'Machine Learning']), services: [] },
+    prefs,
+  )
+  expect(withService.score === 100, 'TEST 8 service interviewer scores 100')
+  expect(withoutService.score === withService.score, 'TEST 8 missing service does not change score')
+  expect(withoutService.skillMatch.matchedSkills.length === 2, 'TEST 8 both skills match without a service')
+}
+
+// TEST 9 — stored wording is kept; canonical duplicates collapse
+{
+  const stored = uniqueCandidateSkillWording(['Python', 'python', 'Python 3'])
+  expect(JSON.stringify(stored) === JSON.stringify(['Python']), 'TEST 9 python aliases collapse to the first wording')
+  const power = uniqueCandidateSkillWording(['Power BI', 'PowerBI'])
+  expect(JSON.stringify(power) === JSON.stringify(['Power BI']), 'TEST 9 PowerBI is the same skill')
+  expect(isCanonicalSkillDuplicate(['Machine Learning'], 'ML'), 'TEST 9 ML duplicates Machine Learning')
+  expect(!isCanonicalSkillDuplicate(['Machine Learning'], 'ML', 'Machine Learning'), 'TEST 9 editing the same row is allowed')
 }
 
 console.log('skill matching checks passed')

@@ -102,14 +102,18 @@ export function ProfilePage() {
               </span>
             </p>
             <div className="mt-5 flex flex-col gap-2 sm:flex-row">
-              <Link to={`/candidate/interviewers/${interviewer.id}/book`}>
-                <Button
-                  fullWidth
-                  onClick={() => resetDraft(interviewer.id)}
-                >
-                  Book Interview
-                </Button>
-              </Link>
+              {interviewer.services.length > 0 ? (
+                <Link to={`/candidate/interviewers/${interviewer.id}/book`}>
+                  <Button
+                    fullWidth
+                    onClick={() => resetDraft(interviewer.id)}
+                  >
+                    Book Interview
+                  </Button>
+                </Link>
+              ) : (
+                <p className="text-sm text-slate-600">Booking not available yet</p>
+              )}
               <Button
                 variant="outline"
                 onClick={() => pushToast('Messaging will be available after the interviewer accepts. Prototype only.')}
@@ -165,11 +169,13 @@ export function ProfilePage() {
         {tab === 'Reviews' ? <ReviewsRatings interviewer={interviewer} reviewsState={reviewsState} /> : null}
       </div>
 
-      <div className="sticky bottom-0 -mx-4 border-t border-slate-200 bg-white px-4 py-3 sm:hidden">
-        <Link to={`/candidate/interviewers/${interviewer.id}/book`}>
-          <Button fullWidth>Book Interview</Button>
-        </Link>
-      </div>
+      {interviewer.services.length > 0 ? (
+        <div className="sticky bottom-0 -mx-4 border-t border-slate-200 bg-white px-4 py-3 sm:hidden">
+          <Link to={`/candidate/interviewers/${interviewer.id}/book`}>
+            <Button fullWidth>Book Interview</Button>
+          </Link>
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -267,6 +273,9 @@ function ExpertiseTab({ interviewer }: { interviewer: Interviewer }) {
 }
 
 function ServicesTab({ interviewer }: { interviewer: Interviewer }) {
+  if (interviewer.services.length === 0) {
+    return <p className="text-sm text-slate-600">Booking not available yet. This interviewer has not configured a service.</p>
+  }
   return (
     <div className="grid gap-4 md:grid-cols-2">
       {interviewer.services.map((service) => (
@@ -298,9 +307,13 @@ function AvailabilityTab({ interviewer }: { interviewer: Interviewer }) {
       <p className="text-sm text-slate-600">
         Live bookable times come from secure server slots in the booking flow. Interviewer timezone: {tz}.
       </p>
-      <Link to={`/candidate/interviewers/${interviewer.id}/book`}>
-        <Button>Book this interviewer</Button>
-      </Link>
+      {interviewer.services.length > 0 ? (
+        <Link to={`/candidate/interviewers/${interviewer.id}/book`}>
+          <Button>Book this interviewer</Button>
+        </Link>
+      ) : (
+        <p className="text-sm text-slate-600">Booking not available yet</p>
+      )}
     </div>
   )
 }

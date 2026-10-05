@@ -1,4 +1,5 @@
 import { isoDateInZone } from '../availability/timezone.ts'
+import { dateInPreferredRange } from '../lib/dates.ts'
 
 export const BOOKABLE_WINDOW_DAYS = 14
 const MS_PER_DAY = 24 * 60 * 60 * 1000
@@ -69,6 +70,22 @@ export function findSlot(
       if (slot.startsAtUtc !== start) return false
       return end ? slot.endsAtUtc === end : true
     }) ?? null
+  )
+}
+
+/**
+ * Hide slots outside the candidate's saved date range.
+ * Does not change interviewer availability. An empty start date leaves the list unchanged.
+ */
+export function filterSlotsByPreferredRange(
+  slots: UtcBookableSlot[],
+  timeZone: string,
+  startDate?: string | null,
+  endDate?: string | null,
+): UtcBookableSlot[] {
+  if (!startDate) return slots
+  return slots.filter((slot) =>
+    dateInPreferredRange(isoDateInZone(new Date(slot.startsAtUtc), timeZone), startDate, endDate),
   )
 }
 

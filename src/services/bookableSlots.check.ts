@@ -1,5 +1,6 @@
 import { formatBookingTime } from '../availability/timezone.ts'
 import {
+  filterSlotsByPreferredRange,
   getBookableWindow,
   groupSlotsByDisplayDate,
   parseBookableSlotRows,
@@ -44,6 +45,13 @@ export function runBookableSlotChecks() {
   expect(parsed.length === 1, 'Invalid RPC rows must be skipped')
   expect(parsed[0]?.startsAtUtc === '2026-09-12T04:30:00.000Z', 'Parsed timestamps must be stored as UTC ISO')
   expect(toUtcIso(parsed[0]?.startsAtUtc) === parsed[0]?.startsAtUtc, 'UTC ISO must round-trip unchanged')
+
+  const inRange = filterSlotsByPreferredRange(slots, 'Asia/Kolkata', '2026-09-01', '2026-09-15')
+  expect(inRange.length === 2, 'slots inside the preferred range stay visible')
+  const outside = filterSlotsByPreferredRange(slots, 'Asia/Kolkata', '2026-10-01', '2026-10-15')
+  expect(outside.length === 0, 'slots outside the preferred range are hidden')
+  const unfiltered = filterSlotsByPreferredRange(slots, 'Asia/Kolkata', '', null)
+  expect(unfiltered.length === slots.length, 'an empty preferred range does not change interviewer slots')
 
   const window = getBookableWindow(0, new Date('2026-09-12T00:00:00.000Z'))
   expect(window.to.getTime() - window.from.getTime() === 14 * 24 * 60 * 60 * 1000, 'MVP window is 14 days')

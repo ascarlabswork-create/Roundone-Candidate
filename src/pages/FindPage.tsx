@@ -8,7 +8,10 @@ import {
 import { NormalizationSuggestions } from '../components/matching/NormalizationSuggestions.tsx'
 import { Button } from '../components/ui/Button.tsx'
 import { Chip, FieldLabel, PageHeader, SelectInput, TextInput } from '../components/ui/primitives.tsx'
+import { preferredDateRangeError } from '../lib/dates.ts'
+import { isCanonicalSkillDuplicate, uniqueCandidateSkillWording } from '../matching/skills.ts'
 import { toNormalizationInput, type NormalizationPatch } from '../matching/normalizeModel.ts'
+import { updateCandidatePreferences } from '../services/candidateProfile.ts'
 import { usePreferenceNormalization } from '../matching/usePreferenceNormalization.ts'
 import { requestResumeSkillPlan } from '../resume/aiAssist.ts'
 import { canAnalyzeResume, type ResumeSkillPlan } from '../resume/aiModel.ts'
@@ -22,10 +25,10 @@ function mergeUniqueSkills(existing: string[], incoming: string[]) {
   for (const skill of incoming) {
     const value = skill.trim()
     if (value.length < 2) continue
-    if (next.some((item) => item.toLowerCase() === value.toLowerCase())) continue
+    if (isCanonicalSkillDuplicate(next, value)) continue
     next.push(value)
   }
-  return next
+  return uniqueCandidateSkillWording(next)
 }
 
 /** Collect every skill/technology grounded in the resume skill plan. */
@@ -82,14 +85,15 @@ export function FindPage() {
   const [resumeExtracting, setResumeExtracting] = useState(false)
   const [resumeStatus, setResumeStatus] = useState<string | null>(null)
   const [resumeError, setResumeError] = useState<string | null>(null)
+  const [dateError, setDateError] = useState<string | null>(null)
   const [optionalOpen, setOptionalOpen] = useState(() =>
     Boolean(initial.targetCompany || initial.naturalLanguageQuery?.trim()),
   )
 
   function addSkill(skill: string) {
     const value = skill.trim()
-    if (!value || form.skills.includes(value)) return
-    setForm({ ...form, skills: [...form.skills, value] })
+    if (!value || isCanonicalSkillDuplicate(form.skills, value)) return
+    setForm({ ...form, skills: uniqueCandidateSkillWording([...form.skills, value]) })
     setSkillDraft('')
   }
 
@@ -187,16 +191,35 @@ export function FindPage() {
     return () => window.clearTimeout(intentTimer.current)
   }, [])
 
-  function submit(event: FormEvent) {
+  async function submit(event: FormEvent) {
     event.preventDefault()
-    setPreferences({
+    const rangeError = preferredDateRangeError(form.preferredDate, form.preferredDateEnd)
+    if (rangeError) {
+      setDateError(rangeError)
+      return
+    }
+    setDateError(null)
+    const skills = uniqueCandidateSkillWording(form.skills)
+    const next = {
       ...form,
+      skills,
       targetRole: '',
       interviewType: '',
       candidateLevel: '',
       budget: 0,
       language: '',
-    })
+    }
+    try {
+      await updateCandidatePreferences({
+        skills,
+        preferredDate: form.preferredDate || null,
+        preferredDateEnd: form.preferredDateEnd || null,
+        preferredTimeWindow: form.preferredTime || null,
+      })
+    } catch {
+      // Matching still uses the range on this page if the preference row cannot be saved.
+    }
+    setPreferences(next)
     navigate('/candidate/matches')
   }
 
@@ -352,8 +375,10 @@ export function FindPage() {
               </div>
             </div>
             <p className="mt-1 text-xs text-slate-500">
-              Pick a range (for example 24–27). Leave empty for any day.
+              Pick a range (for example 01-10-2026 to 15-10-2026). Leave empty for any day. Open times outside this
+              range stay on the interviewer’s calendar and are hidden here.
             </p>
+            {dateError ? <p className="mt-1 text-sm text-red-700">{dateError}</p> : null}
           </div>
           <div className="sm:col-span-2 sm:max-w-xs">
             <FieldLabel htmlFor="time">Preferred Time</FieldLabel>

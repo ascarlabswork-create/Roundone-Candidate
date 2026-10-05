@@ -1,3 +1,4 @@
+import { uniqueCandidateSkillWording } from '../matching/skills.ts'
 import { supabase } from '../lib/supabase.ts'
 import { requireUser } from './auth.ts'
 
@@ -26,6 +27,7 @@ export type CandidatePreferencesRecord = {
   interview_type: string | null
   skills: string[]
   preferred_date: string | null
+  preferred_end_date: string | null
   preferred_time_window: 'morning' | 'afternoon' | 'evening' | null
   budget_max_paise: number | null
   language: string | null
@@ -53,6 +55,7 @@ export type CandidatePreferencesUpdates = {
   interviewType?: string | null
   skills?: string[]
   preferredDate?: string | null
+  preferredDateEnd?: string | null
   preferredTimeWindow?: 'morning' | 'afternoon' | 'evening' | null
   budgetMaxPaise?: number | null
   language?: string | null
@@ -141,7 +144,7 @@ export async function updateCandidateProfile(updates: CandidateProfileUpdates): 
 }
 
 const CANDIDATE_PREFERENCES_SELECT =
-  'candidate_profile_id, interview_type, skills, preferred_date, preferred_time_window, budget_max_paise, language'
+  'candidate_profile_id, interview_type, skills, preferred_date, preferred_end_date, preferred_time_window, budget_max_paise, language'
 
 export async function getCandidatePreferencesIfPresent(): Promise<CandidatePreferencesRecord | null> {
   const account = await getCandidateProfile()
@@ -178,6 +181,7 @@ export async function updateCandidatePreferences(
   if (updates.interviewType !== undefined) patch.interview_type = updates.interviewType
   if (updates.skills !== undefined) patch.skills = updates.skills
   if (updates.preferredDate !== undefined) patch.preferred_date = updates.preferredDate
+  if (updates.preferredDateEnd !== undefined) patch.preferred_end_date = updates.preferredDateEnd
   if (updates.preferredTimeWindow !== undefined) patch.preferred_time_window = updates.preferredTimeWindow
   if (updates.budgetMaxPaise !== undefined) patch.budget_max_paise = updates.budgetMaxPaise
   if (updates.language !== undefined) patch.language = updates.language
@@ -188,9 +192,7 @@ export async function updateCandidatePreferences(
     .from('candidate_preferences')
     .update(patch)
     .eq('candidate_profile_id', current.candidate_profile_id)
-    .select(
-      'candidate_profile_id, interview_type, skills, preferred_date, preferred_time_window, budget_max_paise, language',
-    )
+    .select(CANDIDATE_PREFERENCES_SELECT)
     .single()
   fail(error)
   if (!data) throw new Error('Could not update candidate preferences.')
@@ -210,7 +212,7 @@ export async function getCandidateSkills(): Promise<string[]> {
 
 export async function updateCandidateSkills(skills: string[]): Promise<string[]> {
   const account = await getCandidateProfile()
-  const next = [...new Set(skills.map((skill) => skill.trim()).filter(Boolean))]
+  const next = uniqueCandidateSkillWording(skills)
 
   const { data: existing, error: existingError } = await supabase
     .from('candidate_skills')

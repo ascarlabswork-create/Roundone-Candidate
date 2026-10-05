@@ -74,11 +74,12 @@ export function MatchesPage() {
 
       {ready && state.status === 'success' && state.data.length > 0 ? (
         <div className="mt-8 space-y-4">
-          {state.data.map(({ interviewer, match }) => (
+          {state.data.map(({ interviewer, match, booking }) => (
             <SkillMatchCard
               key={interviewer.id}
               interviewer={interviewer}
               skillMatch={match.skillMatch}
+              booking={booking}
             />
           ))}
         </div>

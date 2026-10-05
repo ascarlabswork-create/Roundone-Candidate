@@ -1,7 +1,10 @@
 import type { MatchingPreferences } from '../types.ts'
+import { listPublicServicesFor } from '../services/interviewerPublic.ts'
 import { resolveMatchingCandidateSkills } from './candidateSkills.ts'
-import type { MatchingCatalogPerson } from './catalog.ts'
+import { applyPublicServices, type MatchingCatalogPerson } from './catalog.ts'
 import type { MatchResult } from '../types.ts'
+import type { BookingReadiness } from './bookingReadiness.ts'
+import { describeBookingReadiness } from './liveAvailability.ts'
 import {
   matchInterviewersBySkills,
   skillMatchRowToCatalogPerson,
@@ -16,6 +19,8 @@ export type RecommendedMatch = {
   match: MatchResult
   /** Final candidate skill set used for this recommendation. */
   candidateSkills: string[]
+  /** Separate from the skill score. Missing service or slots does not remove the match. */
+  booking: BookingReadiness
 }
 
 /**
@@ -34,9 +39,32 @@ export async function recommendMatchedInterviewers(prefs: MatchingPreferences): 
     throw new Error('Unable to load interviewers. Please try again.')
   }
 
-  return rows.slice(0, MATCHING_RESULT_LIMIT).map((row) => ({
-    interviewer: skillMatchRowToCatalogPerson(row),
-    match: skillMatchRowToMatchResult(row),
-    candidateSkills,
+  const limited = rows.slice(0, MATCHING_RESULT_LIMIT)
+  let services: Awaited<ReturnType<typeof listPublicServicesFor>> = []
+  try {
+    services = await listPublicServicesFor(limited.map((row) => row.interviewerProfileId))
+  } catch (error) {
+    console.error('match service lookup failed', error)
+  }
+
+  const recommended = limited.map((row) => {
+    const interviewer = applyPublicServices(
+      skillMatchRowToCatalogPerson(row),
+      services.filter((service) => service.interviewerProfileId === row.interviewerProfileId),
+    )
+    return {
+      interviewer,
+      match: skillMatchRowToMatchResult(row),
+      candidateSkills,
+    }
+  })
+
+  const booking = await Promise.all(
+    recommended.map((item) => describeBookingReadiness(item.interviewer, prefs)),
+  )
+
+  return recommended.map((item, index) => ({
+    ...item,
+    booking: booking[index] ?? 'no_service',
   }))
 }

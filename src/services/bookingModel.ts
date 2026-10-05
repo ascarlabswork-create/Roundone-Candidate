@@ -109,6 +109,9 @@ export function mapBookingError(error: unknown): BookingError {
   ) {
     return new BookingError('unauthenticated', 'Please sign in to complete your booking.')
   }
+  if (text.includes('outside_preferred_dates')) {
+    return new BookingError('slot_unavailable', 'That time is outside your preferred dates.')
+  }
   if (text.includes('slot_unavailable') || text.includes('23p01') || text.includes('exclusion') || text.includes('overlap')) {
     return new BookingError('slot_unavailable', 'This slot was just taken.')
   }
