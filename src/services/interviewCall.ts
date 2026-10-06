@@ -36,7 +36,7 @@ export function interviewCallErrorMessage(code: string) {
   if (code === 'not_authorized') return 'You are not a participant in this interview.'
   if (code === 'unconfigured') return 'Video calling is not configured yet.'
   if (code === 'permission') return 'Camera or microphone permission was denied.'
-  if (code === 'connection') return 'The video call could not connect. Please try again.'
+  if (code === 'connection') return 'Unable to join interview. Please try again.'
   return 'The video call could not be started.'
 }
 

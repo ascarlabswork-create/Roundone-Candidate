@@ -128,7 +128,25 @@ export function scheduledInterviewLabel(startsAt: string | null | undefined) {
 }
 
 export function waitingLabel(role: CallRole) {
-  return role === 'candidate' ? 'Waiting for interviewer' : 'Waiting for candidate'
+  return role === 'candidate' ? 'Waiting for interviewer...' : 'Waiting for candidate...'
+}
+
+export function connectedRemoteLabel(role: CallRole) {
+  return role === 'candidate' ? 'Interviewer is connected.' : 'Candidate is connected.'
+}
+
+/** After Join Interview, LiveKit mounts even while the server phase is still `lobby`. */
+export function shouldMountInterviewCall(input: {
+  canJoin: boolean
+  hasSession: boolean
+  joined: boolean
+  status: string
+}) {
+  return input.canJoin && input.hasSession && (input.joined || input.status === 'in_progress')
+}
+
+export function shouldStayInPreCallLobby(joinState: string, showWorkspace: boolean) {
+  return (joinState === 'lobby' || joinState === 'joinable') && !showWorkspace
 }
 
 export function remoteLeftLabel(role: CallRole) {

@@ -2,6 +2,7 @@ import { candidateFeedbackAction } from '../services/candidateFeedbackModel.ts'
 import { interviewJoinState } from '../services/interviewSessionModel.ts'
 import {
   confirmationCallTarget,
+  connectedRemoteLabel,
   interviewCallHref,
   interviewRoomName,
   interviewTokenGate,
@@ -14,6 +15,8 @@ import {
   roleFromIdentity,
   sameInterviewRoom,
   shouldEnterCall,
+  shouldMountInterviewCall,
+  shouldStayInPreCallLobby,
   waitingLabel,
 } from './callModel.ts'
 
@@ -486,8 +489,24 @@ expect(
   }) === 'No new participants can join.',
   'Lobby copy after the late-join cutoff blocks new participants',
 )
-expect(waitingLabel('candidate') === 'Waiting for interviewer', 'Candidate waits for the interviewer')
-expect(waitingLabel('interviewer') === 'Waiting for candidate', 'Interviewer waits for the candidate')
+expect(waitingLabel('candidate') === 'Waiting for interviewer...', 'Candidate waits for the interviewer')
+expect(waitingLabel('interviewer') === 'Waiting for candidate...', 'Interviewer waits for the candidate')
+expect(connectedRemoteLabel('candidate') === 'Interviewer is connected.', 'Candidate sees the interviewer is connected')
+expect(
+  shouldMountInterviewCall({ canJoin: true, hasSession: true, joined: true, status: 'confirmed' }),
+  'Join Interview mounts LiveKit after the candidate clicks',
+)
+expect(
+  !shouldMountInterviewCall({ canJoin: true, hasSession: true, joined: false, status: 'confirmed' }),
+  'Join Interview is required before LiveKit mounts',
+)
+expect(
+  shouldMountInterviewCall({ canJoin: true, hasSession: true, joined: false, status: 'in_progress' }),
+  'An in-progress booking can reconnect without another click',
+)
+expect(shouldStayInPreCallLobby('lobby', false), 'The lobby stays until Join Interview is clicked')
+expect(!shouldStayInPreCallLobby('lobby', true), 'The lobby unmounts after Join Interview so LiveKit can connect')
+expect(!shouldStayInPreCallLobby('joinable', true), 'A joinable interview leaves the lobby after Join Interview')
 expect(remoteLeftLabel('candidate') === 'Interviewer has left the call', 'Candidate sees the interviewer leave')
 expect(remoteLeftLabel('interviewer') === 'Candidate has left the call', 'Interviewer sees the candidate leave')
 

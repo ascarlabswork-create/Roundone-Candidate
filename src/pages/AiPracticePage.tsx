@@ -832,7 +832,8 @@ export function AiPracticePage() {
             <h3 className="text-sm font-semibold text-navy-950">Voice Interview Guidelines</h3>
             <ul className="mt-2 list-disc space-y-1.5 pl-5 text-xs text-slate-600">
               <li>
-                <strong>{interviewer.name}</strong> asks one question at a time, the way a real interview works.
+                <strong>{interviewer.name}</strong> speaks each question. The question stays off the screen, like a real
+                conversation.
               </li>
               <li>Answer out loud. If you pause to think and then continue, it is still the same answer.</li>
               <li>There is no pause or stop control during the question. The interviewer waits, then moves on.</li>
@@ -858,7 +859,7 @@ export function AiPracticePage() {
     const interviewer = getInterviewerPersona(session.setup.interviewerId)
 
     return (
-      <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6">
+      <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6">
         {session.setup.jobContext ? <JobPracticeContext setup={session.setup} /> : null}
         <PracticeConversation
           interviewerName={interviewer.name}
