@@ -1,6 +1,6 @@
 import { ConnectionState, Room, RoomEvent, Track, TrackEvent, type RemoteAudioTrack, type RemoteTrack, type RemoteTrackPublication } from 'livekit-client'
 import { Mic, MicOff, PhoneOff, Video, VideoOff } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { CallRole } from '../../interview/callModel.ts'
 import { reduceCallPresence, remoteLeftLabel, waitingLabel, connectedRemoteLabel, type CallPresence } from '../../interview/callModel.ts'
 import {
@@ -24,10 +24,21 @@ type InterviewCallProps = {
   role: CallRole
   remoteName: string
   accepted?: boolean
+  fill?: boolean
+  toolbar?: ReactNode
   onLeave: () => void
 }
 
-export function InterviewCall({ bookingId, sessionId, role, remoteName, accepted: _accepted = false, onLeave }: InterviewCallProps) {
+export function InterviewCall({
+  bookingId,
+  sessionId,
+  role,
+  remoteName,
+  accepted: _accepted = false,
+  fill = false,
+  toolbar,
+  onLeave,
+}: InterviewCallProps) {
   const roomRef = useRef<Room | null>(null)
   const localVideoRef = useRef<HTMLVideoElement>(null)
   const remoteVideoRef = useRef<HTMLVideoElement>(null)
@@ -318,9 +329,9 @@ export function InterviewCall({ bookingId, sessionId, role, remoteName, accepted
                 : 'Connecting...'
 
   return (
-    <div className="space-y-3">
-      <div className="grid gap-3 md:grid-cols-3">
-        <div className="relative min-h-48 overflow-hidden rounded-xl bg-navy-800 md:col-span-2">
+    <div className={fill ? 'flex h-full min-h-0 flex-1 flex-col gap-3' : 'space-y-3'}>
+      <div className={fill ? 'relative min-h-0 flex-1' : 'grid gap-3 md:grid-cols-3'}>
+        <div className={fill ? 'absolute inset-0 overflow-hidden rounded-xl bg-navy-800' : 'relative min-h-48 overflow-hidden rounded-xl bg-navy-800 md:col-span-2'}>
           <video ref={remoteVideoRef} autoPlay playsInline className="h-full min-h-48 w-full object-cover" />
           {presence !== 'live' ? (
             <div className="absolute inset-0 flex items-center justify-center px-4 text-center text-sm text-white/80">
@@ -330,7 +341,13 @@ export function InterviewCall({ bookingId, sessionId, role, remoteName, accepted
             <p className="absolute bottom-3 left-3 rounded-md bg-black/40 px-2 py-1 text-xs text-white">{remoteName}</p>
           )}
         </div>
-        <div className="relative min-h-32 overflow-hidden rounded-xl bg-navy-800">
+        <div
+          className={
+            fill
+              ? 'absolute bottom-3 right-3 z-10 h-28 w-36 overflow-hidden rounded-xl bg-navy-800 shadow-lg sm:h-36 sm:w-48'
+              : 'relative min-h-32 overflow-hidden rounded-xl bg-navy-800'
+          }
+        >
           <video ref={localVideoRef} autoPlay playsInline muted className="h-full min-h-32 w-full object-cover" />
           {!cameraOn ? (
             <div className="absolute inset-0 flex items-center justify-center text-sm text-white/70">Camera off</div>
@@ -357,6 +374,7 @@ export function InterviewCall({ bookingId, sessionId, role, remoteName, accepted
           {cameraOn ? <Video className="h-4 w-4" /> : <VideoOff className="h-4 w-4" />}
           {cameraOn ? 'Camera off' : 'Camera on'}
         </Button>
+        {toolbar}
         {presence === 'failed' ? (
           <Button type="button" variant="outline" onClick={() => { setError(null); setPresence('connecting'); setAttempt((value) => value + 1) }}>
             Reconnect

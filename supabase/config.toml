@@ -9,6 +9,9 @@ verify_jwt = true
 [functions.create-interview-token]
 verify_jwt = true
 
+[functions.interview-recording]
+verify_jwt = true
+
 # Server-to-server worker bridge. Auth is NOTIFICATION_WORKER_SECRET (not user JWT).
 [functions.notification-worker]
 verify_jwt = false

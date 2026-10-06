@@ -1,8 +1,11 @@
-import { PhoneOff } from 'lucide-react'
+import { Circle, Maximize2, MessageSquare, Minimize2, PhoneOff, StickyNote } from 'lucide-react'
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { formatBookingTime, formatCivilDateWithYear, isoDateInZone } from '../availability/index.ts'
+import { InterviewAppFeedback } from '../components/interview/InterviewAppFeedback.tsx'
+import { InterviewChatPanel } from '../components/interview/InterviewChatPanel.tsx'
 import { InterviewLobby } from '../components/interview/InterviewLobby.tsx'
+import { InterviewNotesCard, InterviewNotesPanel } from '../components/interview/InterviewNotesPanel.tsx'
 import {
   endInterviewRoom,
   loadInterviewTiming,
@@ -24,6 +27,23 @@ import {
   type CandidateInterview,
 } from '../services/interviewSessions.ts'
 import { shouldMountInterviewCall, shouldStayInPreCallLobby } from '../interview/callModel.ts'
+import {
+  mergeInterviewMessages,
+  unreadChatCount,
+  type InterviewChatMessage,
+  type InterviewRecordingState,
+} from '../interview/roomExperience.ts'
+import { supabase } from '../lib/supabase.ts'
+import {
+  loadInterviewMessages,
+  loadInterviewNotes,
+  loadInterviewRecording,
+  requestInterviewRecording,
+  saveInterviewNotes,
+  sendInterviewMessage,
+  subscribeInterviewMessages,
+  subscribeInterviewRecording,
+} from '../services/interviewRoomExperience.ts'
 
 const InterviewCall = lazy(() =>
   import('../components/interview/InterviewCall.tsx').then((mod) => ({ default: mod.InterviewCall })),
@@ -55,9 +75,6 @@ export function InterviewRoomPage() {
   const joinRequest = useRef(wantJoin)
   const lobbyRecorded = useRef(false)
   const roomClosed = useRef(false)
-  const [notes, setNotes] = useState('')
-  const [mobileTab, setMobileTab] = useState<'video' | 'notes'>('video')
-
   const sessionId =
     interviewState.status === 'success' ? (interviewState.data.session?.id ?? '') : ''
 
@@ -178,10 +195,6 @@ export function InterviewRoomPage() {
       interview={interview}
       remaining={remaining}
       accepted={params.get('accepted') === '1'}
-      notes={notes}
-      mobileTab={mobileTab}
-      onNotes={setNotes}
-      onMobileTab={setMobileTab}
       onLeave={() => navigate('/candidate/interviews')}
     />
   )
@@ -247,6 +260,8 @@ function InterviewStatusScreen({
                 hasReview={interview.hasReview}
                 size="md"
               />
+              {interview.session ? <InterviewNotesCard sessionId={interview.session.id} /> : null}
+              {interview.session ? <InterviewAppFeedback sessionId={interview.session.id} /> : null}
             </>
           ) : null}
           <Button variant="outline" onClick={() => navigate('/candidate/interviews')}>
@@ -341,26 +356,258 @@ function InterviewWorkspace({
   interview,
   remaining,
   accepted,
-  notes,
-  mobileTab,
-  onNotes,
-  onMobileTab,
   onLeave,
 }: {
   interview: CandidateInterview
   remaining: number
   accepted: boolean
-  notes: string
-  mobileTab: 'video' | 'notes'
-  onNotes: (value: string) => void
-  onMobileTab: (value: 'video' | 'notes') => void
   onLeave: () => void
 }) {
   const clock = useMemo(() => formatClock(remaining), [remaining])
   const zone = interview.displayTimezone
+  const sessionId = interview.session?.id ?? ''
+  const rootRef = useRef<HTMLDivElement>(null)
+  const [userId, setUserId] = useState('')
+  const userIdRef = useRef('')
+  userIdRef.current = userId
+  const [panel, setPanel] = useState<'chat' | 'notes' | null>(null)
+  const [fullscreen, setFullscreen] = useState(false)
+  const [maximized, setMaximized] = useState(false)
+  const [messages, setMessages] = useState<InterviewChatMessage[]>([])
+  const [seenIds, setSeenIds] = useState<ReadonlySet<string>>(() => new Set())
+  const [chatError, setChatError] = useState<string | null>(null)
+  const [sending, setSending] = useState(false)
+  const [notes, setNotes] = useState('')
+  const [notesStatus, setNotesStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [recording, setRecording] = useState<InterviewRecordingState>('idle')
+  const [recordingBusy, setRecordingBusy] = useState(false)
+  const [recordingError, setRecordingError] = useState<string | null>(null)
+  const notesTimer = useRef<number | null>(null)
+  const notesReady = useRef(false)
+  const notesDirty = useRef(false)
+  const notesValue = useRef('')
+  const expanded = fullscreen || maximized
+  const unread = userId ? unreadChatCount(messages, userId, seenIds) : 0
+
+  useEffect(() => {
+    let cancelled = false
+    void supabase.auth.getUser().then(({ data }) => {
+      if (!cancelled && data.user) setUserId(data.user.id)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    function onFullscreenChange() {
+      setFullscreen(document.fullscreenElement === rootRef.current)
+    }
+    function onKey(event: KeyboardEvent) {
+      if (event.key === 'Escape') setMaximized(false)
+    }
+    document.addEventListener('fullscreenchange', onFullscreenChange)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('fullscreenchange', onFullscreenChange)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!sessionId) return
+    let cancelled = false
+    notesReady.current = false
+    notesDirty.current = false
+    void loadInterviewNotes(sessionId)
+      .then((value) => {
+        if (cancelled) return
+        if (!notesDirty.current) {
+          setNotes(value)
+          notesValue.current = value
+        }
+        notesReady.current = true
+        if (notesDirty.current && userIdRef.current) {
+          void saveInterviewNotes(sessionId, userIdRef.current, notesValue.current)
+            .then(() => {
+              if (!cancelled) setNotesStatus('saved')
+            })
+            .catch(() => {
+              if (!cancelled) setNotesStatus('error')
+            })
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setNotesStatus('error')
+      })
+    void loadInterviewRecording(sessionId).then((status) => {
+      if (!cancelled) setRecording(status)
+    })
+    return () => {
+      cancelled = true
+      if (notesTimer.current != null) window.clearTimeout(notesTimer.current)
+    }
+  }, [sessionId])
+
+  useEffect(() => {
+    if (!sessionId) return
+    let active = true
+    const stopMessages = subscribeInterviewMessages(
+      sessionId,
+      (message) => {
+        if (active) setMessages((current) => mergeInterviewMessages(current, message))
+      },
+      () => {
+        void loadInterviewMessages(sessionId).then((rows) => {
+          if (!active) return
+          setMessages((current) => rows.reduce(mergeInterviewMessages, current))
+        }).catch(() => {
+          if (active) setChatError('Unable to load chat.')
+        })
+      },
+    )
+    const stopRecording = subscribeInterviewRecording(sessionId, (status) => {
+      if (active) setRecording(status)
+    })
+    return () => {
+      active = false
+      stopMessages()
+      stopRecording()
+    }
+  }, [sessionId])
+
+  function markChatSeen() {
+    if (!userId) return
+    setSeenIds(new Set(messages.filter((item) => item.senderUserId !== userId).map((item) => item.id)))
+  }
+
+  function choosePanel(next: 'chat' | 'notes') {
+    if (panel === 'chat') markChatSeen()
+    setPanel((current) => (current === next ? null : next))
+  }
+
+  function queueNotes(value: string) {
+    notesDirty.current = true
+    notesValue.current = value
+    setNotes(value)
+    if (!notesReady.current || !userIdRef.current || !sessionId) return
+    if (notesTimer.current != null) window.clearTimeout(notesTimer.current)
+    notesTimer.current = window.setTimeout(() => {
+      void persistNotes(value)
+    }, 800)
+  }
+
+  async function persistNotes(value: string) {
+    const owner = userIdRef.current
+    if (!owner || !sessionId) return
+    setNotesStatus('saving')
+    try {
+      await saveInterviewNotes(sessionId, owner, value)
+      setNotesStatus('saved')
+    } catch {
+      setNotesStatus('error')
+    }
+  }
+
+  async function toggleFullscreen() {
+    const node = rootRef.current
+    if (!node) return
+    if (document.fullscreenElement === node) {
+      await document.exitFullscreen()
+      setMaximized(false)
+      return
+    }
+    try {
+      await node.requestFullscreen()
+      setMaximized(false)
+    } catch {
+      setMaximized((current) => !current)
+    }
+  }
+
+  async function toggleRecording() {
+    if (!sessionId || recordingBusy) return
+    setRecordingBusy(true)
+    setRecordingError(null)
+    try {
+      const status = await requestInterviewRecording(sessionId, recording === 'recording' ? 'stop' : 'start')
+      setRecording(status)
+    } catch (caught) {
+      setRecordingError(caught instanceof Error ? caught.message : 'Recording could not be updated. Please try again.')
+    } finally {
+      setRecordingBusy(false)
+    }
+  }
+
+  const toolbar = (
+    <>
+      <Button type="button" variant={panel === 'chat' ? 'secondary' : 'outline'} onClick={() => choosePanel('chat')}>
+        <span className="relative inline-flex items-center gap-2">
+          <MessageSquare className="h-4 w-4" />
+          Chat
+          {unread > 0 && panel !== 'chat' ? (
+            <span className="absolute -right-3 -top-2 grid h-4 min-w-4 place-items-center rounded-full bg-red-600 px-1 text-[10px] text-white">
+              {unread}
+            </span>
+          ) : null}
+        </span>
+      </Button>
+      <Button type="button" variant={panel === 'notes' ? 'secondary' : 'outline'} onClick={() => choosePanel('notes')}>
+        <StickyNote className="h-4 w-4" />
+        Notes
+      </Button>
+      <Button type="button" variant="outline" onClick={() => void toggleFullscreen()}>
+        {expanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+        {expanded ? 'Exit full screen' : 'Full screen'}
+      </Button>
+      <Button type="button" variant={recording === 'recording' ? 'danger' : 'outline'} disabled={recordingBusy} onClick={() => void toggleRecording()}>
+        <Circle className={`h-4 w-4 ${recording === 'recording' ? 'fill-current' : ''}`} />
+        {recording === 'recording' ? 'Stop recording' : 'Record'}
+      </Button>
+    </>
+  )
+
+  const sidePanel =
+    panel === 'chat' ? (
+      <InterviewChatPanel
+        messages={messages}
+        userId={userId}
+        remoteName={interview.interviewerName}
+        sending={sending}
+        error={chatError}
+        onClose={() => choosePanel('chat')}
+        onSend={async (message) => {
+          if (!userId) return
+          setSending(true)
+          setChatError(null)
+          try {
+            const saved = await sendInterviewMessage(sessionId, userId, message)
+            if (saved) setMessages((current) => mergeInterviewMessages(current, saved))
+          } catch (caught) {
+            setChatError(caught instanceof Error ? caught.message : 'Unable to send message.')
+            throw caught
+          } finally {
+            setSending(false)
+          }
+        }}
+      />
+    ) : panel === 'notes' ? (
+      <InterviewNotesPanel
+        notes={notes}
+        status={notesStatus}
+        onChange={queueNotes}
+        onSave={() => void persistNotes(notes)}
+        onClose={() => choosePanel('notes')}
+      />
+    ) : null
 
   return (
-    <div className="flex min-h-svh flex-col bg-navy-950 text-white">
+    <div
+      ref={rootRef}
+      className={`flex min-h-svh flex-col bg-navy-950 text-white [&:fullscreen]:h-screen [&:fullscreen]:w-screen ${
+        maximized ? 'fixed inset-0 z-50 h-screen w-screen' : ''
+      }`}
+    >
       <header className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
         <div className="flex items-center gap-3">
           <Logo inverted />
@@ -373,6 +620,12 @@ function InterviewWorkspace({
           </div>
         </div>
         <div className="flex items-center gap-3">
+          {recording === 'recording' ? (
+            <span className="inline-flex items-center gap-2 rounded-md bg-red-600 px-3 py-1 text-sm font-medium">
+              <Circle className="h-3 w-3 fill-current" />
+              Recording
+            </span>
+          ) : null}
           <span className="rounded-md bg-white/10 px-3 py-1 font-mono text-sm">{clock}</span>
           <Button variant="danger" size="sm" onClick={onLeave}>
             Leave
@@ -380,21 +633,12 @@ function InterviewWorkspace({
         </div>
       </header>
 
-      <div className="flex gap-2 border-b border-white/10 px-4 py-2 md:hidden">
-        {(['video', 'notes'] as const).map((item) => (
-          <button
-            key={item}
-            type="button"
-            onClick={() => onMobileTab(item)}
-            className={`rounded-md px-3 py-1 text-sm capitalize ${mobileTab === item ? 'bg-white text-navy-950' : 'bg-white/10'}`}
-          >
-            {item}
-          </button>
-        ))}
-      </div>
-
-      <div className="grid flex-1 gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className={mobileTab === 'notes' ? 'hidden md:block' : ''}>
+      <div className="relative flex min-h-0 flex-1">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col p-3 sm:p-4">
+          {recording === 'recording' ? (
+            <p className="mb-3 text-center text-sm text-red-200">This interview is being recorded.</p>
+          ) : null}
+          {recordingError ? <p className="mb-3 text-center text-sm text-amber-200">{recordingError}</p> : null}
           {interview.session ? (
             <Suspense fallback={<Skeleton className="h-64" />}>
               <InterviewCall
@@ -403,34 +647,20 @@ function InterviewWorkspace({
                 role="candidate"
                 remoteName={interview.interviewerName}
                 accepted={accepted}
+                fill={expanded}
+                toolbar={toolbar}
                 onLeave={onLeave}
               />
             </Suspense>
           ) : null}
         </div>
-
-        <aside
-          className={`rounded-xl bg-white p-4 text-slate-800 ${mobileTab === 'notes' ? 'block' : 'hidden'} lg:block`}
-        >
-          <h2 className="font-semibold text-navy-950">Notes</h2>
-          <textarea
-            value={notes}
-            onChange={(event) => onNotes(event.target.value)}
-            className="mt-2 min-h-40 w-full rounded-lg border border-slate-200 p-3 text-sm"
-            placeholder="Private notes. Only you can see these."
-          />
-          <h3 className="mt-4 text-sm font-semibold text-navy-950">Interview checklist</h3>
-          <ul className="mt-2 space-y-2 text-sm text-slate-700">
-            {['Clarify constraints', 'Talk through approach', 'Handle follow-ups', 'Summarize trade-offs'].map((item) => (
-              <li key={item}>
-                <label className="flex items-center gap-2">
-                  <input type="checkbox" className="h-4 w-4 rounded border-slate-300" />
-                  {item}
-                </label>
-              </li>
-            ))}
-          </ul>
-        </aside>
+        {sidePanel ? (
+          <aside className="absolute inset-0 z-20 flex justify-end bg-black/40 md:static md:z-auto md:w-80 md:shrink-0 md:bg-transparent">
+            <div className="h-full w-full max-w-sm border-l border-white/10 shadow-xl md:max-w-none md:w-80 md:shadow-none">
+              {sidePanel}
+            </div>
+          </aside>
+        ) : null}
       </div>
 
       <div className="flex justify-center border-t border-white/10 px-4 py-3">
