@@ -41,6 +41,7 @@ export function InterviewLobby({
   const [microphone, setMicrophone] = useState<CheckState>('idle')
   const [speaker, setSpeaker] = useState<CheckState>('idle')
   const [online, setOnline] = useState(() => (typeof navigator === 'undefined' ? true : navigator.onLine))
+  const [joining, setJoining] = useState(false)
   const countdown = formatClock(remainingUntil(interview.startsAtUtc, now))
   const started = now.getTime() >= new Date(interview.startsAtUtc).getTime()
   const statusCopy = interviewLobbyStatusCopy({
@@ -128,7 +129,7 @@ export function InterviewLobby({
           <div className="flex justify-between gap-4">
             <dt className="text-slate-500">Interviewer status</dt>
             <dd className="font-medium text-navy-950">
-              {interviewerJoined ? 'In the interview' : 'Not in the interview yet'}
+              {interviewerJoined ? 'Interviewer is connected.' : 'Waiting for interviewer...'}
             </dd>
           </div>
         </dl>
@@ -150,8 +151,16 @@ export function InterviewLobby({
             Test speaker
           </Button>
         </div>
-        <Button className="mt-4" fullWidth disabled={!canJoin} onClick={onJoin}>
-          Join Interview
+        <Button
+          className="mt-4"
+          fullWidth
+          disabled={!canJoin || joining}
+          onClick={() => {
+            setJoining(true)
+            onJoin()
+          }}
+        >
+          {joining ? 'Connecting...' : 'Join Interview'}
         </Button>
         {!canJoin ? (
           <p className="mt-2 text-center text-xs text-slate-500">{statusCopy}</p>

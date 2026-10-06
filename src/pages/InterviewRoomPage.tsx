@@ -20,8 +20,10 @@ import {
   interviewJoinState,
   interviewRoomOpensAtUtc,
   interviewStatusLabel,
+  canJoinInterview,
   type CandidateInterview,
 } from '../services/interviewSessions.ts'
+import { shouldMountInterviewCall, shouldStayInPreCallLobby } from '../interview/callModel.ts'
 
 const InterviewCall = lazy(() =>
   import('../components/interview/InterviewCall.tsx').then((mod) => ({ default: mod.InterviewCall })),
@@ -135,9 +137,13 @@ export function InterviewRoomPage() {
   const joinState = timing
     ? serverJoinState(interview.status, timing)
     : interviewJoinState(interview, interview.session, clockNow)
-  const joinable = timing?.canJoin === true
-  const showWorkspace =
-    joinable && Boolean(interview.session) && (joined || interview.status === 'in_progress')
+  const joinable = timing ? timing.canJoin : canJoinInterview(interview, interview.session, clockNow)
+  const showWorkspace = shouldMountInterviewCall({
+    canJoin: joinable,
+    hasSession: Boolean(interview.session),
+    joined,
+    status: interview.status,
+  })
   const remaining = remainingUntil(timing?.endsAt ?? interview.endsAtUtc, clockNow)
 
   if (
@@ -151,7 +157,7 @@ export function InterviewRoomPage() {
     return <InterviewStatusScreen interview={interview} joinState={joinState} />
   }
 
-  if (joinState === 'lobby' || (joinState === 'joinable' && !showWorkspace)) {
+  if (shouldStayInPreCallLobby(joinState, showWorkspace)) {
     return (
       <InterviewLobby
         interview={interview}

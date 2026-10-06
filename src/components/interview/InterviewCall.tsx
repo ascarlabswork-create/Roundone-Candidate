@@ -2,7 +2,7 @@ import { ConnectionState, Room, RoomEvent, Track, TrackEvent, type RemoteAudioTr
 import { Mic, MicOff, PhoneOff, Video, VideoOff } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { CallRole } from '../../interview/callModel.ts'
-import { reduceCallPresence, remoteLeftLabel, waitingLabel, type CallPresence } from '../../interview/callModel.ts'
+import { reduceCallPresence, remoteLeftLabel, waitingLabel, connectedRemoteLabel, type CallPresence } from '../../interview/callModel.ts'
 import {
   applyRemoteAudioElement,
   logCallAudio,
@@ -27,7 +27,7 @@ type InterviewCallProps = {
   onLeave: () => void
 }
 
-export function InterviewCall({ bookingId, sessionId, role, remoteName, accepted = false, onLeave }: InterviewCallProps) {
+export function InterviewCall({ bookingId, sessionId, role, remoteName, accepted: _accepted = false, onLeave }: InterviewCallProps) {
   const roomRef = useRef<Room | null>(null)
   const localVideoRef = useRef<HTMLVideoElement>(null)
   const remoteVideoRef = useRef<HTMLVideoElement>(null)
@@ -302,15 +302,15 @@ export function InterviewCall({ bookingId, sessionId, role, remoteName, accepted
 
   const statusLine =
     presence === 'connecting'
-      ? accepted
-        ? 'Interview accepted. Connecting...'
-        : 'Connecting...'
+      ? 'Connecting...'
       : presence === 'waiting'
         ? waitingLabel(role)
-        : presence === 'remote_left'
+        : presence === 'live'
+          ? connectedRemoteLabel(role)
+          : presence === 'remote_left'
           ? remoteLeftLabel(role)
           : presence === 'failed'
-            ? error
+            ? error ?? 'Unable to join interview. Please try again.'
             : connection === ConnectionState.Reconnecting
               ? 'Reconnecting...'
               : connection === ConnectionState.Connected
@@ -347,6 +347,7 @@ export function InterviewCall({ bookingId, sessionId, role, remoteName, accepted
         </div>
       ) : null}
       {error && presence !== 'failed' ? <p className="text-sm text-amber-200">{error}</p> : null}
+      {presence !== 'failed' ? <p className="text-center text-sm text-white/80">{statusLine}</p> : null}
       <div className="flex flex-wrap items-center justify-center gap-2">
         <Button type="button" variant="outline" onClick={() => void toggleMic()}>
           {micOn ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
