@@ -4,6 +4,7 @@ import {
   normalizeInterviewNotes,
   parseInterviewMessage,
   parseRecordingStatus,
+  parseRecordingStoragePath,
   type InterviewChatMessage,
   type InterviewRecordingState,
 } from '../interview/roomExperience.ts'
@@ -36,13 +37,20 @@ async function readFunctionError(error: unknown, data: unknown) {
 }
 
 export function recordingErrorMessage(code: string) {
-  if (code === 'recording_unconfigured') return 'Recording is not available yet.'
+  if (code === 'recording_unconfigured') return 'Recording could not start. Please try again in a moment.'
   if (code === 'not_authorized') return 'You cannot record this interview.'
   if (code === 'session_expired') return 'This interview session has ended.'
   if (code === 'booking_not_confirmed') return 'This interview is not confirmed yet.'
   if (code === 'not_authenticated') return 'Please sign in to record this interview.'
   if (code === 'not_recording') return 'Recording is not active.'
+  if (code === 'recording_processing') return 'The recording is still being saved to this interview. Try Save again in a moment.'
   return 'Recording could not be updated. Please try again.'
+}
+
+export type InterviewRecordingSnapshot = {
+  status: InterviewRecordingState
+  storagePath: string | null
+  downloadUrl: string | null
 }
 
 export async function loadInterviewMessages(sessionId: string) {
@@ -98,17 +106,21 @@ export async function saveInterviewNotes(sessionId: string, userId: string, note
   if (error) throw new Error('Unable to save notes.')
 }
 
-export async function loadInterviewRecording(sessionId: string): Promise<InterviewRecordingState> {
+export async function loadInterviewRecording(sessionId: string): Promise<InterviewRecordingSnapshot> {
   const { data, error } = await supabase
     .from('interview_recordings')
-    .select('status')
+    .select('status, storage_path')
     .eq('interview_session_id', sessionId)
     .maybeSingle()
-  if (error) return 'idle'
-  return parseRecordingStatus(data)
+  if (error || !data) return { status: 'idle', storagePath: null, downloadUrl: null }
+  return {
+    status: parseRecordingStatus(data),
+    storagePath: parseRecordingStoragePath(data, sessionId),
+    downloadUrl: null,
+  }
 }
 
-export async function requestInterviewRecording(sessionId: string, action: 'start' | 'stop') {
+export async function requestInterviewRecording(sessionId: string, action: 'start' | 'stop' | 'save') {
   const { data, error } = await supabase.functions.invoke('interview-recording', {
     body: { interview_session_id: sessionId, action },
   })
@@ -117,7 +129,13 @@ export async function requestInterviewRecording(sessionId: string, action: 'star
     throw new Error(recordingErrorMessage(code))
   }
   const status = parseRecordingStatus(data)
-  return status === 'idle' ? (action === 'start' ? 'recording' : 'stopped') : status
+  const record = asRecord(data)
+  const downloadUrl = typeof record?.download_url === 'string' ? record.download_url : null
+  return {
+    status: status === 'idle' ? (action === 'start' ? 'recording' : 'stopped') : status,
+    storagePath: parseRecordingStoragePath(data, sessionId),
+    downloadUrl,
+  } satisfies InterviewRecordingSnapshot
 }
 
 export type InterviewAppFeedbackDraft = {
@@ -188,7 +206,7 @@ export function subscribeInterviewMessages(
 
 export function subscribeInterviewRecording(
   sessionId: string,
-  onStatus: (status: InterviewRecordingState) => void,
+  onStatus: (snapshot: InterviewRecordingSnapshot) => void,
 ) {
   const channel = supabase
     .channel(`interview-recording-${sessionId}`)
@@ -202,7 +220,11 @@ export function subscribeInterviewRecording(
       },
       (payload) => {
         const row = payload.new && Object.keys(payload.new).length > 0 ? payload.new : payload.old
-        onStatus(parseRecordingStatus(row))
+        onStatus({
+          status: parseRecordingStatus(row),
+          storagePath: parseRecordingStoragePath(row, sessionId),
+          downloadUrl: null,
+        })
       },
     )
     .subscribe((status) => {
