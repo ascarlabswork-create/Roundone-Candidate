@@ -28,6 +28,7 @@ import {
   type CandidateInterview,
 } from '../services/interviewSessions.ts'
 import { shouldMountInterviewCall, shouldStayInPreCallLobby } from '../interview/callModel.ts'
+import { chooseRecordingFile, writeRecordingFile } from '../interview/saveRecordingFile.ts'
 import {
   canSaveInterviewRecording,
   mergeInterviewMessages,
@@ -539,17 +540,13 @@ function InterviewWorkspace({
     setRecordingBusy(true)
     setRecordingError(null)
     try {
+      const chosen = action === 'save' ? await chooseRecordingFile() : null
+      if (chosen === 'cancelled') return
       const snapshot = await requestInterviewRecording(sessionId, action)
       setRecording(snapshot.status)
       if (snapshot.storagePath) setRecordingPath(snapshot.storagePath)
       if (action === 'save' && snapshot.downloadUrl) {
-        const link = document.createElement('a')
-        link.href = snapshot.downloadUrl
-        link.download = 'interview-recording.mp4'
-        link.rel = 'noopener'
-        document.body.appendChild(link)
-        link.click()
-        link.remove()
+        await writeRecordingFile(snapshot.downloadUrl, chosen)
       }
     } catch (caught) {
       setRecordingError(caught instanceof Error ? caught.message : 'Recording could not be updated. Please try again.')
@@ -670,7 +667,7 @@ function InterviewWorkspace({
             <p className="mb-3 text-center text-sm text-red-200">This interview is being recorded.</p>
           ) : (
             <p className="mb-3 text-center text-sm text-white/60">
-              Recordings are stored privately with this interview. Start, stop, then save the file.
+              Recordings are stored privately with this interview. Stop, then Save recording to choose a folder on your computer.
             </p>
           )}
           {recordingError ? <p className="mb-3 text-center text-sm text-amber-200">{recordingError}</p> : null}

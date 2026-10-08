@@ -17,7 +17,14 @@ export function InterviewNotesPanel({
   onSave: () => void
   onClose: () => void
 }) {
-  const label = status === 'saving' ? 'Saving...' : status === 'saved' ? 'Saved' : status === 'error' ? 'Could not save notes.' : 'Only you can see these notes.'
+  const label =
+    status === 'saving'
+      ? 'Saving...'
+      : status === 'saved'
+        ? 'Saved with this interview. Only you can read them.'
+        : status === 'error'
+          ? 'Could not save notes.'
+          : 'Saved privately with this interview. Only you can read them.'
   return (
     <section className="flex h-full min-h-0 flex-col bg-white text-slate-800">
       <header className="flex items-center justify-between border-b border-slate-200 px-4 py-3">

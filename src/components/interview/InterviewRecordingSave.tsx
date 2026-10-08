@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { chooseRecordingFile, writeRecordingFile } from '../../interview/saveRecordingFile.ts'
 import { canSaveInterviewRecording, type InterviewRecordingState } from '../../interview/roomExperience.ts'
 import { loadInterviewRecording, requestInterviewRecording } from '../../services/interviewRoomExperience.ts'
 import { Button } from '../ui/Button.tsx'
@@ -33,18 +34,14 @@ export function InterviewRecordingSave({ sessionId }: { sessionId: string }) {
         if (snapshot.storagePath) setStoragePath(snapshot.storagePath)
         return
       }
+      const chosen = await chooseRecordingFile()
+      if (chosen === 'cancelled') return
       const snapshot = await requestInterviewRecording(sessionId, 'save')
       if (!snapshot.downloadUrl) {
         setError('The recording is still being saved to this interview. Try Save again in a moment.')
         return
       }
-      const link = document.createElement('a')
-      link.href = snapshot.downloadUrl
-      link.download = 'interview-recording.mp4'
-      link.rel = 'noopener'
-      document.body.appendChild(link)
-      link.click()
-      link.remove()
+      await writeRecordingFile(snapshot.downloadUrl, chosen)
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Recording could not be saved.')
     } finally {
@@ -58,7 +55,7 @@ export function InterviewRecordingSave({ sessionId }: { sessionId: string }) {
       <p className="mt-1 text-sm text-slate-600">
         {status === 'recording'
           ? 'Recording is still in progress. Stop it, then save the private file.'
-          : 'Stored privately with this interview. Only the candidate and interviewer can open it.'}
+          : 'Stored privately with this interview. Save recording puts a copy in a folder you choose.'}
       </p>
       {error ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}
       <div className="mt-3 flex flex-wrap gap-2">
