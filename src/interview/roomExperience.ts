@@ -74,6 +74,18 @@ export function parseRecordingStatus(value: unknown): InterviewRecordingState {
   return 'idle'
 }
 
+export function parseRecordingStoragePath(value: unknown, sessionId?: string) {
+  if (!value || typeof value !== 'object') return null
+  const path = (value as Record<string, unknown>).storage_path
+  if (typeof path !== 'string' || !path.startsWith('interviews/') || !path.endsWith('.mp4')) return null
+  if (sessionId && !path.startsWith(`interviews/${sessionId}/`)) return null
+  return path
+}
+
+export function canSaveInterviewRecording(status: InterviewRecordingState, storagePath: string | null) {
+  return status === 'stopped' && Boolean(storagePath)
+}
+
 export function chatSenderLabel(senderUserId: string, userId: string, remoteName: string) {
   return senderUserId === userId ? 'You' : remoteName
 }

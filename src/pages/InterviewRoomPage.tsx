@@ -6,6 +6,7 @@ import { InterviewAppFeedback } from '../components/interview/InterviewAppFeedba
 import { InterviewChatPanel } from '../components/interview/InterviewChatPanel.tsx'
 import { InterviewLobby } from '../components/interview/InterviewLobby.tsx'
 import { InterviewNotesCard, InterviewNotesPanel } from '../components/interview/InterviewNotesPanel.tsx'
+import { InterviewRecordingSave } from '../components/interview/InterviewRecordingSave.tsx'
 import {
   endInterviewRoom,
   loadInterviewTiming,
@@ -27,7 +28,9 @@ import {
   type CandidateInterview,
 } from '../services/interviewSessions.ts'
 import { shouldMountInterviewCall, shouldStayInPreCallLobby } from '../interview/callModel.ts'
+import { chooseRecordingFile, writeRecordingFile } from '../interview/saveRecordingFile.ts'
 import {
+  canSaveInterviewRecording,
   mergeInterviewMessages,
   unreadChatCount,
   type InterviewChatMessage,
@@ -260,6 +263,7 @@ function InterviewStatusScreen({
                 hasReview={interview.hasReview}
                 size="md"
               />
+              {interview.session ? <InterviewRecordingSave sessionId={interview.session.id} /> : null}
               {interview.session ? <InterviewNotesCard sessionId={interview.session.id} /> : null}
               {interview.session ? <InterviewAppFeedback sessionId={interview.session.id} /> : null}
             </>
@@ -380,6 +384,7 @@ function InterviewWorkspace({
   const [notes, setNotes] = useState('')
   const [notesStatus, setNotesStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [recording, setRecording] = useState<InterviewRecordingState>('idle')
+  const [recordingPath, setRecordingPath] = useState<string | null>(null)
   const [recordingBusy, setRecordingBusy] = useState(false)
   const [recordingError, setRecordingError] = useState<string | null>(null)
   const notesTimer = useRef<number | null>(null)
@@ -440,8 +445,11 @@ function InterviewWorkspace({
       .catch(() => {
         if (!cancelled) setNotesStatus('error')
       })
-    void loadInterviewRecording(sessionId).then((status) => {
-      if (!cancelled) setRecording(status)
+    void loadInterviewRecording(sessionId).then((snapshot) => {
+      if (!cancelled) {
+        setRecording(snapshot.status)
+        setRecordingPath(snapshot.storagePath)
+      }
     })
     return () => {
       cancelled = true
@@ -466,8 +474,10 @@ function InterviewWorkspace({
         })
       },
     )
-    const stopRecording = subscribeInterviewRecording(sessionId, (status) => {
-      if (active) setRecording(status)
+    const stopRecording = subscribeInterviewRecording(sessionId, (snapshot) => {
+      if (!active) return
+      setRecording(snapshot.status)
+      setRecordingPath(snapshot.storagePath)
     })
     return () => {
       active = false
@@ -525,13 +535,19 @@ function InterviewWorkspace({
     }
   }
 
-  async function toggleRecording() {
+  async function changeRecording(action: 'start' | 'stop' | 'save') {
     if (!sessionId || recordingBusy) return
     setRecordingBusy(true)
     setRecordingError(null)
     try {
-      const status = await requestInterviewRecording(sessionId, recording === 'recording' ? 'stop' : 'start')
-      setRecording(status)
+      const chosen = action === 'save' ? await chooseRecordingFile() : null
+      if (chosen === 'cancelled') return
+      const snapshot = await requestInterviewRecording(sessionId, action)
+      setRecording(snapshot.status)
+      if (snapshot.storagePath) setRecordingPath(snapshot.storagePath)
+      if (action === 'save' && snapshot.downloadUrl) {
+        await writeRecordingFile(snapshot.downloadUrl, chosen)
+      }
     } catch (caught) {
       setRecordingError(caught instanceof Error ? caught.message : 'Recording could not be updated. Please try again.')
     } finally {
@@ -560,9 +576,21 @@ function InterviewWorkspace({
         {expanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
         {expanded ? 'Exit full screen' : 'Full screen'}
       </Button>
-      <Button type="button" variant={recording === 'recording' ? 'danger' : 'outline'} disabled={recordingBusy} onClick={() => void toggleRecording()}>
-        <Circle className={`h-4 w-4 ${recording === 'recording' ? 'fill-current' : ''}`} />
-        {recording === 'recording' ? 'Stop recording' : 'Record'}
+      <Button type="button" variant="outline" disabled={recordingBusy || recording === 'recording'} onClick={() => void changeRecording('start')}>
+        <Circle className="h-4 w-4" />
+        Start recording
+      </Button>
+      <Button type="button" variant="danger" disabled={recordingBusy || recording !== 'recording'} onClick={() => void changeRecording('stop')}>
+        <Circle className="h-4 w-4 fill-current" />
+        Stop recording
+      </Button>
+      <Button
+        type="button"
+        variant="secondary"
+        disabled={recordingBusy || !canSaveInterviewRecording(recording, recordingPath)}
+        onClick={() => void changeRecording('save')}
+      >
+        Save recording
       </Button>
     </>
   )
@@ -637,7 +665,11 @@ function InterviewWorkspace({
         <div className="flex min-h-0 min-w-0 flex-1 flex-col p-3 sm:p-4">
           {recording === 'recording' ? (
             <p className="mb-3 text-center text-sm text-red-200">This interview is being recorded.</p>
-          ) : null}
+          ) : (
+            <p className="mb-3 text-center text-sm text-white/60">
+              Recordings are stored privately with this interview. Stop, then Save recording to choose a folder on your computer.
+            </p>
+          )}
           {recordingError ? <p className="mb-3 text-center text-sm text-amber-200">{recordingError}</p> : null}
           {interview.session ? (
             <Suspense fallback={<Skeleton className="h-64" />}>

@@ -1,4 +1,5 @@
 import {
+  canSaveInterviewRecording,
   chatSenderLabel,
   formatChatTime,
   mergeInterviewMessages,
@@ -7,6 +8,7 @@ import {
   normalizeInterviewNotes,
   parseInterviewMessage,
   parseRecordingStatus,
+  parseRecordingStoragePath,
   unreadChatCount,
 } from './roomExperience.ts'
 
@@ -51,5 +53,14 @@ expect(formatChatTime('not-a-date') === '', 'bad timestamps stay blank')
 expect(parseRecordingStatus({ status: 'recording' }) === 'recording', 'recording status parses')
 expect(parseRecordingStatus({ status: 'public' }) === 'idle', 'unknown recording status is idle')
 expect(parseRecordingStatus(null) === 'idle', 'missing recording is idle')
+
+const session = '00000000-0000-4000-8000-0000000000aa'
+const stored = `interviews/${session}/00000000-0000-4000-8000-0000000000bb.mp4`
+expect(parseRecordingStoragePath({ storage_path: stored }, session) === stored, 'recording path stays inside the session')
+expect(parseRecordingStoragePath({ storage_path: 'interviews/other/file.mp4' }, session) === null, 'another session path is rejected')
+expect(parseRecordingStoragePath({ storage_path: 'https://example.com/file.mp4' }) === null, 'public urls are not recording paths')
+expect(canSaveInterviewRecording('stopped', stored), 'a stopped recording can be saved')
+expect(!canSaveInterviewRecording('recording', stored), 'an active recording is not saved yet')
+expect(!canSaveInterviewRecording('stopped', null), 'a stop without a file cannot be saved')
 
 console.log('roomExperience.check passed')
