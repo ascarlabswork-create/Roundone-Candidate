@@ -26,6 +26,7 @@ import { PreparationPage } from '../pages/PreparationPage.tsx'
 import { ResumeSkillsPage } from '../pages/ResumeSkillsPage.tsx'
 import { ProgressPage } from '../pages/ProgressPage.tsx'
 import { SearchPage } from '../pages/SearchPage.tsx'
+import { ContactPage, PricingTermsPage, PrivacyPage, RefundPolicyPage, TermsPage } from '../pages/LegalPages.tsx'
 import { NotFoundPage, ResourcesPage } from '../pages/SupportingPages.tsx'
 
 export function AppRouter() {
@@ -34,6 +35,11 @@ export function AppRouter() {
       <BookingCallListener />
       <Routes>
         <Route element={<CandidateLayout />}>
+          <Route path="/privacy" element={<PrivacyPage />} />
+          <Route path="/terms" element={<TermsPage />} />
+          <Route path="/refund-policy" element={<RefundPolicyPage />} />
+          <Route path="/pricing" element={<PricingTermsPage />} />
+          <Route path="/contact" element={<ContactPage />} />
           <Route path="/candidate/login" element={<AuthPage mode="login" />} />
           <Route path="/candidate/register" element={<AuthPage mode="register" />} />
           <Route path="/candidate/auth/callback" element={<AuthCallbackPage />} />

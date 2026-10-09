@@ -1,6 +1,6 @@
 import { Circle, Maximize2, MessageSquare, Minimize2, PhoneOff, StickyNote } from 'lucide-react'
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { formatBookingTime, formatCivilDateWithYear, isoDateInZone } from '../availability/index.ts'
 import { InterviewAppFeedback } from '../components/interview/InterviewAppFeedback.tsx'
 import { InterviewChatPanel } from '../components/interview/InterviewChatPanel.tsx'
@@ -386,6 +386,7 @@ function InterviewWorkspace({
   const [recording, setRecording] = useState<InterviewRecordingState>('idle')
   const [recordingPath, setRecordingPath] = useState<string | null>(null)
   const [recordingBusy, setRecordingBusy] = useState(false)
+  const [recordingConsent, setRecordingConsent] = useState(false)
   const [recordingError, setRecordingError] = useState<string | null>(null)
   const notesTimer = useRef<number | null>(null)
   const notesReady = useRef(false)
@@ -537,6 +538,7 @@ function InterviewWorkspace({
 
   async function changeRecording(action: 'start' | 'stop' | 'save') {
     if (!sessionId || recordingBusy) return
+    if (action === 'start' && !recordingConsent) return
     setRecordingBusy(true)
     setRecordingError(null)
     try {
@@ -576,7 +578,7 @@ function InterviewWorkspace({
         {expanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
         {expanded ? 'Exit full screen' : 'Full screen'}
       </Button>
-      <Button type="button" variant="outline" disabled={recordingBusy || recording === 'recording'} onClick={() => void changeRecording('start')}>
+      <Button type="button" variant="outline" disabled={recordingBusy || recording === 'recording' || !recordingConsent} onClick={() => void changeRecording('start')}>
         <Circle className="h-4 w-4" />
         Start recording
       </Button>
@@ -666,9 +668,21 @@ function InterviewWorkspace({
           {recording === 'recording' ? (
             <p className="mb-3 text-center text-sm text-red-200">This interview is being recorded.</p>
           ) : (
-            <p className="mb-3 text-center text-sm text-white/60">
-              Recordings are stored privately with this interview. Stop, then Save recording to choose a folder on your computer.
-            </p>
+            <label className="mb-3 flex items-start justify-center gap-2 text-left text-sm text-white/70">
+              <input
+                type="checkbox"
+                checked={recordingConsent}
+                onChange={(event) => setRecordingConsent(event.target.checked)}
+                className="mt-0.5 h-4 w-4 shrink-0"
+              />
+              <span>
+                Recording is off until you agree and choose Start recording. It can store a private audio and video file
+                with this interview. It is not public.{' '}
+                <Link to="/privacy" className="underline">
+                  Privacy Policy
+                </Link>
+              </span>
+            </label>
           )}
           {recordingError ? <p className="mb-3 text-center text-sm text-amber-200">{recordingError}</p> : null}
           {interview.session ? (
