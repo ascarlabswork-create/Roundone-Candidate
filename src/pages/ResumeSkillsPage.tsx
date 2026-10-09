@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { DataUseConsent } from '../components/legal/DataUseConsent.tsx'
 import { Button } from '../components/ui/Button.tsx'
 import {
   Badge,
@@ -130,6 +131,7 @@ export function ResumeSkillsPage() {
   const [fileName, setFileName] = useState<string | null>(null)
   const [extracting, setExtracting] = useState(false)
   const [analyzing, setAnalyzing] = useState(false)
+  const [analysisConsent, setAnalysisConsent] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
 
@@ -202,7 +204,7 @@ export function ResumeSkillsPage() {
   }
 
   async function analyze() {
-    if (analyzing || submittingRef.current || !canAnalyzeResume(resumeText)) return
+    if (analyzing || submittingRef.current || !analysisConsent || !canAnalyzeResume(resumeText)) return
     submittingRef.current = true
     setAnalyzing(true)
     setError(null)
@@ -394,10 +396,17 @@ export function ResumeSkillsPage() {
             </p>
           </div>
 
+          <DataUseConsent id="resume-analysis-consent" checked={analysisConsent} onChange={setAnalysisConsent}>
+            I agree to send this resume text for optional AI analysis. It is not published. I can skip this step.{' '}
+            <Link to="/privacy" className="underline">
+              Privacy Policy
+            </Link>
+          </DataUseConsent>
+
           {error ? <p className="text-sm text-red-700">{error}</p> : null}
 
           <div className="flex flex-col gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:justify-end">
-            <Button onClick={() => void analyze()} disabled={!canAnalyze || analyzing}>
+            <Button onClick={() => void analyze()} disabled={!canAnalyze || !analysisConsent || analyzing}>
               {analyzing ? 'Analyzing resume…' : 'Analyze Resume'}
             </Button>
           </div>

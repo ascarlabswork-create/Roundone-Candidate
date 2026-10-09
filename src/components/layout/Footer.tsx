@@ -1,65 +1,22 @@
 import { Link } from 'react-router-dom'
-import { Logo } from './Logo.tsx'
+import { COPYRIGHT_NOTICE, LEGAL_LINKS } from '../../legal/legalCopy.ts'
 
 export function Footer() {
   return (
-    <footer className="mt-auto border-t border-slate-200 bg-white">
-      <div className="mx-auto grid max-w-7xl gap-8 px-4 py-10 sm:px-6 md:grid-cols-4">
-        <div className="md:col-span-2">
-          <Logo />
-          <p className="mt-3 max-w-md text-sm text-slate-600">
-            jobround.ai helps candidates find verified interviewers, book realistic mock interviews, and
-            improve with structured feedback.
-          </p>
-        </div>
-        <div>
-          <p className="text-sm font-semibold text-navy-950">For candidates</p>
-          <ul className="mt-3 space-y-2 text-sm text-slate-600">
-            <li>
-              <Link to="/candidate/find" className="hover:text-navy-900">
-                Find My Interviewer
-              </Link>
-            </li>
-            <li>
-              <Link to="/candidate/job-match" className="hover:text-navy-900">
-                Find for a job
-              </Link>
-            </li>
-            <li>
-              <Link to="/candidate/interviewers" className="hover:text-navy-900">
-                Browse interviewers
-              </Link>
-            </li>
-            <li>
-              <Link to="/candidate/progress" className="hover:text-navy-900">
-                Track progress
-              </Link>
-            </li>
-            <li>
-              <Link to="/candidate/resources" className="hover:text-navy-900">
-                Resources
-              </Link>
-            </li>
-          </ul>
-        </div>
-        <div>
-          <p className="text-sm font-semibold text-navy-950">Prepare</p>
-          <ul className="mt-3 space-y-2 text-sm text-slate-600">
-            <li>
-              <Link to="/candidate/practice" className="hover:text-navy-900">
-                AI Practice
-              </Link>
-            </li>
-            <li>
-              <Link to="/candidate/preparation" className="hover:text-navy-900">
-                AI Preparation
-              </Link>
-            </li>
-          </ul>
-        </div>
-      </div>
-      <div className="border-t border-slate-200 py-4 text-center text-xs text-slate-500">
-        © {new Date().getFullYear()} jobround.ai. Candidate prototype.
+    <footer className="mt-auto border-t border-slate-200 bg-slate-50">
+      <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-6 sm:px-6">
+        <nav aria-label="Legal" className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:gap-x-6 sm:gap-y-2">
+          {LEGAL_LINKS.map((item) => (
+            <Link
+              key={item.to}
+              to={item.to}
+              className="text-sm text-slate-500 underline-offset-2 hover:text-navy-950 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy-950"
+            >
+              {item.label}
+            </Link>
+          ))}
+        </nav>
+        <p className="text-sm text-slate-500">{COPYRIGHT_NOTICE}</p>
       </div>
     </footer>
   )

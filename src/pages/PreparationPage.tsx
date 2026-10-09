@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
+import { DataUseConsent } from '../components/legal/DataUseConsent.tsx'
 import { Button } from '../components/ui/Button.tsx'
 import {
   Badge,
@@ -53,6 +54,7 @@ export function PreparationPage() {
   const [resultHash, setResultHash] = useState(saved?.inputHash ?? '')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [preparationConsent, setPreparationConsent] = useState(false)
   const [prefilled, setPrefilled] = useState(Boolean(saved))
   const submittingRef = useRef(false)
 
@@ -88,7 +90,7 @@ export function PreparationPage() {
 
   async function generate(event?: FormEvent) {
     event?.preventDefault()
-    if (busy || submittingRef.current || !canGeneratePreparation(input)) return
+    if (busy || submittingRef.current || !preparationConsent || !canGeneratePreparation(input)) return
     const hash = preparationInputHash(input)
     submittingRef.current = true
     setBusy(true)
@@ -183,6 +185,13 @@ export function PreparationPage() {
           <p className="mt-1 text-xs text-slate-500">{input.resumeText.trim().length}/8000 · Not stored as a public document.</p>
         </div>
 
+        <DataUseConsent id="preparation-consent" checked={preparationConsent} onChange={setPreparationConsent}>
+          I agree to send this preparation text for optional AI suggestions. Nothing is saved to my public profile.{' '}
+          <Link to="/privacy" className="underline">
+            Privacy Policy
+          </Link>
+        </DataUseConsent>
+
         {error ? <p className="text-sm text-red-700">{error}</p> : null}
         {stale ? <p className="text-sm text-slate-600">Your inputs changed. Generate again to refresh suggestions.</p> : null}
 
@@ -192,7 +201,7 @@ export function PreparationPage() {
               Clear suggestions
             </Button>
           ) : null}
-          <Button type="submit" disabled={!canGenerate || busy}>
+          <Button type="submit" disabled={!canGenerate || !preparationConsent || busy}>
             {busy ? 'Generating…' : result ? 'Regenerate Preparation' : 'Generate Preparation'}
           </Button>
         </div>

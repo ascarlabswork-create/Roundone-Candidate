@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { DataUseConsent } from '../components/legal/DataUseConsent.tsx'
 import { Button } from '../components/ui/Button.tsx'
 import {
   Badge,
@@ -94,6 +95,7 @@ export function AiPracticePage() {
   const [skillDraft, setSkillDraft] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [aiConsent, setAiConsent] = useState(false)
   const [persistError, setPersistError] = useState<string | null>(null)
   const [prefilled, setPrefilled] = useState(false)
   const [voiceState, setVoiceState] = useState<VoiceState>('idle')
@@ -313,7 +315,7 @@ export function AiPracticePage() {
   }
 
   async function startInterview() {
-    if (busy || submittingRef.current) return
+    if (busy || submittingRef.current || !aiConsent) return
     submittingRef.current = true
     setBusy(true)
     setError(null)
@@ -383,6 +385,7 @@ export function AiPracticePage() {
   }
 
   async function resumeSession() {
+    if (!aiConsent) return
     setResumePrompt(false)
     if (session.questions.length > 0) {
       recordAskedQuestions(session.questions.map((q) => q.question))
@@ -613,11 +616,21 @@ export function AiPracticePage() {
             You have an interview in progress for <strong>{session.setup.targetRole}</strong> with{' '}
             {session.turns.length} answer{session.turns.length === 1 ? '' : 's'} recorded.
           </p>
+          <div className="mt-4">
+            <DataUseConsent id="practice-resume-consent" checked={aiConsent} onChange={setAiConsent}>
+              I agree to use my microphone and send this practice session for optional AI questions and feedback.{' '}
+              <Link to="/privacy" className="underline">
+                Privacy Policy
+              </Link>
+            </DataUseConsent>
+          </div>
           <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
             <Button variant="outline" onClick={restartSetup}>
               Start Fresh
             </Button>
-            <Button onClick={() => void resumeSession()}>Resume Interview</Button>
+            <Button onClick={() => void resumeSession()} disabled={!aiConsent}>
+              Resume Interview
+            </Button>
           </div>
         </Card>
       </div>
@@ -840,13 +853,21 @@ export function AiPracticePage() {
             </ul>
           </div>
 
+          <DataUseConsent id="practice-start-consent" checked={aiConsent} onChange={setAiConsent}>
+            I agree to use my microphone and send my answers for optional AI questions and feedback. This is not a
+            recording of a live interview with a person.{' '}
+            <Link to="/privacy" className="underline">
+              Privacy Policy
+            </Link>
+          </DataUseConsent>
+
           {error ? <p className="text-sm text-red-700">{error}</p> : null}
 
           <div className="flex flex-col gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:justify-end">
             <Button variant="outline" onClick={() => setSession({ ...session, phase: 'setup' })} disabled={busy}>
               Edit setup
             </Button>
-            <Button onClick={() => void startInterview()} disabled={busy}>
+            <Button onClick={() => void startInterview()} disabled={busy || !aiConsent}>
               {busy ? 'Connecting AI Interviewer…' : 'Start Interview'}
             </Button>
           </div>
