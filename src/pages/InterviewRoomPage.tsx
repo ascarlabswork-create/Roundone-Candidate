@@ -583,10 +583,6 @@ function InterviewWorkspace({
           <Circle className="h-4 w-4 fill-current" />
           {recordingBusy ? 'Stopping…' : 'Stop recording'}
         </Button>
-      ) : canSaveInterviewRecording(recording, recordingPath) ? (
-        <Button type="button" variant="secondary" disabled={recordingBusy} onClick={() => void changeRecording('save')}>
-          {recordingBusy ? 'Saving…' : 'Save to computer'}
-        </Button>
       ) : (
         <Button
           type="button"
@@ -598,6 +594,11 @@ function InterviewWorkspace({
           {recordingBusy ? 'Starting…' : 'Start recording'}
         </Button>
       )}
+      {canSaveInterviewRecording(recording, recordingPath) ? (
+        <Button type="button" variant="secondary" disabled={recordingBusy} onClick={() => void changeRecording('save')}>
+          {recordingBusy ? 'Saving…' : 'Save to computer'}
+        </Button>
+      ) : null}
     </>
   )
 
