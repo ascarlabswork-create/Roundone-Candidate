@@ -121,7 +121,7 @@ Deno.serve(async (req) => {
     room: roomName,
     canPublish: true,
     canSubscribe: true,
-    canPublishData: false,
+    canPublishData: true,
   });
   const jwt = await token.toJwt();
 
