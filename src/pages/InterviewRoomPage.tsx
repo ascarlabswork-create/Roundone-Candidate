@@ -578,22 +578,26 @@ function InterviewWorkspace({
         {expanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
         {expanded ? 'Exit full screen' : 'Full screen'}
       </Button>
-      <Button type="button" variant="outline" disabled={recordingBusy || recording === 'recording' || !recordingConsent} onClick={() => void changeRecording('start')}>
-        <Circle className="h-4 w-4" />
-        Start recording
-      </Button>
-      <Button type="button" variant="danger" disabled={recordingBusy || recording !== 'recording'} onClick={() => void changeRecording('stop')}>
-        <Circle className="h-4 w-4 fill-current" />
-        Stop recording
-      </Button>
-      <Button
-        type="button"
-        variant="secondary"
-        disabled={recordingBusy || !canSaveInterviewRecording(recording, recordingPath)}
-        onClick={() => void changeRecording('save')}
-      >
-        Save recording
-      </Button>
+      {recording === 'recording' ? (
+        <Button type="button" variant="danger" disabled={recordingBusy} onClick={() => void changeRecording('stop')}>
+          <Circle className="h-4 w-4 fill-current" />
+          {recordingBusy ? 'Stopping…' : 'Stop recording'}
+        </Button>
+      ) : canSaveInterviewRecording(recording, recordingPath) ? (
+        <Button type="button" variant="secondary" disabled={recordingBusy} onClick={() => void changeRecording('save')}>
+          {recordingBusy ? 'Saving…' : 'Save to computer'}
+        </Button>
+      ) : (
+        <Button
+          type="button"
+          variant="outline"
+          disabled={recordingBusy || !recordingConsent}
+          onClick={() => void changeRecording('start')}
+        >
+          <Circle className="h-4 w-4" />
+          {recordingBusy ? 'Starting…' : 'Start recording'}
+        </Button>
+      )}
     </>
   )
 

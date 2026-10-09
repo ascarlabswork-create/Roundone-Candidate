@@ -54,19 +54,18 @@ export function InterviewRecordingSave({ sessionId }: { sessionId: string }) {
       <h2 className="font-semibold text-navy-950">Interview recording</h2>
       <p className="mt-1 text-sm text-slate-600">
         {status === 'recording'
-          ? 'Recording is still in progress. Stop it, then save the private file.'
-          : 'Stored privately with this interview. Save recording puts a copy in a folder you choose.'}
+          ? 'Recording is in progress. Stop it when you are done, then save a copy to your computer.'
+          : 'Stored privately with this interview. Save puts a copy in a folder you choose.'}
       </p>
       {error ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}
       <div className="mt-3 flex flex-wrap gap-2">
         {status === 'recording' ? (
           <Button type="button" size="sm" variant="danger" disabled={busy} onClick={() => void change('stop')}>
-            {busy ? 'Stopping...' : 'Stop recording'}
+            {busy ? 'Stopping…' : 'Stop recording'}
           </Button>
-        ) : null}
-        {canSaveInterviewRecording(status, storagePath) ? (
+        ) : canSaveInterviewRecording(status, storagePath) ? (
           <Button type="button" size="sm" disabled={busy} onClick={() => void change('save')}>
-            {busy ? 'Saving...' : 'Save recording'}
+            {busy ? 'Saving…' : 'Save to computer'}
           </Button>
         ) : null}
       </div>
