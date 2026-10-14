@@ -1,11 +1,13 @@
 export const COMPANY_LEGAL_NAME = 'Ascar Labs India Private Limited'
 export const PRODUCT_NAME = 'jobround.ai'
+export const SUPPORT_EMAIL = 'support@jobround.ai'
 export const LEGAL_LAST_UPDATED = '9 October 2026'
 
 export const COPYRIGHT_NOTICE = `© 2026 ${COMPANY_LEGAL_NAME}. All rights reserved.`
 
 export const LEGAL_LINKS = [
   { to: '/privacy', label: 'Privacy Policy' },
+  { to: '/cookies', label: 'Cookie Policy' },
   { to: '/terms', label: 'Terms of Service' },
   { to: '/refund-policy', label: 'Refund & Cancellation Policy' },
   { to: '/pricing', label: 'Pricing & Billing Terms' },
@@ -17,6 +19,7 @@ export type LegalBlock =
   | { type: 'p'; text: string }
   | { type: 'ul'; items: string[] }
   | { type: 'note'; text: string }
+  | { type: 'email'; label: string; address: string }
 
 export type LegalSection = {
   id?: string
@@ -127,7 +130,7 @@ export const privacySections: LegalSection[] = [
     blocks: [
       {
         type: 'p',
-        text: 'This application does not add an advertising or product-analytics tracker. The sign-in session and a few interface choices, such as skipping the optional experience form, are kept in browser storage. If you use Google sign-in, Google may set its own cookies under Google’s terms. No separate cookie banner is shipped because no extra analytics cookies were added for these pages.',
+        text: `This application does not add an advertising or product-analytics tracker. The sign-in session and a few interface choices, such as skipping the optional experience form, are kept in browser storage. If you use Google sign-in, Google may set its own cookies under Google’s terms. See the Cookie Policy for a fuller list. No separate cookie banner is shipped because no extra analytics cookies were added for these pages.`,
       },
     ],
   },
@@ -140,7 +143,7 @@ export const privacySections: LegalSection[] = [
       },
       {
         type: 'p',
-        text: 'To ask about your personal data, use the personal-data section on the Contact Us page. A verified contact address is not configured in the application yet.',
+        text: `To ask about your personal data, use the personal-data section on the Contact Us page or email ${SUPPORT_EMAIL}.`,
       },
     ],
   },
@@ -273,6 +276,61 @@ export const pricingSections: LegalSection[] = [
   },
 ]
 
+export const cookieSections: LegalSection[] = [
+  {
+    heading: 'Overview',
+    blocks: [
+      {
+        type: 'p',
+        text: `${PRODUCT_NAME} uses cookies and similar browser storage so sign-in and basic features work in the candidate application. This draft is for company and legal review.`,
+      },
+    ],
+  },
+  {
+    heading: 'Strictly necessary',
+    blocks: [
+      {
+        type: 'ul',
+        items: [
+          'Supabase authentication cookies and session data so you can stay signed in securely.',
+          'Browser local storage for a few in-app choices on your device, such as saved interviewer IDs and practice session progress.',
+        ],
+      },
+    ],
+  },
+  {
+    heading: 'Third-party sign-in',
+    blocks: [
+      {
+        type: 'p',
+        text: 'If you choose Google sign-in, Google may set its own cookies under Google’s privacy policy and terms. We do not control those cookies.',
+      },
+    ],
+  },
+  {
+    heading: 'What we do not use',
+    blocks: [
+      {
+        type: 'ul',
+        items: [
+          'No advertising cookies in this candidate application.',
+          'No separate product-analytics cookie package was added for these pages.',
+        ],
+      },
+    ],
+  },
+  {
+    heading: 'Managing cookies and questions',
+    blocks: [
+      {
+        type: 'p',
+        text: 'You can clear cookies and site data in your browser settings. Clearing authentication cookies will sign you out. For questions about this policy, contact support.',
+      },
+      { type: 'email', label: 'Support email', address: SUPPORT_EMAIL },
+    ],
+  },
+]
+
 export const contactSections: LegalSection[] = [
   {
     heading: 'Support',
@@ -282,8 +340,13 @@ export const contactSections: LegalSection[] = [
         text: `${PRODUCT_NAME} is operated by ${COMPANY_LEGAL_NAME}. The product name appears in the application as ${PRODUCT_NAME}.`,
       },
       {
+        type: 'p',
+        text: 'For booking questions, interview issues, or general help, email us at the address below.',
+      },
+      { type: 'email', label: 'Email', address: SUPPORT_EMAIL },
+      {
         type: 'note',
-        text: 'Needs company approval: a support email, phone number, and postal address are not configured in this project. This page does not invent them. Do not send personal data until a verified address is published here.',
+        text: 'Needs company approval: a phone number and postal address are not published in this application yet.',
       },
     ],
   },
@@ -297,12 +360,9 @@ export const contactSections: LegalSection[] = [
       },
       {
         type: 'p',
-        text: 'For access, correction, or another personal-data request, the company must publish a verified contact on this page first. Until then, there is no support address in the application to receive that request.',
+        text: `For access, correction, or another personal-data request under the Digital Personal Data Protection Act, 2023, email ${SUPPORT_EMAIL} with enough detail for us to verify your account.`,
       },
-      {
-        type: 'note',
-        text: 'Needs company approval: the address, email, or form that should receive personal-data requests under the Digital Personal Data Protection Act, 2023.',
-      },
+      { type: 'email', label: 'Personal data requests', address: SUPPORT_EMAIL },
     ],
   },
 ]

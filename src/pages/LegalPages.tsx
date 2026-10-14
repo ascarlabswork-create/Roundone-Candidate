@@ -1,6 +1,7 @@
 import { LegalDocument } from '../components/legal/LegalDocument.tsx'
 import {
   contactSections,
+  cookieSections,
   pricingSections,
   privacySections,
   refundSections,
@@ -25,4 +26,8 @@ export function PricingTermsPage() {
 
 export function ContactPage() {
   return <LegalDocument title="Contact Us" sections={contactSections} />
+}
+
+export function CookiePolicyPage() {
+  return <LegalDocument title="Cookie Policy" sections={cookieSections} />
 }

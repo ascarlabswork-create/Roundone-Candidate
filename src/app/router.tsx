@@ -26,7 +26,14 @@ import { PreparationPage } from '../pages/PreparationPage.tsx'
 import { ResumeSkillsPage } from '../pages/ResumeSkillsPage.tsx'
 import { ProgressPage } from '../pages/ProgressPage.tsx'
 import { SearchPage } from '../pages/SearchPage.tsx'
-import { ContactPage, PricingTermsPage, PrivacyPage, RefundPolicyPage, TermsPage } from '../pages/LegalPages.tsx'
+import {
+  ContactPage,
+  CookiePolicyPage,
+  PricingTermsPage,
+  PrivacyPage,
+  RefundPolicyPage,
+  TermsPage,
+} from '../pages/LegalPages.tsx'
 import { NotFoundPage, ResourcesPage } from '../pages/SupportingPages.tsx'
 
 export function AppRouter() {
@@ -36,6 +43,7 @@ export function AppRouter() {
       <Routes>
         <Route element={<CandidateLayout />}>
           <Route path="/privacy" element={<PrivacyPage />} />
+          <Route path="/cookies" element={<CookiePolicyPage />} />
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/refund-policy" element={<RefundPolicyPage />} />
           <Route path="/pricing" element={<PricingTermsPage />} />
