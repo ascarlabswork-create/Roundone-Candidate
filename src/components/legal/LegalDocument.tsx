@@ -29,6 +29,19 @@ export function LegalDocument({ title, sections }: { title: string; sections: Le
                     </p>
                   )
                 }
+                if (block.type === 'email') {
+                  return (
+                    <p key={index}>
+                      {block.label}:{' '}
+                      <a
+                        href={`mailto:${block.address}`}
+                        className="font-medium text-navy-950 underline underline-offset-2 hover:text-navy-800"
+                      >
+                        {block.address}
+                      </a>
+                    </p>
+                  )
+                }
                 return <p key={index}>{block.text}</p>
               })}
             </div>

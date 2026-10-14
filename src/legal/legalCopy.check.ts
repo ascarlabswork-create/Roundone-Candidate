@@ -3,23 +3,38 @@ import {
   COPYRIGHT_NOTICE,
   LEGAL_LINKS,
   contactSections,
+  cookieSections,
   pricingSections,
   privacySections,
   refundSections,
+  SUPPORT_EMAIL,
 } from './legalCopy.ts'
 
 function expect(condition: boolean, message: string) {
   if (!condition) throw new Error(message)
 }
 
-function textOf(sections: { heading: string; blocks: Array<{ type: string; text?: string; items?: string[] }> }[]) {
+function textOf(
+  sections: {
+    heading: string
+    blocks: Array<{ type: string; text?: string; items?: string[]; address?: string; label?: string }>
+  }[],
+) {
   return sections
-    .flatMap((section) => [section.heading, ...section.blocks.flatMap((block) => (block.type === 'ul' ? (block.items ?? []) : [block.text ?? '']))])
+    .flatMap((section) => [
+      section.heading,
+      ...section.blocks.flatMap((block) => {
+        if (block.type === 'ul') return block.items ?? []
+        if (block.type === 'email') return [block.label ?? '', block.address ?? '']
+        return [block.text ?? '']
+      }),
+    ])
     .join('\n')
 }
 
 const paths = LEGAL_LINKS.map((item) => item.to)
 expect(paths.includes('/privacy'), 'privacy route')
+expect(paths.includes('/cookies'), 'cookies route')
 expect(paths.includes('/terms'), 'terms route')
 expect(paths.includes('/refund-policy'), 'refund route')
 expect(paths.includes('/pricing'), 'pricing route')
@@ -44,9 +59,13 @@ expect(refund.includes('does not create a refund'), 'captured payments are not a
 expect(refund.includes('Pending company approval') || refund.includes('Needs company approval') || refund.includes('company still needs to approve'), 'refund gaps are flagged')
 
 const contact = textOf(contactSections)
-expect(!contact.includes('@'), 'contact does not invent an email address')
+expect(contact.includes(SUPPORT_EMAIL), 'contact lists support email')
 expect(!/\+91|\b\d{10}\b/.test(contact), 'contact does not invent a phone number')
-expect(contact.includes('Needs company approval'), 'missing contact details are marked')
+expect(contact.includes('Needs company approval'), 'missing postal contact is marked')
 expect(contactSections.some((section) => section.id === 'personal-data'), 'personal-data section exists')
+
+const cookies = textOf(cookieSections)
+expect(cookies.includes(SUPPORT_EMAIL), 'cookie policy lists support email')
+expect(cookies.includes('Strictly necessary'), 'cookie policy describes necessary storage')
 
 console.log('legalCopy.check passed')
