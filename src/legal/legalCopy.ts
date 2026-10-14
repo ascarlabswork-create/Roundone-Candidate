@@ -1,4 +1,4 @@
-export const COMPANY_LEGAL_NAME = 'Ascar Labs India Private Limited'
+export const COMPANY_LEGAL_NAME = 'Ascar Labs Private Limited'
 export const PRODUCT_NAME = 'jobround.ai'
 export const SUPPORT_EMAIL = 'support@jobround.ai'
 export const LEGAL_LAST_UPDATED = '9 October 2026'
