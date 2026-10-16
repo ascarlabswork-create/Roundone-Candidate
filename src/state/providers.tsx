@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react'
-import { CookieConsentUI } from '../components/consent/CookieConsentUI.tsx'
 import { BookingProvider } from './booking.tsx'
 import { CookieConsentProvider } from './cookieConsent.tsx'
 import { MatchingProvider } from './matching.tsx'
@@ -16,10 +15,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
           <MatchingProvider>
             <BookingProvider>
               <SavedProvider>
-                <ToastProvider>
-                  {children}
-                  <CookieConsentUI />
-                </ToastProvider>
+                <ToastProvider>{children}</ToastProvider>
               </SavedProvider>
             </BookingProvider>
           </MatchingProvider>
