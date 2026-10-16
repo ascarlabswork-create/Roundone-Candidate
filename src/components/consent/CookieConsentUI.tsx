@@ -1,6 +1,5 @@
 import { ShieldCheck, X } from 'lucide-react'
 import { useEffect, useId, useRef } from 'react'
-import { Link } from 'react-router-dom'
 import { COOKIE_CATEGORIES } from '../../consent/consentModel.ts'
 import { useCookieConsent } from '../../state/cookieConsent.tsx'
 import { Button } from '../ui/Button.tsx'
@@ -135,9 +134,9 @@ export function CookieConsentUI() {
           ) : (
             <p className="text-sm text-slate-600">
               Read more in our{' '}
-              <Link to="/cookies" className="font-medium text-navy-950 underline underline-offset-2">
+              <a href="/cookies" className="font-medium text-navy-950 underline underline-offset-2">
                 Cookie Policy
-              </Link>
+              </a>
               .
             </p>
           )}
