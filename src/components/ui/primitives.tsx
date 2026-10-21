@@ -1,4 +1,5 @@
-import type { InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react'
+import { Eye, EyeOff } from 'lucide-react'
+import { useState, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react'
 import { cn } from '../../lib/cn.ts'
 
 export function Card({
@@ -82,6 +83,31 @@ const fieldClass =
 
 export function TextInput(props: InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={cn(fieldClass, props.className)} />
+}
+
+export function PasswordInput({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
+  const [visible, setVisible] = useState(false)
+  const label = visible ? 'Hide password' : 'Show password'
+
+  return (
+    <div className="relative">
+      <input
+        {...props}
+        type={visible ? 'text' : 'password'}
+        className={cn(fieldClass, 'pr-11', className)}
+      />
+      <button
+        type="button"
+        className="absolute inset-y-0 right-0 grid w-11 place-items-center text-slate-500 hover:text-navy-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy-950"
+        aria-label={label}
+        aria-pressed={visible}
+        title={label}
+        onClick={() => setVisible((current) => !current)}
+      >
+        {visible ? <EyeOff className="h-4 w-4" aria-hidden /> : <Eye className="h-4 w-4" aria-hidden />}
+      </button>
+    </div>
+  )
 }
 
 export function SelectInput(props: SelectHTMLAttributes<HTMLSelectElement>) {

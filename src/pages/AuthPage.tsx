@@ -1,11 +1,13 @@
 import { useState, type FormEvent } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { Button } from '../components/ui/Button.tsx'
-import { Card, FieldLabel, PageHeader, SelectInput, TextInput } from '../components/ui/primitives.tsx'
+import { Card, FieldLabel, PageHeader, PasswordInput, SelectInput, TextInput } from '../components/ui/primitives.tsx'
 import { GoogleIcon } from '../components/ui/GoogleIcon.tsx'
 import { timezoneSelectOptions } from '../lib/candidateTimezone.ts'
 import {
   authErrorMessage,
+  parseAuthRateLimitSeconds,
+  resendSignupConfirmation,
   sendPasswordReset,
   signInCandidate,
   signInWithGoogle,
@@ -27,29 +29,38 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [timezone, setTimezone] = useState('Asia/Kolkata')
   const [submitting, setSubmitting] = useState(false)
   const [googleSubmitting, setGoogleSubmitting] = useState(false)
+  const [emailBusy, setEmailBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
+  const [needsConfirmation, setNeedsConfirmation] = useState(false)
+  const [resetWait, setResetWait] = useState(0)
 
   if (status === 'authenticated' && user) {
     return <Navigate to={nextPath} replace />
   }
 
   const isRegister = mode === 'register'
-  const busy = submitting || googleSubmitting || status === 'loading'
+  const busy = submitting || googleSubmitting || emailBusy || status === 'loading'
 
   async function submit(event: FormEvent) {
     event.preventDefault()
     setError(null)
     setInfo(null)
+    if (isRegister && password !== confirmPassword) {
+      setError('Passwords do not match.')
+      return
+    }
     setSubmitting(true)
     try {
       if (isRegister) {
         const result = await signUpCandidate({ email, password, fullName, timezone })
         if (result.needsEmailConfirmation) {
-          setInfo('Check your email to confirm your account, then sign in.')
+          setNeedsConfirmation(true)
+          setInfo('We sent a confirmation link to your email. Check your inbox and spam folder, then sign in.')
           return
         }
         await refreshAccount()
@@ -58,7 +69,9 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
         await refreshAccount()
       }
     } catch (caught) {
-      setError(authErrorMessage(caught))
+      const message = authErrorMessage(caught)
+      setError(message)
+      if (message.includes('confirm your email')) setNeedsConfirmation(true)
     } finally {
       setSubmitting(false)
     }
@@ -76,14 +89,57 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
     }
   }
 
+  function startResetWait(seconds: number) {
+    setResetWait(seconds)
+    const started = Date.now()
+    const timer = window.setInterval(() => {
+      const remaining = Math.max(0, seconds - Math.ceil((Date.now() - started) / 1000))
+      setResetWait(remaining)
+      if (remaining <= 0) window.clearInterval(timer)
+    }, 1000)
+  }
+
   async function forgotPassword() {
     setError(null)
     setInfo(null)
+    if (!email.trim()) {
+      setError('Enter your email above first, then choose “Forgot password?”.')
+      return
+    }
+    setEmailBusy(true)
     try {
       await sendPasswordReset(email)
-      setInfo('If an account exists for that email, we sent a password reset link.')
+      setInfo('If an account exists for that email, we sent a password reset link. Check your inbox and spam folder.')
+      startResetWait(60)
     } catch (caught) {
+      const raw = caught instanceof Error ? caught.message : ''
+      const wait = parseAuthRateLimitSeconds(raw)
+      if (wait) startResetWait(wait)
       setError(authErrorMessage(caught))
+    } finally {
+      setEmailBusy(false)
+    }
+  }
+
+  async function resendConfirmation() {
+    setError(null)
+    setInfo(null)
+    if (!email.trim()) {
+      setError('Enter your email above first, then resend the confirmation email.')
+      return
+    }
+    setEmailBusy(true)
+    try {
+      await resendSignupConfirmation(email)
+      setInfo('We sent another confirmation email. Check your inbox and spam folder.')
+      startResetWait(60)
+    } catch (caught) {
+      const raw = caught instanceof Error ? caught.message : ''
+      const wait = parseAuthRateLimitSeconds(raw)
+      if (wait) startResetWait(wait)
+      setError(authErrorMessage(caught))
+    } finally {
+      setEmailBusy(false)
     }
   }
 
@@ -130,16 +186,15 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
                 <button
                   type="button"
                   onClick={() => void forgotPassword()}
-                  disabled={busy}
+                  disabled={busy || resetWait > 0}
                   className="text-xs font-medium text-blue-700 hover:underline disabled:text-slate-400"
                 >
-                  Forgot password?
+                  {resetWait > 0 ? `Wait ${resetWait}s` : 'Forgot password?'}
                 </button>
               ) : null}
             </div>
-            <TextInput
+            <PasswordInput
               id="password"
-              type="password"
               required
               minLength={6}
               autoComplete={isRegister ? 'new-password' : 'current-password'}
@@ -147,6 +202,19 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
               onChange={(event) => setPassword(event.target.value)}
             />
           </div>
+          {isRegister ? (
+            <div>
+              <FieldLabel htmlFor="confirmPassword">Confirm password</FieldLabel>
+              <PasswordInput
+                id="confirmPassword"
+                required
+                minLength={6}
+                autoComplete="new-password"
+                value={confirmPassword}
+                onChange={(event) => setConfirmPassword(event.target.value)}
+              />
+            </div>
+          ) : null}
           {isRegister ? (
             <div>
               <FieldLabel htmlFor="timezone">Timezone</FieldLabel>
@@ -166,6 +234,16 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
 
           {error || sessionError ? <p className="text-sm text-red-700">{error || sessionError}</p> : null}
           {info ? <p className="text-sm text-emerald-700">{info}</p> : null}
+          {needsConfirmation ? (
+            <button
+              type="button"
+              onClick={() => void resendConfirmation()}
+              disabled={busy || resetWait > 0}
+              className="text-sm font-medium text-blue-700 hover:underline disabled:text-slate-400"
+            >
+              {resetWait > 0 ? `Resend available in ${resetWait}s` : 'Resend confirmation email'}
+            </button>
+          ) : null}
 
           <Button type="submit" fullWidth disabled={busy}>
             {submitting ? 'Please wait…' : isRegister ? 'Create account' : 'Sign In'}
