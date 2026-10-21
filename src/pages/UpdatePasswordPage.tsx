@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '../components/ui/Button.tsx'
-import { Card, FieldLabel, PageHeader, TextInput } from '../components/ui/primitives.tsx'
+import { Card, FieldLabel, PageHeader, PasswordInput } from '../components/ui/primitives.tsx'
 import { authErrorMessage, updatePassword } from '../services/auth.ts'
 import { useSession } from '../state/session.tsx'
 
@@ -64,9 +64,8 @@ export function UpdatePasswordPage() {
           <form className="space-y-4" onSubmit={submit}>
             <div>
               <FieldLabel htmlFor="password">New password</FieldLabel>
-              <TextInput
+              <PasswordInput
                 id="password"
-                type="password"
                 required
                 minLength={6}
                 autoComplete="new-password"
@@ -76,9 +75,8 @@ export function UpdatePasswordPage() {
             </div>
             <div>
               <FieldLabel htmlFor="confirm">Confirm new password</FieldLabel>
-              <TextInput
+              <PasswordInput
                 id="confirm"
-                type="password"
                 required
                 minLength={6}
                 autoComplete="new-password"

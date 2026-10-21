@@ -12,10 +12,9 @@ function safeNextPath(value: string | null) {
 }
 
 /**
- * Handles the Google OAuth redirect. The Supabase client is configured with
- * detectSessionInUrl, so it exchanges the code and fires onAuthStateChange,
- * which the SessionProvider uses to load the candidate profile (and to sign
- * out any interviewer/admin account). This page only reacts to that state.
+ * Handles Google OAuth, email confirmation, and password-recovery redirects.
+ * The Supabase client is configured with detectSessionInUrl, so it exchanges
+ * the code and fires onAuthStateChange. This page only reacts to that state.
  */
 export function AuthCallbackPage() {
   const { status, account, error } = useSession()
@@ -23,6 +22,8 @@ export function AuthCallbackPage() {
   const nextPath = safeNextPath(params.get('next'))
   const oauthError = params.get('error_description') ?? params.get('error')
   const [timedOut, setTimedOut] = useState(false)
+  const hashType = typeof window === 'undefined' ? null : new URLSearchParams(window.location.hash.replace(/^#/, '')).get('type')
+  const isRecovery = hashType === 'recovery' || params.get('type') === 'recovery'
 
   useEffect(() => {
     const id = window.setTimeout(() => setTimedOut(true), 10_000)
@@ -34,6 +35,10 @@ export function AuthCallbackPage() {
     if (!window.opener || window.opener === window) return
     window.close()
   }, [status, account])
+
+  if (status === 'authenticated' && isRecovery) {
+    return <Navigate to="/candidate/update-password" replace />
+  }
 
   if (status === 'authenticated' && account) {
     return <Navigate to={nextPath} replace />
@@ -47,8 +52,8 @@ export function AuthCallbackPage() {
     const body = notCandidate
       ? 'This Google account is registered as an interviewer or admin. We’ve signed it out. Use a candidate account to continue.'
       : oauthError
-        ? 'Google sign-in was cancelled or failed. Please try again.'
-        : 'We couldn’t confirm your session. Please try signing in again.'
+        ? 'Sign-in was cancelled or failed. Please try again.'
+        : 'We couldn’t confirm your session. Open the latest email link, or try signing in again.'
 
     return (
       <div className="mx-auto max-w-md px-4 py-16 sm:px-6">
@@ -69,7 +74,7 @@ export function AuthCallbackPage() {
     <div className="mx-auto max-w-md px-4 py-16 sm:px-6">
       <Card className="p-8 text-center">
         <h1 className="text-xl font-semibold text-navy-950">Completing sign-in…</h1>
-        <p className="mt-2 text-sm text-slate-600">Confirming your candidate account with Google.</p>
+        <p className="mt-2 text-sm text-slate-600">Confirming your candidate account.</p>
       </Card>
     </div>
   )

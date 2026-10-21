@@ -3,7 +3,7 @@
 Candidate-facing app for finding verified interviewers, booking mock interviews, viewing private feedback, practicing with AI, and preparing for interviews.
 
 **Repo:** https://github.com/ascarlabswork-create/Roundone-Candidate  
-**Production:** https://roundone-candidate-plum.vercel.app/
+**Production:** https://www.jobround.ai/
 
 ## Stack
 
