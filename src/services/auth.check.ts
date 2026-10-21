@@ -12,5 +12,13 @@ expect(
 )
 expect(isDuplicateSignup({ identities: [] } as never), 'empty identities is a duplicate signup')
 expect(!isDuplicateSignup({ identities: [{ id: '1' }] } as never), 'real identities are not treated as duplicates')
+expect(
+  authErrorMessage(new Error('Invalid login credentials')) === 'Incorrect email or password. Please try again.',
+  'sign-in failures are not treated as short passwords',
+)
+expect(
+  authErrorMessage(new Error('Password should be at least 6 characters')) === 'Your password must be at least 6 characters.',
+  'short-password signup still maps correctly',
+)
 
 console.log('auth.check passed')
