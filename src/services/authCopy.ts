@@ -14,7 +14,13 @@ export function authErrorMessage(error: unknown): string {
   const raw = error instanceof Error ? error.message : typeof error === 'string' ? error : ''
   const message = raw.toLowerCase()
 
-  if (message.includes('invalid login credentials')) {
+  if (
+    message.includes('invalid login credentials') ||
+    message.includes('invalid email or password') ||
+    message.includes('wrong password') ||
+    message.includes('incorrect password') ||
+    message.includes('invalid password')
+  ) {
     return 'Incorrect email or password. Please try again.'
   }
   if (message.includes('email not confirmed') || message.includes('not confirmed')) {
@@ -32,7 +38,13 @@ export function authErrorMessage(error: unknown): string {
       ? `Please wait ${wait} seconds before requesting another email.`
       : 'Too many email requests. Please wait a moment and try again.'
   }
-  if (message.includes('password')) {
+  if (
+    message.includes('at least 6') ||
+    message.includes('password should be') ||
+    message.includes('password must be') ||
+    message.includes('password is too short') ||
+    message.includes('weak password')
+  ) {
     return 'Your password must be at least 6 characters.'
   }
   if (message.includes('failed to fetch') || message.includes('network')) {
