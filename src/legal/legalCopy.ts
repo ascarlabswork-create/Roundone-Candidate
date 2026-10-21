@@ -130,7 +130,7 @@ export const privacySections: LegalSection[] = [
     blocks: [
       {
         type: 'p',
-        text: `Essential storage supports sign-in and core features. Optional analytics and marketing categories are off by default and are not connected to a provider in this candidate app today. You can change choices anytime from Cookie preferences in the footer. If you use Google sign-in, Google may set its own cookies under Google’s terms. See the Cookie Policy for more detail.`,
+        text: `Essential storage supports sign-in and core features. This application does not show a cookie-acceptance popup. Optional analytics and marketing are not connected in this candidate app today. If you use Google sign-in, Google may set its own cookies under Google’s terms. See the Cookie Policy for more detail.`,
       },
     ],
   },
@@ -324,7 +324,7 @@ export const cookieSections: LegalSection[] = [
     blocks: [
       {
         type: 'p',
-        text: 'Use Cookie preferences in the site footer to accept, reject, or customize optional categories. You can clear cookies and site data in your browser settings. Clearing authentication cookies will sign you out. For questions about this policy, contact support.',
+        text: 'This application does not require cookie acceptance to use the site. You can clear cookies and site data in your browser settings. Clearing authentication cookies will sign you out. For questions about this policy, contact support.',
       },
       { type: 'email', label: 'Support email', address: SUPPORT_EMAIL },
     ],
