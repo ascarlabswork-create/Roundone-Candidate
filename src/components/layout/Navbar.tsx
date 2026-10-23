@@ -1,206 +1,175 @@
-import { CalendarCheck, Menu, X } from 'lucide-react'
-import { useState } from 'react'
+import { Bell, CalendarDays, Menu, X } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
 import { cn } from '../../lib/cn.ts'
 import { useNotifications } from '../../state/notifications.tsx'
 import { useSession } from '../../state/session.tsx'
 import { Button } from '../ui/Button.tsx'
-import { NotificationBell } from '../notifications/NotificationBell.tsx'
+import { Avatar } from '../ui/identity.tsx'
 import { Logo } from './Logo.tsx'
 
-/** Desktop header links (shown from xl up — avoids overlap on laptop widths). */
-const primaryNavItems = [
-  { to: '/', label: 'Home' },
-  { to: '/candidate/interviewers', label: 'Find Interviewer' },
+const guestLinks: Array<{ to: string; label: string; end?: boolean }> = [
+  { to: '/candidate/how-it-works', label: 'How it works' },
+  { to: '/contact', label: 'Contact' },
+]
+
+const signedInLinks: Array<{ to: string; label: string; end?: boolean }> = [
+  { to: '/', label: 'Home', end: true },
+  { to: '/candidate/find', label: 'Find Interviewer' },
   { to: '/candidate/practice', label: 'AI Practice' },
   { to: '/candidate/preparation', label: 'AI Prep' },
   { to: '/candidate/resources', label: 'Resources' },
 ]
 
-/** Routes that should show only the logo (no app navigation). */
-const AUTH_ROUTES = [
-  '/candidate/login',
-  '/candidate/register',
-  '/candidate/auth/callback',
-  '/candidate/update-password',
-]
-
-function initials(name: string) {
-  return name
-    .split(' ')
-    .filter(Boolean)
-    .map((part) => part[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase()
-}
-
 export function Navbar() {
-  const [open, setOpen] = useState(false)
-  const { status, account, user, signOut } = useSession()
+  const { pathname } = useLocation()
+  const { account, status, signOut } = useSession()
   const { unreadCount } = useNotifications()
-  const location = useLocation()
-  const displayName = account?.profile.full_name || user?.email || ''
-  const isAuthRoute = AUTH_ROUTES.includes(location.pathname)
+  const [open, setOpen] = useState(false)
+  const signedIn = status === 'authenticated' && Boolean(account)
+
+  useEffect(() => {
+    setOpen(false)
+  }, [pathname])
+
+  const links = signedIn ? signedInLinks : guestLinks
   const unreadBadge = unreadCount != null && unreadCount > 0 ? (unreadCount > 99 ? '99+' : String(unreadCount)) : null
 
-  if (isAuthRoute) {
-    return (
-      <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-7xl items-center px-4 sm:px-6">
-          <Logo />
-        </div>
-      </header>
-    )
-  }
-
   return (
-    <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
-      <div className="mx-auto flex h-16 max-w-7xl items-center gap-2 px-4 sm:px-6">
-        <div className="flex min-w-0 flex-1 items-center gap-4 overflow-hidden">
-          <div className="shrink-0">
-            <Logo />
-          </div>
-          <nav className="hidden min-w-0 items-center gap-0.5 xl:flex" aria-label="Primary">
-            {primaryNavItems.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.to === '/'}
-                className={({ isActive }) =>
-                  cn(
-                    'whitespace-nowrap rounded-lg px-2 py-2 text-sm font-medium transition-colors',
-                    isActive ? 'bg-slate-100 text-navy-950' : 'text-slate-600 hover:bg-slate-50 hover:text-navy-900',
-                  )
-                }
-              >
-                {item.label}
-              </NavLink>
-            ))}
-          </nav>
-        </div>
-
-        <div className="relative z-10 flex shrink-0 items-center gap-0.5 bg-white pl-2 xl:gap-1">
-          <Link
-            to="/candidate/interviews"
-            className="hidden items-center justify-center rounded-lg p-2 text-slate-700 hover:bg-slate-50 xl:inline-flex"
-            aria-label="My Interviews"
-            title="My Interviews"
-          >
-            <CalendarCheck className="h-4 w-4" />
-          </Link>
-          {status === 'authenticated' ? (
+    <header className="sticky top-0 z-40 border-b border-navy-950/8 bg-paper/80 backdrop-blur-xl">
+      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6">
+        <Logo />
+        <nav className="hidden items-center gap-1 lg:flex">
+          {links.map((link) => (
+            <NavLink
+              key={link.to}
+              to={link.to}
+              end={link.end}
+              className={({ isActive }) =>
+                cn(
+                  'rounded-full px-3.5 py-2 text-sm font-medium transition-colors',
+                  isActive ? 'bg-navy-950 text-white' : 'text-slate-600 hover:bg-navy-950/5 hover:text-navy-950',
+                )
+              }
+            >
+              {link.label}
+            </NavLink>
+          ))}
+        </nav>
+        <div className="hidden items-center gap-2 lg:flex">
+          {signedIn ? (
             <>
-              <NotificationBell />
               <Link
-                to="/candidate/profile"
-                className="hidden items-center rounded-lg p-1 hover:bg-slate-50 xl:inline-flex"
-                aria-label="Profile"
+                to="/candidate/interviews"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full text-navy-800 hover:bg-navy-950/5"
+                aria-label="My interviews"
               >
-                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-navy-900 text-xs font-semibold text-white">
-                  {initials(displayName) || 'C'}
-                </span>
+                <CalendarDays className="h-5 w-5" />
               </Link>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="hidden xl:inline-flex"
-                onClick={() => void signOut()}
+              <Link
+                to="/candidate/notifications"
+                className="relative inline-flex h-10 w-10 items-center justify-center rounded-full text-navy-800 hover:bg-navy-950/5"
+                aria-label={unreadBadge ? `Notifications, ${unreadBadge} unread` : 'Notifications'}
               >
+                <Bell className="h-5 w-5" />
+                {unreadBadge ? (
+                  <span className="absolute right-1 top-1 min-w-4 rounded-full bg-coral-600 px-1 text-center text-[10px] font-bold leading-4 text-white">
+                    {unreadBadge}
+                  </span>
+                ) : null}
+              </Link>
+              <Link to="/candidate/profile" aria-label="Profile" className="rounded-full">
+                <Avatar src={account?.profile.avatar_url ?? ''} name={account?.profile.full_name || 'Profile'} size="sm" />
+              </Link>
+              <Button variant="ghost" size="sm" onClick={() => void signOut()}>
                 Sign out
               </Button>
+              <Link to="/candidate/find">
+                <Button size="sm">Find My Interviewer</Button>
+              </Link>
             </>
           ) : (
-            <div className="hidden items-center gap-2 xl:flex">
-              <Link to="/candidate/login">
-                <Button variant="ghost" size="sm">
-                  Sign in
-                </Button>
+            <>
+              <Link to="/candidate/login" className="text-sm font-semibold text-navy-800 hover:text-coral-700">
+                Sign in
               </Link>
               <Link to="/candidate/register">
-                <Button variant="outline" size="sm">
-                  Create account
-                </Button>
+                <Button size="sm">Get started</Button>
               </Link>
-            </div>
+            </>
           )}
-          <Link to="/candidate/find" className="hidden xl:block">
-            <Button size="sm">Find My Interviewer</Button>
-          </Link>
-          <button
-            type="button"
-            className="rounded-lg p-2 text-navy-950 xl:hidden"
-            onClick={() => setOpen((value) => !value)}
-            aria-label={open ? 'Close menu' : 'Open menu'}
-          >
-            {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-          </button>
         </div>
+        <button
+          type="button"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-full hover:bg-navy-950/5 lg:hidden"
+          onClick={() => setOpen((value) => !value)}
+          aria-label={open ? 'Close menu' : 'Open menu'}
+        >
+          {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+        </button>
       </div>
-
       {open ? (
-        <div className="border-t border-slate-200 bg-white px-4 py-3 xl:hidden">
-          <nav className="flex flex-col gap-1" aria-label="Mobile">
-            {primaryNavItems.map((item) => (
+        <div className="border-t border-navy-950/8 bg-paper px-4 py-4 lg:hidden">
+          <nav className="flex flex-col gap-1">
+            {links.map((link) => (
               <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.to === '/'}
-                onClick={() => setOpen(false)}
+                key={link.to}
+                to={link.to}
+                end={link.end}
                 className={({ isActive }) =>
                   cn(
-                    'rounded-lg px-3 py-2 text-sm font-medium',
-                    isActive ? 'bg-slate-100 text-navy-950' : 'text-slate-700',
+                    'rounded-xl px-3 py-2.5 text-sm font-medium',
+                    isActive ? 'bg-navy-950 text-white' : 'text-slate-700',
                   )
                 }
               >
-                {item.label}
+                {link.label}
               </NavLink>
             ))}
-            <NavLink to="/candidate/interviews" onClick={() => setOpen(false)} className="rounded-lg px-3 py-2 text-sm font-medium text-slate-700">
-              My Interviews
-            </NavLink>
-            {status === 'authenticated' ? (
-              <NavLink to="/candidate/notifications" onClick={() => setOpen(false)} className="rounded-lg px-3 py-2 text-sm font-medium text-slate-700">
-                <span className="flex items-center justify-between gap-3">
-                  Notifications
-                  {unreadBadge ? (
-                    <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-blue-600 px-1.5 text-[10px] font-semibold leading-4 text-white">
-                      {unreadBadge}
-                    </span>
-                  ) : null}
-                </span>
-              </NavLink>
-            ) : null}
-            {status === 'authenticated' ? (
+            {signedIn ? (
               <>
-                <NavLink to="/candidate/profile" onClick={() => setOpen(false)} className="rounded-lg px-3 py-2 text-sm font-medium text-slate-700">
+                <NavLink
+                  to="/candidate/interviews"
+                  className={({ isActive }) =>
+                    cn('rounded-xl px-3 py-2.5 text-sm font-medium', isActive ? 'bg-navy-950 text-white' : 'text-slate-700')
+                  }
+                >
+                  My interviews
+                </NavLink>
+                <NavLink
+                  to="/candidate/notifications"
+                  className={({ isActive }) =>
+                    cn('rounded-xl px-3 py-2.5 text-sm font-medium', isActive ? 'bg-navy-950 text-white' : 'text-slate-700')
+                  }
+                >
+                  Notifications{unreadBadge ? ` (${unreadBadge})` : ''}
+                </NavLink>
+                <NavLink
+                  to="/candidate/profile"
+                  className={({ isActive }) =>
+                    cn('rounded-xl px-3 py-2.5 text-sm font-medium', isActive ? 'bg-navy-950 text-white' : 'text-slate-700')
+                  }
+                >
                   Profile
                 </NavLink>
-                <button
-                  type="button"
-                  className="rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-700"
-                  onClick={() => {
-                    setOpen(false)
-                    void signOut()
-                  }}
-                >
+                <Button className="mt-2" onClick={() => void signOut()}>
                   Sign out
-                </button>
+                </Button>
               </>
             ) : (
-              <>
-                <NavLink to="/candidate/login" onClick={() => setOpen(false)} className="rounded-lg px-3 py-2 text-sm font-medium text-slate-700">
-                  Sign in
-                </NavLink>
-                <NavLink to="/candidate/register" onClick={() => setOpen(false)} className="rounded-lg px-3 py-2 text-sm font-medium text-slate-700">
-                  Create account
-                </NavLink>
-              </>
+              <div className="mt-3 flex gap-2">
+                <Link to="/candidate/login" className="flex-1">
+                  <Button variant="outline" fullWidth>
+                    Sign in
+                  </Button>
+                </Link>
+                <Link to="/candidate/register" className="flex-1">
+                  <Button fullWidth>
+                    Get started
+                  </Button>
+                </Link>
+              </div>
             )}
-            <Link to="/candidate/find" onClick={() => setOpen(false)} className="pt-2">
-              <Button fullWidth>Find My Interviewer</Button>
-            </Link>
           </nav>
         </div>
       ) : null}

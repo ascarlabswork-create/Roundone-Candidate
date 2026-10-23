@@ -75,7 +75,7 @@ export function PracticeSessionDetailPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
-      <Link to="/candidate/practice/history" className="text-sm font-medium text-blue-700">
+      <Link to="/candidate/practice/history" className="text-sm font-medium text-coral-700">
         ← Practice progress
       </Link>
 

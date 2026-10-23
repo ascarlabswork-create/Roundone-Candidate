@@ -61,7 +61,7 @@ export function FeedbackPage() {
       <div className="mx-auto max-w-3xl px-4 py-10">
         <ErrorState title="Unable to load feedback" body={state.error} />
         <div className="mt-4">
-          <Link to="/candidate/interviews" className="text-sm font-medium text-blue-700">
+          <Link to="/candidate/interviews" className="text-sm font-medium text-coral-700">
             Back to My Interviews
           </Link>
         </div>

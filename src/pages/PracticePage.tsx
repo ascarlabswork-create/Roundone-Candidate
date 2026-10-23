@@ -76,7 +76,7 @@ export function PracticePage() {
       <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
         <PageHeader title="Practice session not found" subtitle="Pick a drill from AI Practice to start a timed session." />
         <div className="mt-8">
-          <Link to="/candidate/practice" className="text-sm font-medium text-blue-700">
+          <Link to="/candidate/practice" className="text-sm font-medium text-coral-700">
             ← Back to AI Practice
           </Link>
         </div>
@@ -95,13 +95,14 @@ function PracticeHub() {
   return (
     <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
       <PageHeader
+        eyebrow="Studio"
         title="AI Practice"
         subtitle="Practice with generated questions and written feedback, or use a timed drill. Live mocks still happen with a human interviewer."
       />
       <Card className="mt-8 p-5 sm:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Practice interview</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-coral-700">Practice interview</p>
             <h2 className="mt-1 font-semibold text-navy-950">Answer questions and get practice feedback</h2>
             <p className="mt-2 max-w-xl text-sm text-slate-600">
               Choose a role, interview type, and topics. This is AI practice only — it does not create a booking or
@@ -122,7 +123,7 @@ function PracticeHub() {
       <Card className="mt-4 p-5 sm:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Interview preparation</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-coral-700">Interview preparation</p>
             <h2 className="mt-1 font-semibold text-navy-950">Suggested topics from your profile</h2>
             <p className="mt-2 max-w-xl text-sm text-slate-600">
               Get practice recommendations based on your role and skills. Suggestions only — your profile is not changed
@@ -322,7 +323,7 @@ function PracticeSession({ drill }: { drill: PracticeDrill }) {
   if (!started) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
-        <button type="button" className="text-sm font-medium text-blue-700" onClick={() => navigate('/candidate/practice')}>
+        <button type="button" className="text-sm font-medium text-coral-700" onClick={() => navigate('/candidate/practice')}>
           ← All drills
         </button>
         <PageHeader
@@ -437,7 +438,7 @@ function PracticeSession({ drill }: { drill: PracticeDrill }) {
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <button type="button" className="text-sm font-medium text-blue-700" onClick={() => navigate('/candidate/practice')}>
+        <button type="button" className="text-sm font-medium text-coral-700" onClick={() => navigate('/candidate/practice')}>
           ← Exit drill
         </button>
         <div className="flex items-center gap-3">
@@ -456,7 +457,7 @@ function PracticeSession({ drill }: { drill: PracticeDrill }) {
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
         <Card className="p-5 sm:p-6">
-          <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">{drill.type}</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-coral-700">{drill.type}</p>
           <h1 className="mt-1 text-xl font-semibold text-navy-950">{question.title}</h1>
           <p className="mt-3 text-sm leading-6 text-slate-700">{question.prompt}</p>
 

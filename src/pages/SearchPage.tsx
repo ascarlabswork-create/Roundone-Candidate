@@ -149,7 +149,7 @@ export function SearchPage() {
           />
         </div>
         {looksLikeNaturalLanguage(filters.query) ? (
-          <Link to={`/candidate/find?q=${encodeURIComponent(filters.query)}`} className="text-sm font-medium text-blue-700">
+          <Link to={`/candidate/find?q=${encodeURIComponent(filters.query)}`} className="text-sm font-medium text-coral-700">
             Find matches from this description
           </Link>
         ) : null}
@@ -183,7 +183,7 @@ export function SearchPage() {
 
       <div className="mt-6 grid gap-8 lg:grid-cols-[280px_minmax(0,1fr)]">
         <div className="hidden lg:block">
-          <div className="sticky top-24 rounded-xl border border-slate-200 bg-white p-5">
+          <div className="sticky top-24 rounded-2xl border border-navy-950/8 bg-white/90 p-5 shadow-[0_18px_40px_-28px_rgba(12,18,32,0.45)]">
             <FilterPanel
               filters={filters}
               onChange={updateFilters}

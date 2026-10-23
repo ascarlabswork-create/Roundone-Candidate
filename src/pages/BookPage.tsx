@@ -404,7 +404,7 @@ export function BookPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
-      <Link to={`/candidate/interviewers/${header.id}`} className="text-sm font-medium text-blue-700">
+      <Link to={`/candidate/interviewers/${header.id}`} className="text-sm font-medium text-coral-700">
         ← Back to profile
       </Link>
       <h1 className="mt-4 text-2xl font-semibold text-navy-950">Book your interview</h1>

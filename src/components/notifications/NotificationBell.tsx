@@ -92,7 +92,7 @@ export function NotificationBell() {
             {unreadCount != null && unreadCount > 0 ? (
               <button
                 type="button"
-                className="text-xs font-medium text-blue-700 hover:text-blue-800"
+                className="text-xs font-medium text-coral-700 hover:text-coral-600"
                 onClick={() => void onMarkAll()}
               >
                 Mark all as read
@@ -135,7 +135,7 @@ export function NotificationBell() {
           <div className="border-t border-slate-100 px-4 py-2">
             <Link
               to="/candidate/notifications"
-              className="text-xs font-medium text-blue-700 hover:text-blue-800"
+              className="text-xs font-medium text-coral-700 hover:text-coral-600"
               onClick={() => setOpen(false)}
             >
               View all

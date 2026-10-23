@@ -676,7 +676,7 @@ export function AiPracticePage() {
                 </p>
                 <h2 className="mt-1 text-2xl font-bold text-navy-950 sm:text-3xl">
                   AI Practice Score:{' '}
-                  <span className="text-blue-700">{average == null ? '—' : `${average} / 10`}</span>
+                  <span className="text-coral-700">{average == null ? '—' : `${average} / 10`}</span>
                 </h2>
               </div>
               <Badge tone="blue">Completed</Badge>
@@ -729,7 +729,7 @@ export function AiPracticePage() {
               {session.turns.map((turn, idx) => (
                 <div key={turn.question.id || idx} className="rounded-lg border border-slate-200 bg-slate-50/70 p-4">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="text-xs font-semibold uppercase text-blue-700">Question {idx + 1}</span>
+                    <span className="text-xs font-semibold uppercase text-coral-700">Question {idx + 1}</span>
                     {turn.feedback?.score && (
                       <span className="text-xs font-semibold text-navy-900">
                         Score: {turn.feedback.score} / 10
@@ -778,7 +778,7 @@ export function AiPracticePage() {
       <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
         <button
           type="button"
-          className="text-sm font-medium text-blue-700"
+          className="text-sm font-medium text-coral-700"
           onClick={() => setSession({ ...session, phase: 'setup' })}
         >
           ← Back to setup
@@ -808,7 +808,7 @@ export function AiPracticePage() {
                   {interviewer.gender}
                 </span>
               </div>
-              <p className="text-xs font-medium text-blue-700">{interviewer.title}</p>
+              <p className="text-xs font-medium text-coral-700">{interviewer.title}</p>
               <p className="mt-0.5 text-xs text-slate-600">{interviewer.style}</p>
             </div>
           </div>
@@ -932,7 +932,7 @@ export function AiPracticePage() {
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
       <button
         type="button"
-        className="text-sm font-medium text-blue-700"
+        className="text-sm font-medium text-coral-700"
         onClick={() => navigate('/candidate/practice')}
       >
         ← All practice
@@ -955,7 +955,7 @@ export function AiPracticePage() {
         </p>
         <Link
           to="/candidate/resume-skills"
-          className="mt-2 inline-block shrink-0 font-medium text-blue-700 hover:text-blue-800 sm:mt-0"
+          className="mt-2 inline-block shrink-0 font-medium text-coral-700 hover:text-coral-600 sm:mt-0"
         >
           Build skills from resume →
         </Link>
@@ -1049,7 +1049,7 @@ export function AiPracticePage() {
                   onClick={() => updateSetup({ interviewerId: persona.id })}
                   className={`flex flex-col rounded-xl border p-3.5 text-left transition-all ${
                     selected
-                      ? 'border-blue-600 bg-blue-50/70 ring-2 ring-blue-600/20'
+                      ? 'border-coral-600 bg-coral-50/70 ring-2 ring-coral-600/20'
                       : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
                   }`}
                 >
@@ -1063,7 +1063,7 @@ export function AiPracticePage() {
                       Voice: {persona.voice}
                     </span>
                   </div>
-                  <span className="mt-0.5 text-xs font-medium text-blue-700">{persona.title}</span>
+                  <span className="mt-0.5 text-xs font-medium text-coral-700">{persona.title}</span>
                   <p className="mt-1 text-xs text-slate-600 leading-normal">{persona.style}</p>
                 </button>
               )

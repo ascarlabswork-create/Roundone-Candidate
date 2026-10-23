@@ -7,9 +7,9 @@ export function CandidateLayout() {
   const { toasts, dismissToast } = useToast()
 
   return (
-    <div className="flex min-h-svh flex-col bg-slate-50">
+    <div className="flex min-h-svh flex-col bg-paper">
       <Navbar />
-      <main className="flex-1">
+      <main className="studio-grid flex-1">
         <Outlet />
       </main>
       <Footer />
@@ -18,7 +18,7 @@ export function CandidateLayout() {
           <button
             key={toast.id}
             type="button"
-            className="pointer-events-auto rounded-lg bg-navy-950 px-4 py-3 text-left text-sm text-white shadow-lg"
+            className="pointer-events-auto rounded-2xl bg-navy-950 px-4 py-3 text-left text-sm text-white shadow-lg"
             onClick={() => dismissToast(toast.id)}
           >
             {toast.message}

@@ -27,7 +27,7 @@ export function Avatar({
         sizes[size],
       )}
     >
-      <img src={src} alt="" className="relative z-10 h-full w-full object-cover" />
+      {src ? <img src={src} alt="" className="relative z-10 h-full w-full object-cover" /> : null}
       <span className="absolute inset-0 flex items-center justify-center">{initials(name)}</span>
     </span>
   )
@@ -82,7 +82,7 @@ export function InteractiveStars({
             key={star}
             type="button"
             onClick={() => onChange(star)}
-            className="rounded p-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+            className="rounded p-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral-500"
             aria-label={`${star} star${star === 1 ? '' : 's'}`}
           >
             <Star className={cn('h-7 w-7', filled ? 'fill-amber-400 text-amber-400' : 'text-slate-300')} />

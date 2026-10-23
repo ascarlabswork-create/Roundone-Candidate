@@ -43,6 +43,7 @@ export function NotificationsPage() {
   return (
     <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
       <PageHeader
+        eyebrow="Inbox"
         title="Notifications"
         subtitle="Booking updates, feedback, and reminders."
         actions={

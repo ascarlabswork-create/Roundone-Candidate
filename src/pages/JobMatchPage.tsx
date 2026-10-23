@@ -226,7 +226,7 @@ export function JobMatchPage() {
         subtitle="Paste a public job URL. jobround.ai reads the posting, then ranks interviewers by how well their skills cover that job."
       />
 
-      <form onSubmit={onAnalyze} className="mt-8 space-y-4 rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
+      <form onSubmit={onAnalyze} className="mt-8 space-y-4 rounded-2xl border border-navy-950/8 bg-white/90 p-5 sm:p-6">
         <h2 className="text-lg font-semibold text-navy-950">Find an interviewer for a job</h2>
         <div>
           <FieldLabel htmlFor="job-url">Job URL</FieldLabel>
@@ -255,7 +255,7 @@ export function JobMatchPage() {
       </form>
 
       {showPaste ? (
-        <form onSubmit={onPaste} className="mt-4 space-y-3 rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
+        <form onSubmit={onPaste} className="mt-4 space-y-3 rounded-2xl border border-navy-950/8 bg-white/90 p-5 sm:p-6">
           <FieldLabel htmlFor="job-paste">Paste Job Description</FieldLabel>
           <TextArea id="job-paste" value={paste} onChange={(event) => setPaste(event.target.value)} rows={8} />
           <p className="text-xs text-slate-500">This description is entered by you. It is not claimed to come from a job URL.</p>
@@ -269,7 +269,7 @@ export function JobMatchPage() {
       {loadingTarget ? <Skeleton className="mt-6 h-40" /> : null}
 
       {review ? (
-        <section className="mt-8 space-y-4 rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
+        <section className="mt-8 space-y-4 rounded-2xl border border-navy-950/8 bg-white/90 p-5 sm:p-6">
           <h2 className="text-lg font-semibold text-navy-950">Review extracted job</h2>
           <p className="text-sm text-slate-600">
             {review.sourceType === 'url'
@@ -278,7 +278,7 @@ export function JobMatchPage() {
           </p>
           {review.sourceUrl ? (
             <p className="break-all text-sm text-slate-600">
-              Source URL: <a className="text-blue-700" href={review.sourceUrl}>{review.sourceUrl}</a>
+              Source URL: <a className="text-coral-700" href={review.sourceUrl}>{review.sourceUrl}</a>
             </p>
           ) : null}
           <div>

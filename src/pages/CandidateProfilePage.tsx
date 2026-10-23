@@ -344,6 +344,7 @@ export function CandidateProfilePage() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
       <PageHeader
+        eyebrow="Account"
         title="Profile"
         subtitle="These details are stored on your candidate account and are visible only to you until you share them in a booking."
       />
@@ -682,7 +683,7 @@ export function CandidateProfilePage() {
           <ul className="mt-3 space-y-2 text-sm">
             {saved.map((person) => (
               <li key={person.id}>
-                <Link className="font-medium text-blue-700" to={`/candidate/interviewers/${person.id}`}>
+                <Link className="font-medium text-coral-700" to={`/candidate/interviewers/${person.id}`}>
                   {person.name}
                 </Link>
               </li>

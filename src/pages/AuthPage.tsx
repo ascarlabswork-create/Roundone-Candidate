@@ -144,7 +144,22 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
   }
 
   return (
-    <div className="mx-auto max-w-md px-4 py-10 sm:px-6">
+    <div className="studio-grid">
+      <div className="mx-auto grid max-w-6xl items-stretch gap-6 px-4 py-10 sm:px-6 lg:grid-cols-2 lg:py-16">
+        <div className="studio-ink hidden flex-col justify-between rounded-[2rem] p-10 text-white lg:flex">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gold-400">jobround.ai</p>
+            <h2 className="mt-4 text-4xl font-semibold tracking-tight">
+              Your next interview should not be the first time you hear the question.
+            </h2>
+            <p className="mt-5 max-w-md text-sm leading-6 text-slate-300">
+              Sign in to book live mocks with working professionals, run AI practice, and keep every scorecard in one
+              place.
+            </p>
+          </div>
+          <p className="text-sm text-slate-400">Mock interviews with people who have sat on the hiring side.</p>
+        </div>
+        <div className="mx-auto w-full max-w-md lg:mx-0 lg:max-w-none">
       <PageHeader
         title={isRegister ? 'Create your candidate account' : 'Sign in'}
         subtitle={
@@ -187,7 +202,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
                   type="button"
                   onClick={() => void forgotPassword()}
                   disabled={busy || resetWait > 0}
-                  className="text-xs font-medium text-blue-700 hover:underline disabled:text-slate-400"
+                  className="text-xs font-medium text-coral-700 hover:underline disabled:text-slate-400"
                 >
                   {resetWait > 0 ? `Wait ${resetWait}s` : 'Forgot password?'}
                 </button>
@@ -232,6 +247,11 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
             </div>
           ) : null}
 
+          {!isRegister ? (
+            <p className="text-xs text-slate-500">
+              Accounts created with Google have no password. Use Continue with Google, or Forgot password to set one.
+            </p>
+          ) : null}
           {error || sessionError ? <p className="text-sm text-red-700">{error || sessionError}</p> : null}
           {info ? <p className="text-sm text-emerald-700">{info}</p> : null}
           {needsConfirmation ? (
@@ -239,7 +259,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
               type="button"
               onClick={() => void resendConfirmation()}
               disabled={busy || resetWait > 0}
-              className="text-sm font-medium text-blue-700 hover:underline disabled:text-slate-400"
+              className="text-sm font-medium text-coral-700 hover:underline disabled:text-slate-400"
             >
               {resetWait > 0 ? `Resend available in ${resetWait}s` : 'Resend confirmation email'}
             </button>
@@ -271,7 +291,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
           {isRegister ? (
             <>
               Already have an account?{' '}
-              <Link className="font-medium text-blue-700" to={`/candidate/login?next=${encodeURIComponent(nextPath)}`}>
+              <Link className="font-medium text-coral-700" to={`/candidate/login?next=${encodeURIComponent(nextPath)}`}>
                 Sign in
               </Link>
             </>
@@ -279,7 +299,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
             <>
               Don&apos;t have an account?{' '}
               <Link
-                className="font-medium text-blue-700"
+                className="font-medium text-coral-700"
                 to={`/candidate/register?next=${encodeURIComponent(nextPath)}`}
               >
                 Create Candidate Account
@@ -288,6 +308,8 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
           )}
         </p>
       </Card>
+        </div>
+      </div>
     </div>
   )
 }

@@ -103,7 +103,7 @@ export function SkillMatchCard({
   const profileTo = `/candidate/interviewers/${interviewer.id}?from=matches`
 
   return (
-    <article className="flex flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+    <article className="flex flex-col rounded-2xl border border-navy-950/8 bg-white p-4 shadow-[0_18px_40px_-28px_rgba(12,18,32,0.45)] sm:p-5">
       <div className="flex gap-3 sm:gap-4">
         <Avatar src={interviewer.photo} name={interviewer.name} size="lg" />
         <div className="min-w-0 flex-1">
