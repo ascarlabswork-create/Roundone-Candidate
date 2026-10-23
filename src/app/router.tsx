@@ -34,7 +34,7 @@ import {
   RefundPolicyPage,
   TermsPage,
 } from '../pages/LegalPages.tsx'
-import { NotFoundPage, ResourcesPage } from '../pages/SupportingPages.tsx'
+import { HowItWorksPage, NotFoundPage, ResourcesPage } from '../pages/SupportingPages.tsx'
 
 export function AppRouter() {
   return (
@@ -48,6 +48,7 @@ export function AppRouter() {
           <Route path="/refund-policy" element={<RefundPolicyPage />} />
           <Route path="/pricing" element={<PricingTermsPage />} />
           <Route path="/contact" element={<ContactPage />} />
+          <Route path="/candidate/how-it-works" element={<HowItWorksPage />} />
           <Route path="/candidate/login" element={<AuthPage mode="login" />} />
           <Route path="/candidate/register" element={<AuthPage mode="register" />} />
           <Route path="/candidate/auth/callback" element={<AuthCallbackPage />} />

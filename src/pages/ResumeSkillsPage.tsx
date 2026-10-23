@@ -427,7 +427,7 @@ export function ResumeSkillsPage() {
 
           {profileSummary ? (
             <Card className="p-5 sm:p-6">
-              <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">From your resume</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-coral-700">From your resume</p>
               <p className="mt-2 text-sm leading-6 text-slate-700">{profileSummary}</p>
             </Card>
           ) : null}

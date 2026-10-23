@@ -126,6 +126,7 @@ export function PreparationPage() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
       <PageHeader
+        eyebrow="Prep"
         title="AI Interview Preparation"
         subtitle="Personalized preparation based on your profile and optional background text. Suggestions only — nothing changes your profile unless you edit it yourself."
       />
@@ -217,7 +218,7 @@ export function PreparationPage() {
       ) : (
         <div className="mt-8 space-y-5">
           <Card className="p-5 sm:p-6">
-            <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Based on your profile</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-coral-700">Based on your profile</p>
             <h2 className="mt-1 font-semibold text-navy-950">Preparation summary</h2>
             <p className="mt-2 text-sm leading-6 text-slate-700">{result.profileSummary}</p>
           </Card>

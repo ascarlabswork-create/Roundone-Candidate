@@ -232,19 +232,20 @@ export function FindPage() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
       <PageHeader
+        eyebrow="Match"
         title="Tell us about your interview"
         subtitle="We’ll rank interviewers against this goal. You can still browse everyone afterwards."
         actions={
           <Link
             to="/candidate/job-match"
-            className="inline-flex h-11 shrink-0 items-center justify-center whitespace-nowrap rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-navy-950 transition-colors hover:border-navy-700 hover:bg-slate-50 hover:text-navy-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
+            className="inline-flex h-11 shrink-0 items-center justify-center whitespace-nowrap rounded-full border border-navy-950/15 bg-white px-4 text-sm font-semibold text-navy-950 transition-colors hover:border-coral-600 hover:text-coral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral-500 focus-visible:ring-offset-2"
           >
             Match interviewers to a job posting
           </Link>
         }
       />
 
-      <form onSubmit={submit} className="mt-8 space-y-5 rounded-xl border border-slate-200 bg-white p-5 sm:p-8">
+      <form onSubmit={submit} className="mt-8 space-y-5 rounded-2xl border border-navy-950/8 bg-white/90 p-5 shadow-[0_18px_40px_-28px_rgba(12,18,32,0.45)] sm:p-8">
         <div>
           <FieldLabel htmlFor="resume-file">Resume</FieldLabel>
           <input
@@ -410,7 +411,7 @@ export function FindPage() {
               <p className="text-sm font-semibold text-navy-950">Optional details</p>
               <p className="text-xs text-slate-500">Describe what you want and target company</p>
             </div>
-            <span className="text-sm font-medium text-blue-700">{optionalOpen ? 'Hide' : 'Show'}</span>
+            <span className="text-sm font-medium text-coral-700">{optionalOpen ? 'Hide' : 'Show'}</span>
           </button>
 
           {optionalOpen ? (

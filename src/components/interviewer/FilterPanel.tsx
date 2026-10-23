@@ -62,7 +62,7 @@ function MultiCheck({
                 onChange={() =>
                   onChange(checked ? values.filter((item) => item !== option) : [...values, option])
                 }
-                className="h-4 w-4 rounded border-slate-300 text-navy-950 focus:ring-blue-600"
+                className="h-4 w-4 rounded border-slate-300 text-navy-950 focus:ring-coral-500"
               />
               {option}
             </label>
@@ -187,7 +187,7 @@ export function FilterPanel({
           type="checkbox"
           checked={filters.verifiedOnly}
           onChange={(event) => onChange({ ...filters, verifiedOnly: event.target.checked })}
-          className="h-4 w-4 rounded border-slate-300 text-navy-950 focus:ring-blue-600"
+          className="h-4 w-4 rounded border-slate-300 text-navy-950 focus:ring-coral-500"
         />
         Verified only
       </label>

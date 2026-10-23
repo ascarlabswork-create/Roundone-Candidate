@@ -1,22 +1,58 @@
 import { Link } from 'react-router-dom'
-import { COPYRIGHT_NOTICE, LEGAL_LINKS } from '../../legal/legalCopy.ts'
+import { COPYRIGHT_NOTICE } from '../../legal/legalCopy.ts'
+import { Logo } from './Logo.tsx'
 
 export function Footer() {
   return (
-    <footer className="mt-auto border-t border-slate-200 bg-slate-50">
-      <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-6 sm:px-6">
-        <nav aria-label="Legal" className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:gap-x-6 sm:gap-y-2">
-          {LEGAL_LINKS.map((item) => (
-            <Link
-              key={item.to}
-              to={item.to}
-              className="text-sm text-slate-500 underline-offset-2 hover:text-navy-950 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy-950"
-            >
-              {item.label}
+    <footer className="mt-auto border-t border-navy-950/8 bg-navy-950 text-slate-300">
+      <div className="mx-auto grid max-w-7xl gap-10 px-4 py-12 sm:px-6 md:grid-cols-4">
+        <div className="md:col-span-2">
+          <Logo inverted />
+          <p className="mt-4 max-w-sm text-sm leading-6 text-slate-400">
+            Mock interviews with people who have sat on the other side of the table. Practice, get scored, then walk into
+            the real round ready.
+          </p>
+        </div>
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gold-400">Product</p>
+          <div className="mt-4 flex flex-col gap-2 text-sm">
+            <Link className="hover:text-white" to="/candidate/how-it-works">
+              How it works
             </Link>
-          ))}
-        </nav>
-        <p className="text-sm text-slate-500">{COPYRIGHT_NOTICE}</p>
+            <Link className="hover:text-white" to="/candidate/find">
+              Find interviewers
+            </Link>
+            <Link className="hover:text-white" to="/candidate/practice">
+              AI practice
+            </Link>
+            <Link className="hover:text-white" to="/candidate/resources">
+              Resources
+            </Link>
+          </div>
+        </div>
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gold-400">Company</p>
+          <div className="mt-4 flex flex-col gap-2 text-sm">
+            <Link className="hover:text-white" to="/contact">
+              Contact
+            </Link>
+            <Link className="hover:text-white" to="/privacy">
+              Privacy
+            </Link>
+            <Link className="hover:text-white" to="/terms">
+              Terms
+            </Link>
+            <Link className="hover:text-white" to="/cookies">
+              Cookies
+            </Link>
+            <Link className="hover:text-white" to="/refund-policy">
+              Refunds
+            </Link>
+          </div>
+        </div>
+      </div>
+      <div className="border-t border-white/10">
+        <p className="mx-auto max-w-7xl px-4 py-4 text-xs text-slate-500 sm:px-6">{COPYRIGHT_NOTICE}</p>
       </div>
     </footer>
   )

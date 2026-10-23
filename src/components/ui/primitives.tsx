@@ -10,7 +10,7 @@ export function Card({
   children: ReactNode
 }) {
   return (
-    <div className={cn('rounded-xl border border-slate-200 bg-white shadow-sm', className)}>
+    <div className={cn('rounded-2xl border border-navy-950/8 bg-white/90 shadow-[0_18px_40px_-28px_rgba(12,18,32,0.45)]', className)}>
       {children}
     </div>
   )
@@ -79,7 +79,7 @@ export function FieldLabel({ children, htmlFor }: { children: ReactNode; htmlFor
 }
 
 const fieldClass =
-  'h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50'
+  'h-11 w-full rounded-xl border border-navy-950/12 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-coral-500 focus:ring-2 focus:ring-coral-100 disabled:bg-slate-50'
 
 export function TextInput(props: InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={cn(fieldClass, props.className)} />
@@ -119,7 +119,7 @@ export function TextArea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
     <textarea
       {...props}
       className={cn(
-        'min-h-28 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100',
+        'min-h-28 w-full rounded-xl border border-navy-950/12 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-coral-500 focus:ring-2 focus:ring-coral-100',
         props.className,
       )}
     />
@@ -136,7 +136,7 @@ export function EmptyState({
   action?: ReactNode
 }) {
   return (
-    <div className="rounded-xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center">
+    <div className="rounded-2xl border border-dashed border-navy-950/15 bg-white/80 px-6 py-16 text-center">
       <h3 className="text-lg font-semibold text-navy-950">{title}</h3>
       <p className="mx-auto mt-2 max-w-md text-sm text-slate-600">{body}</p>
       {action ? <div className="mt-6 flex justify-center">{action}</div> : null}
@@ -199,8 +199,8 @@ export function Toggle({
       disabled={disabled}
       onClick={() => onChange(!checked)}
       className={cn(
-        'relative h-6 w-11 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60',
-        checked ? 'bg-blue-600' : 'bg-slate-300',
+        'relative h-6 w-11 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60',
+        checked ? 'bg-coral-600' : 'bg-slate-300',
       )}
     >
       <span
@@ -228,7 +228,7 @@ export function PageHeader({
     <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div>
         {eyebrow ? (
-          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-violet-700">{eyebrow}</p>
+          <p className="mb-1 text-xs font-semibold uppercase tracking-[0.18em] text-coral-700">{eyebrow}</p>
         ) : null}
         <h1 className="text-2xl font-semibold tracking-tight text-navy-950 sm:text-3xl">{title}</h1>
         {subtitle ? <p className="mt-2 max-w-2xl text-sm text-slate-600 sm:text-base">{subtitle}</p> : null}

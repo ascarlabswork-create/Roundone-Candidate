@@ -38,7 +38,7 @@ export function UpdatePasswordPage() {
   }
 
   return (
-    <div className="mx-auto max-w-md px-4 py-10 sm:px-6">
+    <div className="studio-grid mx-auto max-w-md px-4 py-10 sm:px-6">
       <PageHeader
         title="Set a new password"
         subtitle="Choose a new password for your candidate account."
