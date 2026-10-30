@@ -53,7 +53,9 @@ function PublicNavItem({
       className={({ isActive }) =>
         cn(
           'rounded-xl px-3 py-2 text-sm font-medium transition-colors',
-          isActive ? 'bg-coral-50 text-coral-700' : 'text-slate-600 hover:bg-black/[0.04] hover:text-navy-950',
+                  isActive
+                    ? 'bg-gradient-to-r from-coral-50 to-violet-50 text-violet-700'
+                    : 'text-slate-600 hover:bg-violet-50/70 hover:text-navy-950',
         )
       }
     >

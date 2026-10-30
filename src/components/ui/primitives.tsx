@@ -61,8 +61,8 @@ export function Chip({
       className={cn(
         'rounded-full border px-3 py-1.5 text-sm transition-colors',
         active
-          ? 'border-coral-600 bg-coral-50 text-coral-700'
-          : 'border-black/10 bg-white text-slate-700 hover:border-black/20 hover:text-navy-950',
+          ? 'border-violet-600 bg-gradient-to-r from-coral-50 to-violet-100 text-violet-800'
+          : 'border-black/10 bg-white text-slate-700 hover:border-violet-200 hover:bg-violet-50 hover:text-violet-800',
       )}
     >
       {children}
@@ -228,7 +228,7 @@ export function PageHeader({
     <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div>
         {eyebrow ? (
-          <p className="mb-1 text-xs font-medium uppercase tracking-[0.14em] text-coral-700">{eyebrow}</p>
+          <p className="mb-1 text-xs font-semibold uppercase tracking-[0.14em] text-gradient-brand">{eyebrow}</p>
         ) : null}
         <h1 className="text-[1.65rem] font-semibold tracking-tight text-navy-950 sm:text-[1.85rem]">{title}</h1>
         {subtitle ? <p className="mt-2 max-w-2xl text-sm text-slate-600 sm:text-base">{subtitle}</p> : null}

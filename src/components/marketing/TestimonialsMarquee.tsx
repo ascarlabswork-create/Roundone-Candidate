@@ -88,8 +88,8 @@ export function TestimonialsMarquee() {
         Illustrative preparation stories by role. Roles reflect common tracks on JobRound.ai (
         {TARGET_ROLES.slice(0, 3).join(', ')}, and more). Levels include {CANDIDATE_LEVELS.slice(0, 4).join(', ')}.
       </p>
-      <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-16 bg-gradient-to-r from-[#f5f7fa] to-transparent sm:w-24" />
-      <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-16 bg-gradient-to-l from-[#f5f7fa] to-transparent sm:w-24" />
+      <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-16 bg-gradient-to-r from-[#ecfdf5] to-transparent sm:w-24" />
+      <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-16 bg-gradient-to-l from-[#ecfdf5] to-transparent sm:w-24" />
       <div className="testimonial-marquee flex w-max gap-4 py-2">
         {track.map((item, index) => (
           <StoryCard key={`${item.role}-${index}`} item={item} />

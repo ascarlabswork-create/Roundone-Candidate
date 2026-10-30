@@ -14,7 +14,7 @@ export function Sidebar({
   onSignOut: () => void
 }) {
   return (
-    <aside className="flex h-full w-64 shrink-0 flex-col border-r border-black/[0.06] bg-white">
+    <aside className="flex h-full w-64 shrink-0 flex-col border-r border-violet-100/80 bg-gradient-to-b from-white via-violet-50/30 to-sky-50/40">
       <div className="flex h-16 items-center px-5">
         <Logo />
       </div>
@@ -28,7 +28,9 @@ export function Sidebar({
             className={({ isActive }) =>
               cn(
                 'flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium transition-colors',
-                isActive ? 'bg-coral-50 text-coral-700' : 'text-slate-600 hover:bg-black/[0.04] hover:text-navy-950',
+                isActive
+                  ? 'bg-gradient-to-r from-coral-50 to-violet-50 text-violet-700 ring-1 ring-violet-100'
+                  : 'text-slate-600 hover:bg-violet-50/60 hover:text-navy-950',
               )
             }
           >

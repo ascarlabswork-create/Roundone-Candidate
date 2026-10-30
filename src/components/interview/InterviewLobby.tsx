@@ -103,8 +103,8 @@ export function InterviewLobby({
 
   return (
     <div className="mx-auto max-w-xl px-4 py-10">
-      <div className="rounded-xl border border-slate-200 bg-white p-6">
-        <p className="text-sm font-medium text-slate-500">Pre-interview lobby</p>
+      <div className="rounded-2xl border border-black/[0.06] bg-white p-6 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+        <p className="text-xs font-medium uppercase tracking-[0.14em] text-coral-700">Pre-interview lobby</p>
         <h1 className="mt-2 text-2xl font-semibold text-navy-950">
           {interview.interviewType || 'Interview'}
         </h1>

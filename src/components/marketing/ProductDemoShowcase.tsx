@@ -63,7 +63,8 @@ export function ProductDemoShowcase() {
 
   return (
     <div className="relative">
-      <div className="overflow-hidden rounded-2xl border border-black/[0.08] bg-white shadow-[0_24px_60px_-32px_rgba(16,28,53,0.45)]">
+      <div className="pointer-events-none absolute -inset-3 rounded-[1.75rem] bg-gradient-to-r from-coral-400/30 via-violet-400/30 to-sky-400/30 blur-2xl" aria-hidden />
+      <div className="relative overflow-hidden rounded-2xl border border-violet-200/60 bg-white shadow-[0_24px_60px_-32px_rgba(79,70,229,0.35)]">
         <div className="flex items-center gap-2 border-b border-black/[0.06] bg-[#f5f7fa] px-4 py-3">
           <span className="h-2.5 w-2.5 rounded-full bg-[#ff5f57]" aria-hidden />
           <span className="h-2.5 w-2.5 rounded-full bg-[#febc2e]" aria-hidden />
