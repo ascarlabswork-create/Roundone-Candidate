@@ -48,13 +48,13 @@ export function AppRouter() {
           <Route path="/refund-policy" element={<RefundPolicyPage />} />
           <Route path="/pricing" element={<PricingTermsPage />} />
           <Route path="/contact" element={<ContactPage />} />
+          <Route path="/" element={<HomePage />} />
           <Route path="/candidate/how-it-works" element={<HowItWorksPage />} />
           <Route path="/candidate/login" element={<AuthPage mode="login" />} />
           <Route path="/candidate/register" element={<AuthPage mode="register" />} />
           <Route path="/candidate/auth/callback" element={<AuthCallbackPage />} />
           <Route path="/candidate/update-password" element={<UpdatePasswordPage />} />
           <Route element={<RequireCandidateAuth />}>
-            <Route path="/" element={<HomePage />} />
             <Route path="/candidate/find" element={<FindPage />} />
             <Route path="/candidate/job-match" element={<JobMatchPage />} />
             <Route path="/candidate/matches" element={<MatchesPage />} />

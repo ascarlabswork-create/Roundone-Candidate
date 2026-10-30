@@ -82,7 +82,7 @@ export function InteractiveStars({
             key={star}
             type="button"
             onClick={() => onChange(star)}
-            className="rounded p-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral-500"
+            className="min-h-11 min-w-11 rounded-lg p-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral-600"
             aria-label={`${star} star${star === 1 ? '' : 's'}`}
           >
             <Star className={cn('h-7 w-7', filled ? 'fill-amber-400 text-amber-400' : 'text-slate-300')} />
