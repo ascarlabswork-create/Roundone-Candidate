@@ -82,4 +82,36 @@
   .studio-ink {
     background: #101c35;
   }
+
+  .public-surface {
+    background: #f5f7fa;
+  }
+
+  .public-hero {
+    background:
+      radial-gradient(ellipse 80% 60% at 50% -20%, rgba(0, 122, 255, 0.12), transparent 55%),
+      linear-gradient(180deg, #ffffff 0%, #f5f7fa 100%);
+  }
+}
+
+@keyframes testimonial-marquee {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.testimonial-marquee {
+  animation: testimonial-marquee 45s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .testimonial-marquee {
+    animation: none;
+    flex-wrap: wrap;
+    width: 100%;
+    justify-content: center;
+  }
 }
