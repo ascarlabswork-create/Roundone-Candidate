@@ -35,12 +35,14 @@ import {
   TermsPage,
 } from '../pages/LegalPages.tsx'
 import { HowItWorksPage, NotFoundPage, ResourcesPage } from '../pages/SupportingPages.tsx'
+import { AuthModalProvider } from '../state/authModal.tsx'
 
 export function AppRouter() {
   return (
     <BrowserRouter>
-      <BookingCallListener />
-      <Routes>
+      <AuthModalProvider>
+        <BookingCallListener />
+        <Routes>
         <Route element={<CandidateLayout />}>
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/cookies" element={<CookiePolicyPage />} />
@@ -83,7 +85,8 @@ export function AppRouter() {
         <Route element={<RequireCandidateAuth />}>
           <Route path="/candidate/interview/:id" element={<InterviewRoomPage />} />
         </Route>
-      </Routes>
+        </Routes>
+      </AuthModalProvider>
     </BrowserRouter>
   )
 }
