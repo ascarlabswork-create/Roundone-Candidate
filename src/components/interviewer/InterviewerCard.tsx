@@ -31,7 +31,7 @@ export function InterviewerCard({
       className={
         selected
           ? 'flex flex-col rounded-2xl border border-coral-600 bg-white p-5 shadow-sm ring-2 ring-coral-100'
-          : 'flex flex-col rounded-2xl border border-navy-950/8 bg-white p-5 shadow-[0_18px_40px_-28px_rgba(12,18,32,0.45)]'
+          : 'flex flex-col rounded-2xl border border-black/[0.06] bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]'
       }
     >
       <div className="flex gap-4">
@@ -122,7 +122,7 @@ export function InterviewerCard({
 
 export function InterviewerCardSkeleton() {
   return (
-    <div className="animate-pulse rounded-2xl border border-navy-950/8 bg-white p-5">
+    <div className="animate-pulse rounded-2xl border border-black/[0.06] bg-white p-5">
       <div className="flex gap-4">
         <div className="h-20 w-20 rounded-full bg-slate-200" />
         <div className="flex-1 space-y-2">

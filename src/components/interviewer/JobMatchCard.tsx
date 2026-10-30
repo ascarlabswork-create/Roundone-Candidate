@@ -65,7 +65,7 @@ export function JobMatchCard({
   const roleLine = [interviewer.currentRole, interviewer.company].filter(Boolean).join(' @ ')
 
   return (
-    <article className="flex h-full flex-col rounded-2xl border border-navy-950/8 bg-white p-4 shadow-[0_18px_40px_-28px_rgba(12,18,32,0.45)] sm:p-5">
+    <article className="flex h-full flex-col rounded-2xl border border-black/[0.06] bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.04)] sm:p-5">
       <div className="flex gap-3">
         <Avatar src={interviewer.photo} name={interviewer.name} size="lg" />
         <div className="min-w-0 flex-1">

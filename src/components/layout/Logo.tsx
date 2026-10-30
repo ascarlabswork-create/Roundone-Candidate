@@ -14,8 +14,8 @@ export function Logo({
     <Link to="/" className={cn('inline-flex items-center gap-2', className)} aria-label="jobround.ai home">
       <span
         className={cn(
-          'flex h-9 w-9 items-center justify-center rounded-2xl text-sm font-black shadow-sm',
-          inverted ? 'bg-white text-navy-950' : 'bg-navy-950 text-gold-400',
+          'flex h-8 w-8 items-center justify-center rounded-lg text-sm font-semibold',
+          inverted ? 'bg-white text-navy-950' : 'bg-coral-600 text-white',
         )}
       >
         1
@@ -23,7 +23,7 @@ export function Logo({
       {compact ? null : (
         <span
           className={cn(
-            'text-lg font-semibold tracking-tight',
+            'text-[15px] font-semibold tracking-tight',
             inverted ? 'text-white' : 'text-navy-950',
           )}
         >

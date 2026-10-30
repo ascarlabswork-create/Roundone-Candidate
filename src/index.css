@@ -4,24 +4,25 @@
 @theme {
   --font-sans: 'Inter Variable', Inter, ui-sans-serif, system-ui, sans-serif;
 
-  --color-navy-950: #0c1220;
-  --color-navy-900: #141c2e;
-  --color-navy-800: #1c2a45;
-  --color-navy-700: #24385c;
-  --color-navy-600: #2f4d7a;
+  --color-navy-950: #101c35;
+  --color-navy-900: #152544;
+  --color-navy-800: #1c3058;
+  --color-navy-700: #243b6c;
+  --color-navy-600: #3d5278;
 
-  --color-coral-50: #fff4f0;
-  --color-coral-100: #ffddd3;
-  --color-coral-500: #e85d3a;
-  --color-coral-600: #d24726;
-  --color-coral-700: #b3391d;
+  --color-coral-50: #eef6ff;
+  --color-coral-100: #d6ebff;
+  --color-coral-200: #b3d7ff;
+  --color-coral-500: #3395ff;
+  --color-coral-600: #007aff;
+  --color-coral-700: #0066d6;
 
-  --color-gold-100: #f8edd0;
-  --color-gold-400: #e3b34c;
-  --color-gold-500: #c9962b;
+  --color-gold-100: #f2f2f7;
+  --color-gold-400: #8e8e93;
+  --color-gold-500: #636366;
 
-  --color-paper: #f6f1e8;
-  --color-paper-deep: #ebe3d4;
+  --color-paper: #f5f7fa;
+  --color-paper-deep: #e8ecf1;
 
   --color-violet-50: #f5f3ff;
   --color-violet-100: #ede9fe;
@@ -35,11 +36,26 @@
     scroll-behavior: smooth;
   }
 
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
   body {
     margin: 0;
     min-width: 320px;
-    background: #f6f1e8;
-    color: #3d4450;
+    overflow-x: hidden;
+    background: #f5f7fa;
+    color: #1d1d1f;
     font-family: var(--font-sans);
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
     -webkit-font-smoothing: antialiased;
@@ -60,15 +76,10 @@
 
 @layer utilities {
   .studio-grid {
-    background-image:
-      radial-gradient(ellipse 80% 60% at 12% -10%, rgba(232, 93, 58, 0.18), transparent 55%),
-      radial-gradient(ellipse 50% 40% at 92% 8%, rgba(227, 179, 76, 0.22), transparent 50%),
-      radial-gradient(ellipse 40% 30% at 70% 100%, rgba(15, 118, 110, 0.08), transparent 45%);
+    background: #f5f7fa;
   }
 
   .studio-ink {
-    background:
-      radial-gradient(ellipse 70% 50% at 80% 0%, rgba(232, 93, 58, 0.22), transparent 50%),
-      linear-gradient(165deg, #141c2e 0%, #0c1220 55%, #1a2438 100%);
+    background: #101c35;
   }
 }

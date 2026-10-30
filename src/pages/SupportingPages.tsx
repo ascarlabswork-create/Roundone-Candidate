@@ -46,7 +46,7 @@ export function ResourcesPage() {
       <div className="mt-8 space-y-3">
         {items.map((item) => (
           <Card key={item.title} className="p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-coral-700">{item.type}</p>
+            <p className="text-xs font-medium text-coral-700">{item.type}</p>
             <h2 className="mt-1 font-semibold text-navy-950">{item.title}</h2>
             <p className="mt-2 text-sm text-slate-600">
               Placeholder content for the candidate prototype. Replace with CMS or MDX later.
@@ -84,10 +84,10 @@ export function HowItWorksPage() {
   ]
 
   return (
-    <div className="studio-grid">
-      <div className="mx-auto max-w-5xl px-4 py-14 sm:px-6 sm:py-20">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-coral-700">How it works</p>
-        <h1 className="mt-3 max-w-3xl text-4xl font-semibold tracking-tight text-navy-950 sm:text-5xl">
+    <div>
+      <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 sm:py-14">
+        <p className="text-xs font-medium uppercase tracking-[0.14em] text-coral-700">How it works</p>
+        <h1 className="mt-2 max-w-3xl text-3xl font-semibold tracking-tight text-navy-950 sm:text-4xl">
           Four steps from “I should practice” to a round you can reuse.
         </h1>
         <p className="mt-5 max-w-2xl text-base leading-7 text-slate-600">

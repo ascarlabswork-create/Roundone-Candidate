@@ -238,7 +238,7 @@ export function FindPage() {
         actions={
           <Link
             to="/candidate/job-match"
-            className="inline-flex h-11 shrink-0 items-center justify-center whitespace-nowrap rounded-full border border-navy-950/15 bg-white px-4 text-sm font-semibold text-navy-950 transition-colors hover:border-coral-600 hover:text-coral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral-500 focus-visible:ring-offset-2"
+            className="inline-flex h-11 min-h-11 shrink-0 items-center justify-center whitespace-nowrap rounded-xl border border-black/10 bg-white px-4 text-sm font-medium text-navy-950 transition-colors hover:bg-black/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral-600 focus-visible:ring-offset-2"
           >
             Match interviewers to a job posting
           </Link>

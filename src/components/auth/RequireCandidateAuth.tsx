@@ -25,7 +25,8 @@ export function RequireCandidateAuth() {
 
   if (!user) {
     const next = `${location.pathname}${location.search}`
-    return <Navigate to={`/candidate/login?next=${encodeURIComponent(next)}`} replace />
+    const params = new URLSearchParams({ auth: 'login', next })
+    return <Navigate to={`/?${params.toString()}`} replace />
   }
 
   return <Outlet />
