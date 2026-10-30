@@ -1,123 +1,94 @@
-import {
-  BadgeCheck,
-  Bot,
-  Briefcase,
-  ChevronLeft,
-  ChevronRight,
-  ClipboardList,
-  FileSearch,
-  MessageSquare,
-  Sparkles,
-  Target,
-  Users,
-  Video,
-} from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { Bot, ClipboardList, FileSearch, Target, Users, Video } from 'lucide-react'
 import { ProductDemoShowcase } from '../components/marketing/ProductDemoShowcase.tsx'
+import { TestimonialsMarquee } from '../components/marketing/TestimonialsMarquee.tsx'
 import { Button } from '../components/ui/Button.tsx'
 import { Card } from '../components/ui/primitives.tsx'
 import { useAuthModal } from '../state/authModal.tsx'
-import { cn } from '../lib/cn.ts'
 
 const steps = [
-  { n: '1', title: 'Upload your resume or select a target job', body: 'Tell us what you are preparing for.' },
-  { n: '2', title: 'Discover skills and prepare with AI', body: 'Practice questions and prep tailored to your goals.' },
-  { n: '3', title: 'Connect with experienced interviewers', body: 'Match on skills and book a live mock.' },
-  { n: '4', title: 'Practise, receive feedback, and improve', body: 'Scorecards and notes for your next round.' },
+  { n: '1', title: 'Share your goal', body: 'Resume upload or target job — we learn what to practice.' },
+  { n: '2', title: 'Prepare with AI', body: 'Mock questions, prep plans, and skill gaps surfaced early.' },
+  { n: '3', title: 'Book a live round', body: 'Match with a professional and join a real-time video mock.' },
+  { n: '4', title: 'Improve with feedback', body: 'Scores and notes you can reuse before the next interview.' },
 ]
 
 const features = [
-  { icon: Bot, title: 'AI Mock Interviews', body: 'Timed practice with generated questions and written feedback.' },
-  { icon: Target, title: 'Job-Specific Preparation', body: 'Align prep with a posting or target company.' },
-  { icon: FileSearch, title: 'Resume-Based Skill Analysis', body: 'Extract skills from your resume for matching and practice.' },
-  { icon: Users, title: 'Interviewer Matching', body: 'Ranked professionals with clear skill overlap.' },
-  { icon: Video, title: 'Live 1-to-1 Video Interviews', body: 'Real-time mocks with working professionals.' },
-  { icon: ClipboardList, title: 'Interview Feedback and Performance Tracking', body: 'History, scores, and progress over time.' },
-]
-
-const sampleTestimonials = [
-  {
-    quote: 'Sample quote for development only — replace with approved customer testimonials before launch.',
-    name: 'Sample candidate',
-    role: 'Software engineer',
-  },
-  {
-    quote: 'Another placeholder testimonial. Do not publish fabricated reviews in production.',
-    name: 'Sample candidate',
-    role: 'Product manager',
-  },
-  {
-    quote: 'Structure preview for a future testimonial carousel.',
-    name: 'Sample candidate',
-    role: 'Data analyst',
-  },
+  { icon: Bot, title: 'AI mock interviews', body: 'Timed practice with written feedback.' },
+  { icon: Target, title: 'Job-specific preparation', body: 'Align sessions with a posting or company.' },
+  { icon: FileSearch, title: 'Resume skill analysis', body: 'Skills extracted from what you actually wrote.' },
+  { icon: Users, title: 'Interviewer matching', body: 'Ranked fits with clear overlap reasons.' },
+  { icon: Video, title: 'Live video mocks', body: 'One-to-one sessions with working professionals.' },
+  { icon: ClipboardList, title: 'Performance tracking', body: 'History, scores, and progress over time.' },
 ]
 
 function scrollToId(id: string) {
-  const el = document.getElementById(id)
-  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
 export function PublicHomePage() {
   const { openAuth } = useAuthModal()
-  const [testimonialIndex, setTestimonialIndex] = useState(0)
-
-  useEffect(() => {
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    if (reduced) return
-    const timer = window.setInterval(() => {
-      setTestimonialIndex((i) => (i + 1) % sampleTestimonials.length)
-    }, 8000)
-    return () => window.clearInterval(timer)
-  }, [])
-
-  const testimonial = sampleTestimonials[testimonialIndex]
 
   return (
-    <div className="bg-[#f5f7fa] text-[#1d1d1f]">
-      <section id="home" className="border-b border-black/[0.06] bg-white">
-        <div className="mx-auto grid max-w-6xl gap-10 px-4 py-12 sm:px-6 lg:grid-cols-2 lg:items-center lg:gap-12 lg:py-20">
-          <div className="order-1 lg:order-1">
-            <ProductDemoShowcase />
-          </div>
-          <div className="order-2 lg:order-2">
-            <p className="text-sm font-semibold text-coral-600">For candidates</p>
-            <h1 className="mt-3 text-4xl font-bold tracking-tight text-[#101c35] sm:text-5xl sm:leading-[1.08]">
-              Your Next Interview Starts With Confidence.
-            </h1>
-            <blockquote className="mt-5 border-l-4 border-coral-600 pl-4 text-base font-medium leading-relaxed text-[#101c35] sm:text-lg">
-              Don&apos;t just prepare for interviews. Experience them, practise them, and improve with every conversation.
-            </blockquote>
-            <p className="mt-5 text-base leading-7 text-slate-600">
-              Prepare with AI-powered mock interviews, connect with experienced professionals, and build the confidence to
-              succeed in your next opportunity.
+    <div className="public-surface text-[#1d1d1f]">
+      <section id="home" className="public-hero scroll-mt-24 border-b border-black/[0.05]">
+        <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24 lg:py-28">
+          <div className="mx-auto max-w-3xl text-center">
+            <p className="inline-flex rounded-full border border-coral-200 bg-white/80 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-coral-700">
+              Interview preparation platform
             </p>
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Button size="lg" fullWidth className="sm:w-auto" onClick={() => openAuth('register')}>
-                Start Preparing
+            <h1 className="mt-6 text-4xl font-bold tracking-tight text-[#101c35] sm:text-5xl lg:text-6xl lg:leading-[1.05]">
+              Your next interview starts with confidence.
+            </h1>
+            <p className="mt-5 text-lg leading-8 text-slate-600">
+              Prepare with AI-powered mock interviews, connect with experienced professionals, and build the confidence
+              to succeed in your next opportunity.
+            </p>
+            <div className="mt-9 flex flex-col justify-center gap-3 sm:flex-row">
+              <Button size="lg" onClick={() => openAuth('register')}>
+                Start preparing
               </Button>
-              <Button
-                size="lg"
-                variant="outline"
-                fullWidth
-                className="sm:w-auto"
-                onClick={() => scrollToId('features')}
-              >
-                Explore Features
+              <Button size="lg" variant="outline" onClick={() => scrollToId('demo')}>
+                Watch the demo
               </Button>
             </div>
           </div>
         </div>
       </section>
 
-      <section id="how-it-works" className="scroll-mt-24 border-b border-black/[0.06] py-16 sm:py-20">
+      <section id="demo" className="scroll-mt-24 border-b border-black/[0.05] bg-white py-16 sm:py-20">
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
-          <p className="text-sm font-semibold text-coral-600">How JobRound.ai works</p>
+          <div className="mx-auto max-w-2xl text-center">
+            <p className="text-sm font-semibold text-coral-600">Platform demo</p>
+            <h2 className="mt-2 text-3xl font-bold tracking-tight text-[#101c35]">See how JobRound.ai works</h2>
+            <p className="mt-3 text-slate-600">A guided tour of AI practice, matching, booking, and feedback — built from the real product.</p>
+          </div>
+          <div className="mt-10">
+            <ProductDemoShowcase />
+          </div>
+        </div>
+      </section>
+
+      <section id="quote" className="scroll-mt-24 border-b border-black/[0.05] py-16 sm:py-20">
+        <div className="mx-auto max-w-4xl px-4 text-center sm:px-6">
+          <p className="text-sm font-semibold text-coral-600">Career growth</p>
+          <blockquote className="mt-4 text-2xl font-semibold leading-snug tracking-tight text-[#101c35] sm:text-3xl sm:leading-tight">
+            Don&apos;t just prepare for interviews. Experience them, practise them, and improve with every conversation.
+          </blockquote>
+          <p className="mx-auto mt-6 max-w-2xl text-base leading-7 text-slate-600">
+            Confidence comes from repetition with structure — the same pressure as a hiring loop, with room to learn
+            before it counts.
+          </p>
+        </div>
+      </section>
+
+      <section id="how-it-works" className="scroll-mt-24 border-b border-black/[0.05] bg-white py-16 sm:py-20">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">
+          <p className="text-sm font-semibold text-coral-600">How it works</p>
           <h2 className="mt-2 text-3xl font-bold tracking-tight text-[#101c35]">Four steps to a stronger round</h2>
           <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {steps.map((step) => (
-              <Card key={step.n} className="p-5">
-                <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-coral-50 text-sm font-bold text-coral-700">
+              <Card key={step.n} className="border-black/[0.06] bg-[#fafbfc] p-5 shadow-none">
+                <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-coral-600 text-sm font-bold text-white">
                   {step.n}
                 </span>
                 <h3 className="mt-4 font-semibold text-navy-950">{step.title}</h3>
@@ -128,14 +99,13 @@ export function PublicHomePage() {
         </div>
       </section>
 
-      <section id="features" className="scroll-mt-24 border-b border-black/[0.06] bg-white py-16 sm:py-20">
+      <section id="features" className="scroll-mt-24 border-b border-black/[0.05] py-16 sm:py-20">
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
-          <p className="text-sm font-semibold text-coral-600">Our features</p>
-          <h2 className="mt-2 text-3xl font-bold tracking-tight text-[#101c35]">Everything you need to prepare</h2>
-          <p className="mt-3 max-w-2xl text-slate-600">Capabilities available in the candidate app today.</p>
+          <p className="text-sm font-semibold text-coral-600">Features</p>
+          <h2 className="mt-2 text-3xl font-bold tracking-tight text-[#101c35]">Built for serious preparation</h2>
           <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {features.map((item) => (
-              <Card key={item.title} className="p-5">
+              <Card key={item.title} className="p-5 transition-shadow hover:shadow-[0_18px_40px_-28px_rgba(16,28,53,0.35)]">
                 <item.icon className="h-6 w-6 text-coral-600" aria-hidden />
                 <h3 className="mt-4 font-semibold text-navy-950">{item.title}</h3>
                 <p className="mt-2 text-sm leading-6 text-slate-600">{item.body}</p>
@@ -145,128 +115,25 @@ export function PublicHomePage() {
         </div>
       </section>
 
-      <section id="for-candidates" className="scroll-mt-24 border-b border-black/[0.06] py-16 sm:py-20">
-        <div className="mx-auto grid max-w-6xl gap-10 px-4 sm:px-6 lg:grid-cols-2 lg:items-center">
-          <div>
-            <p className="text-sm font-semibold text-coral-600">AI interview preparation</p>
-            <h2 className="mt-2 text-3xl font-bold tracking-tight text-[#101c35]">Practise questions. Improve weak areas.</h2>
-            <ul className="mt-6 space-y-3 text-sm leading-6 text-slate-600">
-              <li className="flex gap-2">
-                <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-coral-600" />
-                Run AI mock interviews with scored feedback.
-              </li>
-              <li className="flex gap-2">
-                <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 text-coral-600" />
-                Review answers and notes after each session.
-              </li>
-              <li className="flex gap-2">
-                <Briefcase className="mt-0.5 h-4 w-4 shrink-0 text-coral-600" />
-                Prepare from job requirements and your skill profile.
-              </li>
-            </ul>
-            <Button className="mt-8" onClick={() => openAuth('register', '/candidate/practice')}>
-              Try AI Practice
-            </Button>
+      <section id="testimonials" className="scroll-mt-24 border-b border-black/[0.05] bg-white py-16 sm:py-20">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">
+          <div className="mx-auto max-w-2xl text-center">
+            <p className="text-sm font-semibold text-coral-600">By role</p>
+            <h2 className="mt-2 text-3xl font-bold tracking-tight text-[#101c35]">How different tracks use JobRound.ai</h2>
+            <p className="mt-3 text-slate-600">Stories grouped by role — no individual names, just the kind of preparation each track needs.</p>
           </div>
-          <Card className="p-6">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Preview</p>
-            <p className="mt-3 text-lg font-semibold text-navy-950">AI Practice report</p>
-            <p className="mt-2 text-sm text-slate-600">Average score · question breakdown · suggested next topics.</p>
-            <div className="mt-6 h-2 rounded-full bg-[#f5f7fa]">
-              <div className="h-2 w-3/4 rounded-full bg-coral-600" />
-            </div>
-            <p className="mt-2 text-xs text-slate-500">Available after sign-in at /candidate/practice</p>
-          </Card>
-        </div>
-      </section>
-
-      <section id="human-interviews" className="scroll-mt-24 border-b border-black/[0.06] bg-white py-16 sm:py-20">
-        <div className="mx-auto grid max-w-6xl gap-10 px-4 sm:px-6 lg:grid-cols-2 lg:items-center">
-          <Card className="order-2 p-6 lg:order-1">
-            <div className="flex items-center gap-3">
-              <div className="h-12 w-12 rounded-full bg-navy-950 text-center text-sm font-bold leading-[3rem] text-white">
-                Pro
-              </div>
-              <div>
-                <p className="font-semibold text-navy-950">Interviewer profile</p>
-                <p className="text-sm text-slate-600">Skills · experience · availability</p>
-              </div>
-            </div>
-            <ul className="mt-5 space-y-2 text-sm text-slate-600">
-              <li className="flex items-center gap-2">
-                <BadgeCheck className="h-4 w-4 text-emerald-600" />
-                Verification badges shown only when checks are completed in the product.
-              </li>
-              <li>Skill-based matching and flexible booking.</li>
-              <li>Live video interviews in the app.</li>
-            </ul>
-          </Card>
-          <div className="order-1 lg:order-2">
-            <p className="text-sm font-semibold text-coral-600">Real human interview experience</p>
-            <h2 className="mt-2 text-3xl font-bold tracking-tight text-[#101c35]">Learn from people who hire</h2>
-            <p className="mt-4 text-slate-600 leading-7">
-              Browse professionals, compare skill fit, and book a live mock — the same format as a real hiring loop,
-              with feedback you can act on.
-            </p>
-            <Button className="mt-8" variant="outline" onClick={() => openAuth('register', '/candidate/find')}>
-              Find an interviewer
-            </Button>
-          </div>
-        </div>
-      </section>
-
-      <section id="testimonials" className="scroll-mt-24 border-b border-black/[0.06] py-16 sm:py-20">
-        <div className="mx-auto max-w-3xl px-4 text-center sm:px-6">
-          <p className="text-sm font-semibold text-coral-600">Testimonials</p>
-          <h2 className="mt-2 text-3xl font-bold tracking-tight text-[#101c35]">Candidate stories</h2>
-          <p className="mt-2 text-xs font-medium uppercase tracking-wide text-amber-700">
-            Development placeholders — not real customer quotes
-          </p>
-          <figure className="mt-8 rounded-2xl border border-black/[0.08] bg-white p-8 shadow-sm">
-            <blockquote className="text-lg leading-relaxed text-slate-700">&ldquo;{testimonial.quote}&rdquo;</blockquote>
-            <figcaption className="mt-4 text-sm font-semibold text-navy-950">
-              {testimonial.name}
-              <span className="font-normal text-slate-500"> · {testimonial.role}</span>
-            </figcaption>
-          </figure>
-          <div className="mt-4 flex items-center justify-center gap-2">
-            <button
-              type="button"
-              aria-label="Previous testimonial"
-              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-black/[0.08] hover:bg-white"
-              onClick={() => setTestimonialIndex((i) => (i - 1 + sampleTestimonials.length) % sampleTestimonials.length)}
-            >
-              <ChevronLeft className="h-5 w-5" />
-            </button>
-            {sampleTestimonials.map((_, i) => (
-              <button
-                key={i}
-                type="button"
-                aria-label={`Go to testimonial ${i + 1}`}
-                className={cn('h-2 w-2 rounded-full', i === testimonialIndex ? 'bg-coral-600' : 'bg-slate-300')}
-                onClick={() => setTestimonialIndex(i)}
-              />
-            ))}
-            <button
-              type="button"
-              aria-label="Next testimonial"
-              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-black/[0.08] hover:bg-white"
-              onClick={() => setTestimonialIndex((i) => (i + 1) % sampleTestimonials.length)}
-            >
-              <ChevronRight className="h-5 w-5" />
-            </button>
+          <div className="mt-10">
+            <TestimonialsMarquee />
           </div>
         </div>
       </section>
 
       <section id="get-started" className="scroll-mt-24 bg-[#101c35] py-16 text-white sm:py-20">
         <div className="mx-auto max-w-3xl px-4 text-center sm:px-6">
-          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Your Next Opportunity Deserves Better Preparation.</h2>
-          <p className="mt-4 text-base leading-7 text-slate-300">
-            Start practising with AI and learn from real interview experiences.
-          </p>
-          <Button size="lg" className="mt-8" onClick={() => openAuth('register')}>
-            Get Started
+          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Your next opportunity deserves better preparation.</h2>
+          <p className="mt-4 text-base leading-7 text-slate-300">Start practising with AI and learn from real interview experiences.</p>
+          <Button size="lg" className="mt-8 bg-white text-[#101c35] hover:bg-slate-100" onClick={() => openAuth('register')}>
+            Get started
           </Button>
           <p className="mt-6 text-sm text-slate-400">
             Already have an account?{' '}
