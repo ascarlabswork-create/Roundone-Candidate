@@ -57,7 +57,7 @@ export function AuthModal() {
         tabIndex={-1}
         className="relative flex max-h-[min(92svh,720px)] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl"
       >
-        <div className="flex items-start justify-between gap-4 border-b border-black/[0.06] px-5 py-4 sm:px-6">
+        <div className="flex items-start justify-between gap-4 border-b border-violet-100 bg-gradient-to-r from-coral-50 via-violet-50 to-sky-50 px-5 py-4 sm:px-6">
           <div>
             <h2 id={titleId} className="text-xl font-semibold tracking-tight text-navy-950">
               Welcome to JobRound.ai

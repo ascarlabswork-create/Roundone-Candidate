@@ -15,7 +15,7 @@ export function CandidateLayout() {
   const unreadBadge = unreadCount != null && unreadCount > 0 ? (unreadCount > 99 ? '99+' : String(unreadCount)) : null
 
   return (
-    <div className={signedIn ? 'flex min-h-svh bg-paper' : 'flex min-h-svh flex-col bg-paper'}>
+    <div className={signedIn ? 'flex min-h-svh studio-grid' : 'flex min-h-svh flex-col public-surface'}>
       {signedIn ? (
         <div className="sticky top-0 hidden h-svh lg:flex">
           <Sidebar unreadBadge={unreadBadge} onSignOut={() => void signOut()} />

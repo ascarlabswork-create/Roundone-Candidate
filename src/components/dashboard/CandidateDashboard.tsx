@@ -1,5 +1,6 @@
 import { ArrowRight, CalendarDays, ClipboardCheck, Sparkles, Target } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
+import { cn } from '../../lib/cn.ts'
 import { Link } from 'react-router-dom'
 import { InterviewSummaryCard } from '../interviews/InterviewSummaryCard.tsx'
 import { CandidateFeedbackAction } from '../interviews/CandidateFeedbackAction.tsx'
@@ -18,11 +19,21 @@ import {
 import { useNotifications } from '../../state/notifications.tsx'
 import { useSession } from '../../state/session.tsx'
 
-function Metric({ label, value }: { label: string; value: number | null }) {
+const metricTones = [
+  'from-coral-500 to-sky-500',
+  'from-violet-500 to-coral-500',
+  'from-mint-500 to-sky-500',
+  'from-amber-500 to-rose-500',
+] as const
+
+function Metric({ label, value, tone }: { label: string; value: number | null; tone: (typeof metricTones)[number] }) {
   return (
-    <Card className="p-4">
-      <p className="text-xs font-medium text-slate-500">{label}</p>
-      <p className="mt-2 text-2xl font-semibold tracking-tight text-navy-950">{value == null ? '—' : value}</p>
+    <Card className="overflow-hidden p-0">
+      <div className={cn('h-1 bg-gradient-to-r', tone)} />
+      <div className="p-4">
+        <p className="text-xs font-medium text-slate-500">{label}</p>
+        <p className="mt-2 text-2xl font-semibold tracking-tight text-navy-950">{value == null ? '—' : value}</p>
+      </div>
     </Card>
   )
 }
@@ -71,9 +82,9 @@ function Shortcut({
   return (
     <Link
       to={to}
-      className="group flex min-h-11 flex-col rounded-2xl border border-black/[0.06] bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition hover:border-coral-200"
+      className="group flex min-h-11 flex-col rounded-2xl border border-black/[0.06] bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition hover:border-violet-200 hover:shadow-md hover:shadow-violet-100"
     >
-      <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-coral-50 text-coral-700">
+      <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-coral-100 to-violet-100 text-violet-700">
         {icon}
       </span>
       <span className="mt-4 flex items-center gap-1 text-base font-semibold text-navy-950">
@@ -187,31 +198,35 @@ export function CandidateDashboard() {
   return (
     <section className="pb-12">
       <div className="mx-auto max-w-6xl space-y-6 px-4 py-8 sm:px-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-xs font-medium uppercase tracking-[0.14em] text-coral-700">Dashboard</p>
-            <h1 className="mt-1 text-[1.75rem] font-semibold tracking-tight text-navy-950 sm:text-[2rem]">
-              {firstName ? `Welcome back, ${firstName}` : 'Your jobround.ai overview'}
-            </h1>
-            <p className="mt-2 max-w-xl text-sm leading-6 text-slate-500">
-              Your next interview, practice score, and anything that needs attention — in one place.
-            </p>
+        <Card className="overflow-hidden border-0 bg-gradient-to-br from-navy-950 via-[#1e40af] to-violet-700 p-0 text-white shadow-lg shadow-violet-900/20">
+          <div className="flex flex-col gap-4 p-6 sm:flex-row sm:items-end sm:justify-between sm:p-8">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-sky-200">Dashboard</p>
+              <h1 className="mt-2 text-[1.75rem] font-semibold tracking-tight sm:text-[2rem]">
+                {firstName ? `Welcome back, ${firstName}` : 'Your jobround.ai overview'}
+              </h1>
+              <p className="mt-2 max-w-xl text-sm leading-6 text-blue-100">
+                Your next interview, practice score, and anything that needs attention — in one place.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Link to="/candidate/find">
+                <Button className="shadow-lg">Find My Interviewer</Button>
+              </Link>
+              <Link to="/candidate/practice/mock?fresh=1">
+                <Button variant="outline" className="border-white/30 bg-white/10 text-white hover:bg-white/20">
+                  Start AI Interview
+                </Button>
+              </Link>
+            </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Link to="/candidate/find">
-              <Button>Find My Interviewer</Button>
-            </Link>
-            <Link to="/candidate/practice/mock?fresh=1">
-              <Button variant="outline">Start AI Interview</Button>
-            </Link>
-          </div>
-        </div>
+        </Card>
         {state.status === 'success' ? (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <Metric label="Interviews completed" value={state.data.counts.completed} />
-            <Metric label="Upcoming interviews" value={state.data.counts.upcoming} />
-            <Metric label="Feedback received" value={state.data.counts.feedbackReceived} />
-            <Metric label="Reviews submitted" value={state.data.counts.reviewsSubmitted} />
+            <Metric label="Interviews completed" value={state.data.counts.completed} tone={metricTones[0]} />
+            <Metric label="Upcoming interviews" value={state.data.counts.upcoming} tone={metricTones[1]} />
+            <Metric label="Feedback received" value={state.data.counts.feedbackReceived} tone={metricTones[2]} />
+            <Metric label="Reviews submitted" value={state.data.counts.reviewsSubmitted} tone={metricTones[3]} />
           </div>
         ) : null}
 

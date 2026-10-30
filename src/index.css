@@ -17,18 +17,32 @@
   --color-coral-600: #007aff;
   --color-coral-700: #0066d6;
 
-  --color-gold-100: #f2f2f7;
-  --color-gold-400: #8e8e93;
-  --color-gold-500: #636366;
+  --color-mint-50: #ecfdf5;
+  --color-mint-500: #10b981;
+  --color-mint-600: #059669;
 
-  --color-paper: #f5f7fa;
-  --color-paper-deep: #e8ecf1;
+  --color-sky-50: #f0f9ff;
+  --color-sky-500: #0ea5e9;
+  --color-sky-600: #0284c7;
+
+  --color-rose-50: #fff1f2;
+  --color-rose-500: #f43f5e;
+
+  --color-amber-50: #fffbeb;
+  --color-amber-500: #f59e0b;
+
+  --color-gold-100: #fef3c7;
+  --color-gold-400: #fbbf24;
+  --color-gold-500: #f59e0b;
+
+  --color-paper: #f4f7fc;
+  --color-paper-deep: #e8eef8;
 
   --color-violet-50: #f5f3ff;
   --color-violet-100: #ede9fe;
-  --color-violet-500: #7c3aed;
-  --color-violet-600: #6d28d9;
-  --color-violet-700: #5b21b6;
+  --color-violet-500: #8b5cf6;
+  --color-violet-600: #7c3aed;
+  --color-violet-700: #6d28d9;
 }
 
 @layer base {
@@ -54,7 +68,7 @@
     margin: 0;
     min-width: 320px;
     overflow-x: hidden;
-    background: #f5f7fa;
+    background: #f4f7fc;
     color: #1d1d1f;
     font-family: var(--font-sans);
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
@@ -76,21 +90,52 @@
 
 @layer utilities {
   .studio-grid {
-    background: #f5f7fa;
+    background:
+      radial-gradient(ellipse 70% 50% at 0% 0%, rgba(0, 122, 255, 0.08), transparent 50%),
+      radial-gradient(ellipse 50% 40% at 100% 10%, rgba(139, 92, 246, 0.1), transparent 45%),
+      radial-gradient(ellipse 40% 30% at 50% 100%, rgba(16, 185, 129, 0.08), transparent 40%),
+      #f4f7fc;
   }
 
   .studio-ink {
-    background: #101c35;
+    background: linear-gradient(135deg, #101c35 0%, #1a3a6e 45%, #4c1d95 100%);
   }
 
   .public-surface {
-    background: #f5f7fa;
+    background:
+      radial-gradient(ellipse 90% 60% at 50% -30%, rgba(0, 122, 255, 0.14), transparent 55%),
+      #f4f7fc;
   }
 
   .public-hero {
     background:
-      radial-gradient(ellipse 80% 60% at 50% -20%, rgba(0, 122, 255, 0.12), transparent 55%),
-      linear-gradient(180deg, #ffffff 0%, #f5f7fa 100%);
+      radial-gradient(ellipse 70% 55% at 15% 20%, rgba(14, 165, 233, 0.2), transparent 50%),
+      radial-gradient(ellipse 60% 50% at 85% 10%, rgba(139, 92, 246, 0.18), transparent 50%),
+      radial-gradient(ellipse 50% 40% at 50% 100%, rgba(16, 185, 129, 0.12), transparent 45%),
+      linear-gradient(180deg, #ffffff 0%, #f4f7fc 100%);
+  }
+
+  .public-section-sky {
+    background: linear-gradient(180deg, #f0f9ff 0%, #f4f7fc 100%);
+  }
+
+  .public-section-violet {
+    background: linear-gradient(180deg, #f5f3ff 0%, #f4f7fc 100%);
+  }
+
+  .public-section-mint {
+    background: linear-gradient(180deg, #ecfdf5 0%, #f4f7fc 100%);
+  }
+
+  .public-cta-gradient {
+    background: linear-gradient(120deg, #101c35 0%, #1d4ed8 40%, #7c3aed 100%);
+  }
+
+  .text-gradient-brand {
+    background: linear-gradient(90deg, #007aff 0%, #7c3aed 50%, #059669 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
   }
 }
 
