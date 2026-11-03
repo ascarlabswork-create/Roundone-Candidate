@@ -25,10 +25,10 @@ export function classifyBookingReadiness(input: {
 export function bookingStatusMessage(readiness: BookingReadiness): { headline: string; detail: string } | null {
   if (readiness === 'ready') return null
   if (readiness === 'no_service') {
-    return { headline: 'Matched by skills', detail: 'Booking not available yet' }
+    return { headline: 'Matched by skills', detail: 'Session details may still be setting up — you can open booking anytime.' }
   }
   if (readiness === 'no_availability') {
-    return { headline: 'Matched by skills', detail: 'Availability not configured' }
+    return { headline: 'Matched by skills', detail: 'Availability not configured yet — open booking to check again.' }
   }
-  return { headline: 'Matched by skills', detail: 'No openings in your preferred dates' }
+  return { headline: 'Matched by skills', detail: 'No openings in your preferred dates — try another range in booking.' }
 }

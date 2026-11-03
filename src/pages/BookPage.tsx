@@ -467,8 +467,8 @@ export function BookPage() {
               {!service ? (
                 <div className="mt-6">
                   <EmptyState
-                    title="Booking not available yet"
-                    body="This interviewer has not configured a session yet. You can still view their profile."
+                    title="Session setup in progress"
+                    body="This interviewer has not published a bookable session type yet. Open booking again after they finish setup, or go back to their profile."
                     action={
                       <Link to={`/candidate/interviewers/${header.id}`}>
                         <Button variant="outline">Back to profile</Button>

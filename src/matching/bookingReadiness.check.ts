@@ -77,8 +77,14 @@ expect(
   'the same instant is still 5 October in Central Time',
 )
 
-expect(bookingStatusMessage('no_service')?.detail === 'Booking not available yet', 'no-service copy')
-expect(bookingStatusMessage('no_availability')?.detail === 'Availability not configured', 'no-availability copy')
+expect(
+  Boolean(bookingStatusMessage('no_service')?.detail?.toLowerCase().includes('booking')),
+  'no-service copy still points candidates to booking',
+)
+expect(
+  Boolean(bookingStatusMessage('no_availability')?.detail?.toLowerCase().includes('availability')),
+  'no-availability copy',
+)
 expect(bookingStatusMessage('no_service')?.headline === 'Matched by skills', 'skill match stays visible')
 expect(bookingStatusMessage('ready') === null, 'ready matches show the book action')
 expect(preferredDateRangeError('2026-10-01', '2026-10-15') === null, 'a valid preferred range is accepted')

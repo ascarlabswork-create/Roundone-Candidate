@@ -78,13 +78,10 @@ export function InterviewerCard({
         <div>
           {interviewer.services.length > 0 ? (
             <p className="text-lg font-semibold text-navy-950">{formatINR(interviewer.price)} / session</p>
+          ) : typeof matchScore === 'number' ? (
+            <p className="text-sm font-medium text-navy-950">Matched by skills</p>
           ) : (
-            <div>
-              {typeof matchScore === 'number' ? (
-                <p className="text-sm font-medium text-navy-950">Matched by skills</p>
-              ) : null}
-              <p className="text-sm text-slate-600">Booking not available yet</p>
-            </div>
+            <p className="text-sm text-slate-600">Open booking to request a session</p>
           )}
         </div>
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
@@ -107,13 +104,11 @@ export function InterviewerCard({
               View Profile
             </Button>
           </Link>
-          {interviewer.services.length > 0 ? (
-            <Link to={`/candidate/interviewers/${interviewer.id}/book`} className="sm:w-auto">
-              <Button size="sm" fullWidth>
-                Book
-              </Button>
-            </Link>
-          ) : null}
+          <Link to={`/candidate/interviewers/${interviewer.id}/book`} className="sm:w-auto">
+            <Button size="sm" fullWidth>
+              Book
+            </Button>
+          </Link>
         </div>
       </div>
     </article>
