@@ -6,6 +6,7 @@ import {
   TIME_WINDOWS,
 } from '../data/catalogs.ts'
 import { NormalizationSuggestions } from '../components/matching/NormalizationSuggestions.tsx'
+import { ResumeExtractingBanner } from '../components/matching/ResumeExtractingBanner.tsx'
 import { Button } from '../components/ui/Button.tsx'
 import { Chip, FieldLabel, PageHeader, SelectInput, TextInput } from '../components/ui/primitives.tsx'
 import { preferredDateRangeError } from '../lib/dates.ts'
@@ -256,17 +257,28 @@ export function FindPage() {
             className="hidden"
             onChange={(event) => void onResumeSelected(event.target.files?.[0] ?? null)}
           />
-          <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-3">
+          <div
+            className={`rounded-2xl border p-3 transition-colors ${
+              resumeExtracting
+                ? 'border-violet-200 bg-gradient-to-br from-white via-violet-50/40 to-sky-50/50'
+                : 'border-slate-200 bg-slate-50/70'
+            }`}
+          >
             <div className="flex flex-wrap items-center gap-3">
               <Button
-                variant="outline"
+                variant={resumeExtracting ? 'secondary' : 'outline'}
                 size="sm"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={resumeExtracting}
+                className={
+                  resumeExtracting
+                    ? 'bg-gradient-to-r from-coral-600 via-violet-600 to-sky-600 text-white disabled:from-coral-400 disabled:via-violet-400 disabled:to-sky-400 disabled:text-white'
+                    : undefined
+                }
               >
                 {resumeExtracting ? 'Extracting…' : resumeFileName ? 'Replace file' : 'Upload resume'}
               </Button>
-              {resumeFileName ? (
+              {resumeFileName && !resumeExtracting ? (
                 <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
                   <span className="inline-flex max-w-full items-center gap-2 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-navy-950">
                     <span className="truncate font-medium" title={resumeFileName}>
@@ -281,14 +293,20 @@ export function FindPage() {
                       ×
                     </button>
                   </span>
-                  {resumeStatus ? <span className="text-xs text-slate-500">{resumeStatus}</span> : null}
+                  {resumeStatus ? (
+                    <span className="text-xs font-medium text-emerald-700">{resumeStatus}</span>
+                  ) : null}
                 </div>
-              ) : (
+              ) : null}
+              {!resumeFileName && !resumeExtracting ? (
                 <span className="text-sm text-slate-500">
                   PDF or plain text, up to 8 MB. We extract all skills found in the resume.
                 </span>
-              )}
+              ) : null}
             </div>
+            {resumeExtracting && resumeFileName ? (
+              <ResumeExtractingBanner fileName={resumeFileName} status={resumeStatus} />
+            ) : null}
             {resumeError ? <p className="mt-2 text-sm text-red-700">{resumeError}</p> : null}
           </div>
         </div>
