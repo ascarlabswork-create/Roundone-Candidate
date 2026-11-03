@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-label="JobRound.ai product demo">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#101c35"/>
+      <stop offset="45%" stop-color="#1d4ed8"/>
+      <stop offset="100%" stop-color="#7c3aed"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="720" fill="url(#bg)"/>
+  <circle cx="200" cy="120" r="180" fill="#007aff" opacity="0.15"/>
+  <circle cx="1100" cy="80" r="220" fill="#8b5cf6" opacity="0.2"/>
+  <text x="640" y="320" text-anchor="middle" fill="#fff" font-family="system-ui,sans-serif" font-size="56" font-weight="700">JobRound.ai</text>
+  <text x="640" y="390" text-anchor="middle" fill="#dbeafe" font-family="system-ui,sans-serif" font-size="28">Product demo</text>
+  <circle cx="640" cy="500" r="52" fill="#fff" opacity="0.95"/>
+  <polygon points="620,470 620,530 670,500" fill="#007aff"/>
+</svg>

@@ -1,4 +1,5 @@
 import type { User } from '@supabase/supabase-js'
+import { candidateDisplayTimezone } from '../lib/candidateTimezone.ts'
 import { supabase } from '../lib/supabase.ts'
 import { authErrorMessage, isDuplicateSignup } from './authCopy.ts'
 
@@ -61,12 +62,13 @@ export async function signUpCandidate(input: SignUpInput): Promise<SignUpResult>
       data: {
         full_name: input.fullName.trim(),
         role: 'candidate',
-        timezone: input.timezone?.trim() || 'Asia/Kolkata',
+        timezone: input.timezone?.trim() || candidateDisplayTimezone(),
       },
     },
   })
   if (error) throw new Error(authErrorMessage(error))
-  if (isDuplicateSignup(data.user)) {
+  const duplicate = isDuplicateSignup(data.user)
+  if (duplicate) {
     throw new Error('An account with this email already exists. Try signing in instead.')
   }
 
@@ -91,8 +93,9 @@ export async function resendSignupConfirmation(email: string) {
 }
 
 export async function signInCandidate(input: SignInInput) {
+  const trimmed = input.email.trim()
   const { data, error } = await supabase.auth.signInWithPassword({
-    email: input.email.trim(),
+    email: trimmed,
     password: input.password,
   })
   if (error) throw new Error(authErrorMessage(error))
@@ -107,7 +110,33 @@ export async function signInCandidate(input: SignInInput) {
  * returns to `/candidate/auth/callback`. Role is never set client-side: the
  * database `handle_new_user_before` trigger provisions new users as `candidate`.
  */
+const PENDING_TIMEZONE_KEY = 'jobround.pendingTimezone'
+
+/** Persist browser timezone across the Google OAuth redirect. */
+export function stashBrowserTimezone() {
+  try {
+    sessionStorage.setItem(PENDING_TIMEZONE_KEY, candidateDisplayTimezone())
+  } catch {
+    /* ignore private-mode storage failures */
+  }
+}
+
+/** Apply stashed/browser timezone to a newly provisioned default profile. */
+export async function applyDetectedTimezone(userId: string) {
+  let timezone = candidateDisplayTimezone()
+  try {
+    const pending = sessionStorage.getItem(PENDING_TIMEZONE_KEY)?.trim()
+    if (pending) timezone = pending
+    sessionStorage.removeItem(PENDING_TIMEZONE_KEY)
+  } catch {
+    /* ignore */
+  }
+  if (!timezone) return
+  await supabase.from('profiles').update({ timezone }).eq('id', userId).eq('timezone', 'Asia/Kolkata')
+}
+
 export async function signInWithGoogle(nextPath?: string) {
+  stashBrowserTimezone()
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
@@ -128,6 +157,7 @@ export async function signInWithGoogleIdToken(token: string, nonce: string) {
   })
   if (error) throw new Error(authErrorMessage(error))
   if (!data.user || !data.session) throw new Error('Sign in did not create a session.')
+  await applyDetectedTimezone(data.user.id)
   return data.user
 }
 

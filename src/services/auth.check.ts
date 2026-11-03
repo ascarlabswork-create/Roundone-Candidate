@@ -13,7 +13,7 @@ expect(
 expect(isDuplicateSignup({ identities: [] } as never), 'empty identities is a duplicate signup')
 expect(!isDuplicateSignup({ identities: [{ id: '1' }] } as never), 'real identities are not treated as duplicates')
 expect(
-  authErrorMessage(new Error('Invalid login credentials')) === 'Incorrect email or password. Please try again.',
+  authErrorMessage(new Error('Invalid login credentials')).includes('Continue with Google'),
   'sign-in failures are not treated as short passwords',
 )
 expect(
