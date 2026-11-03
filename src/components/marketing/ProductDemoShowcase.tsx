@@ -6,24 +6,14 @@ import { useDemoNarration } from './useDemoNarration.ts'
 
 const scenes = [
   {
-    id: 'ai',
-    label: 'AI mock interview',
-    title: 'Live AI practice session',
-    body: 'Answer real interview questions and get scored feedback after each round.',
+    id: 'book',
+    label: 'Book a human round',
+    title: 'Pick a time and confirm',
+    body: 'Choose a service, select a slot, and join a live video mock with a real interviewer.',
     narration:
-      'Start with AI mock interviews. You answer real questions out loud or in writing, then get scored feedback you can act on before your next round.',
-    icon: Sparkles,
-    accent: 'bg-coral-50 text-coral-700',
-  },
-  {
-    id: 'job',
-    label: 'Job-specific prep',
-    title: 'Matched to your target role',
-    body: 'Paste a job posting or pick skills — preparation follows the role you are targeting.',
-    narration:
-      'Add a target job or résumé. JobRound tailors practice and prep to the role and skills you care about, not generic flashcards.',
-    icon: Target,
-    accent: 'bg-sky-50 text-sky-700',
+      'Start with a live human mock. Match with a working professional, pick a service and time, then join a real video interview from your browser.',
+    icon: Calendar,
+    accent: 'bg-violet-50 text-violet-700',
   },
   {
     id: 'match',
@@ -36,14 +26,24 @@ const scenes = [
     accent: 'bg-emerald-50 text-emerald-700',
   },
   {
-    id: 'book',
-    label: 'Book a human round',
-    title: 'Pick a time and confirm',
-    body: 'Choose a service, select a slot, and join a live video mock interview.',
+    id: 'job',
+    label: 'Job-specific prep',
+    title: 'Matched to your target role',
+    body: 'Paste a job posting or pick skills — preparation follows the role you are targeting.',
     narration:
-      'Book a live video mock with a working professional. Pick a service, choose a time, and join from your browser when it is time.',
-    icon: Calendar,
-    accent: 'bg-violet-50 text-violet-700',
+      'Add a target job or résumé. JobRound tailors practice and prep to the role and skills you care about, not generic flashcards.',
+    icon: Target,
+    accent: 'bg-sky-50 text-sky-700',
+  },
+  {
+    id: 'ai',
+    label: 'AI mock interview',
+    title: 'Practice between live rounds',
+    body: 'Answer real interview questions and get scored feedback after each AI practice session.',
+    narration:
+      'Between live bookings, use AI mock interviews. Answer real prompts, get scored feedback, and sharpen your answers before the next human round.',
+    icon: Sparkles,
+    accent: 'bg-coral-50 text-coral-700',
   },
   {
     id: 'feedback',

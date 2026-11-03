@@ -7,18 +7,18 @@ import { useAuthModal } from '../state/authModal.tsx'
 import { cn } from '../lib/cn.ts'
 
 const steps = [
-  { n: '1', title: 'Share your goal', body: 'Resume upload or target job — we learn what to practice.', tone: 'from-coral-500 to-sky-500' },
-  { n: '2', title: 'Prepare with AI', body: 'Mock questions, prep plans, and skill gaps surfaced early.', tone: 'from-violet-500 to-coral-500' },
-  { n: '3', title: 'Book a live round', body: 'Match with a professional and join a real-time video mock.', tone: 'from-sky-500 to-mint-500' },
+  { n: '1', title: 'Share your goal', body: 'Resume upload or target job — we learn who you should practice with.', tone: 'from-coral-500 to-sky-500' },
+  { n: '2', title: 'Book a live human round', body: 'Match with a professional and join a real-time video mock interview.', tone: 'from-sky-500 to-mint-500' },
+  { n: '3', title: 'Practice with AI', body: 'Between bookings, sharpen answers with AI mocks and prep plans.', tone: 'from-violet-500 to-coral-500' },
   { n: '4', title: 'Improve with feedback', body: 'Scores and notes you can reuse before the next interview.', tone: 'from-amber-500 to-rose-500' },
 ]
 
 const features = [
-  { icon: Bot, title: 'AI mock interviews', body: 'Timed practice with written feedback.', iconBg: 'bg-violet-100 text-violet-600', ring: 'ring-violet-100' },
+  { icon: Video, title: 'Live human mock interviews', body: 'One-to-one video sessions with working professionals.', iconBg: 'bg-rose-50 text-rose-500', ring: 'ring-rose-100' },
+  { icon: Users, title: 'Interviewer matching', body: 'Ranked fits with clear skill-overlap reasons.', iconBg: 'bg-mint-50 text-mint-600', ring: 'ring-emerald-100' },
   { icon: Target, title: 'Job-specific preparation', body: 'Align sessions with a posting or company.', iconBg: 'bg-coral-100 text-coral-600', ring: 'ring-coral-100' },
   { icon: FileSearch, title: 'Resume skill analysis', body: 'Skills extracted from what you actually wrote.', iconBg: 'bg-sky-100 text-sky-600', ring: 'ring-sky-100' },
-  { icon: Users, title: 'Interviewer matching', body: 'Ranked fits with clear overlap reasons.', iconBg: 'bg-mint-50 text-mint-600', ring: 'ring-emerald-100' },
-  { icon: Video, title: 'Live video mocks', body: 'One-to-one sessions with working professionals.', iconBg: 'bg-rose-50 text-rose-500', ring: 'ring-rose-100' },
+  { icon: Bot, title: 'AI mock interviews', body: 'Timed practice with written feedback between live rounds.', iconBg: 'bg-violet-100 text-violet-600', ring: 'ring-violet-100' },
   { icon: ClipboardList, title: 'Performance tracking', body: 'History, scores, and progress over time.', iconBg: 'bg-amber-50 text-amber-500', ring: 'ring-amber-100' },
 ]
 
@@ -35,19 +35,19 @@ export function PublicHomePage() {
         <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24 lg:py-28">
           <div className="mx-auto max-w-3xl text-center">
             <p className="inline-flex rounded-full border border-violet-200 bg-white/90 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-violet-700 shadow-sm">
-              Interview preparation platform
+              Live mock interviews with professionals
             </p>
             <h1 className="mt-6 text-4xl font-bold tracking-tight text-[#101c35] sm:text-5xl lg:text-6xl lg:leading-[1.05]">
               Your next interview starts with{' '}
               <span className="text-gradient-brand">confidence.</span>
             </h1>
             <p className="mt-5 text-lg leading-8 text-slate-600">
-              Prepare with AI-powered mock interviews, connect with experienced professionals, and build the confidence
-              to succeed in your next opportunity.
+              Book live mock interviews with experienced professionals first — then use AI practice and feedback to keep
+              improving between rounds.
             </p>
             <div className="mt-9 flex flex-col justify-center gap-3 sm:flex-row">
               <Button size="lg" onClick={() => openAuth('register')}>
-                Start preparing
+                Book a mock interview
               </Button>
               <Button size="lg" variant="outline" onClick={() => scrollToId('demo')}>
                 Watch the demo
@@ -63,7 +63,7 @@ export function PublicHomePage() {
             <p className="text-sm font-semibold text-violet-600">Platform demo</p>
             <h2 className="mt-2 text-3xl font-bold tracking-tight text-[#101c35]">See how JobRound.ai works</h2>
             <p className="mt-3 text-slate-600">
-              Watch the walkthrough with sound — AI practice, matching, booking, and feedback from the real product.
+              Watch the walkthrough with sound — live human booking first, then matching, AI practice, and feedback.
             </p>
           </div>
           <div className="mt-10">
@@ -148,13 +148,15 @@ export function PublicHomePage() {
       <section id="get-started" className="public-cta-gradient scroll-mt-24 py-16 text-white sm:py-20">
         <div className="mx-auto max-w-3xl px-4 text-center sm:px-6">
           <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Your next opportunity deserves better preparation.</h2>
-          <p className="mt-4 text-base leading-7 text-blue-100">Start practising with AI and learn from real interview experiences.</p>
+          <p className="mt-4 text-base leading-7 text-blue-100">
+            Book a live mock with a real interviewer, then sharpen with AI practice between sessions.
+          </p>
           <Button
             size="lg"
             className="mt-8 bg-white text-violet-700 shadow-lg hover:bg-violet-50"
             onClick={() => openAuth('register')}
           >
-            Get started
+            Book a mock interview
           </Button>
           <p className="mt-6 text-sm text-blue-200/90">
             Already have an account?{' '}
