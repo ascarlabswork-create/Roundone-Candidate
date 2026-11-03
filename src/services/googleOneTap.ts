@@ -17,20 +17,31 @@ type GooglePromptNotification = {
   getDismissedReason(): string
 }
 
+type GoogleButtonConfig = {
+  type?: 'standard' | 'icon'
+  theme?: 'outline' | 'filled_blue' | 'filled_black'
+  size?: 'large' | 'medium' | 'small'
+  text?: 'signin_with' | 'signup_with' | 'continue_with' | 'signin'
+  shape?: 'rectangular' | 'pill' | 'circle' | 'square'
+  logo_alignment?: 'left' | 'center'
+  width?: number | string
+}
+
 type GoogleIdConfiguration = {
   client_id: string
   callback: (response: GoogleCredentialResponse) => void
-  nonce: string
-  auto_select: boolean
-  cancel_on_tap_outside: boolean
-  context: 'signin' | 'signup' | 'use'
-  itp_support: boolean
-  use_fedcm_for_prompt: boolean
+  nonce?: string
+  auto_select?: boolean
+  cancel_on_tap_outside?: boolean
+  context?: 'signin' | 'signup' | 'use'
+  itp_support?: boolean
+  use_fedcm_for_prompt?: boolean
 }
 
 export type GoogleAccountsId = {
   initialize(config: GoogleIdConfiguration): void
   prompt(momentListener?: (notification: GooglePromptNotification) => void): void
+  renderButton(parent: HTMLElement, config: GoogleButtonConfig): void
   cancel(): void
 }
 
@@ -77,58 +88,89 @@ export async function createGoogleNonce(): Promise<{ raw: string; hashed: string
   return { raw, hashed }
 }
 
+export type MountGoogleButtonOptions = {
+  parent: HTMLElement
+  context?: 'signin' | 'signup'
+  text?: GoogleButtonConfig['text']
+  onCredential: (credential: string, nonce: string) => void | Promise<void>
+  onError?: (message: string) => void
+}
+
 /**
- * Opens Google's account chooser on the current site origin (jobround.ai in
- * production). Returns the ID token + raw nonce for supabase.auth.signInWithIdToken.
- * Does not redirect through *.supabase.co, so Google shows "continue to jobround.ai".
+ * Official Google button on the current origin → account chooser says
+ * "continue to jobround.ai" (not *.supabase.co). More reliable than prompt()
+ * inside modals.
  */
-export async function promptGoogleIdToken(): Promise<{ credential: string; nonce: string }> {
+export async function mountGoogleContinueButton(options: MountGoogleButtonOptions): Promise<() => void> {
   const [google, nonce] = await Promise.all([loadGoogleIdentity(), createGoogleNonce()])
+  let rawNonce = nonce.raw
+  let hashedNonce = nonce.hashed
+  let cancelled = false
 
-  return new Promise((resolve, reject) => {
-    let settled = false
-    const finish = (fn: () => void) => {
-      if (settled) return
-      settled = true
-      fn()
-    }
+  const refreshNonce = async () => {
+    const next = await createGoogleNonce()
+    rawNonce = next.raw
+    hashedNonce = next.hashed
+  }
 
+  const paint = async () => {
+    if (cancelled) return
+    await refreshNonce()
+    if (cancelled) return
+
+    google.cancel()
     google.initialize({
       client_id: googleClientId(),
-      nonce: nonce.hashed,
+      nonce: hashedNonce,
       auto_select: false,
       cancel_on_tap_outside: true,
-      context: 'signin',
+      context: options.context ?? 'signin',
       itp_support: true,
-      use_fedcm_for_prompt: true,
+      // FedCM prompt() is flaky in modals; the official button does not need it.
+      use_fedcm_for_prompt: false,
       callback: (response) => {
         if (!response.credential) {
-          finish(() => reject(new Error('Google did not return a sign-in credential. Please try again.')))
+          options.onError?.('Google did not return a sign-in credential. Please try again.')
           return
         }
-        finish(() => resolve({ credential: response.credential!, nonce: nonce.raw }))
+        void Promise.resolve(options.onCredential(response.credential, rawNonce)).catch((caught: unknown) => {
+          options.onError?.(caught instanceof Error ? caught.message : 'Google sign-in failed.')
+        })
       },
     })
 
-    google.prompt((notification) => {
-      if (notification.isDismissedMoment()) {
-        const reason = notification.getDismissedReason()
-        if (reason === 'credential_returned') return
-        finish(() => reject(new Error('Google sign-in was cancelled.')))
-        return
-      }
-      if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-        const reason = notification.isNotDisplayed()
-          ? notification.getNotDisplayedReason()
-          : notification.getSkippedReason()
-        finish(() =>
-          reject(
-            new Error(
-              `Google sign-in could not open (${reason}). Allow popups for this site, or try again in a normal browser window.`,
-            ),
-          ),
-        )
-      }
+    options.parent.innerHTML = ''
+    const width = Math.min(400, Math.max(240, Math.floor(options.parent.clientWidth || 320)))
+    google.renderButton(options.parent, {
+      type: 'standard',
+      theme: 'outline',
+      size: 'large',
+      text: options.text ?? 'continue_with',
+      shape: 'rectangular',
+      logo_alignment: 'left',
+      width,
     })
-  })
+  }
+
+  let lastWidth = 0
+  await paint()
+  lastWidth = Math.floor(options.parent.clientWidth || 0)
+
+  const observer =
+    typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver(() => {
+          const nextWidth = Math.floor(options.parent.clientWidth || 0)
+          if (Math.abs(nextWidth - lastWidth) < 12) return
+          lastWidth = nextWidth
+          void paint()
+        })
+      : null
+  observer?.observe(options.parent)
+
+  return () => {
+    cancelled = true
+    observer?.disconnect()
+    google.cancel()
+    options.parent.innerHTML = ''
+  }
 }

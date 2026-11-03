@@ -2,22 +2,23 @@ import { useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
 import { createGoogleNonce, googleClientId, loadGoogleIdentity } from '../../services/googleOneTap.ts'
 import { authErrorMessage, signInWithGoogleIdToken } from '../../services/auth.ts'
+import { useAuthModal } from '../../state/authModal.tsx'
 import { useSession } from '../../state/session.tsx'
 import { useToast } from '../../state/toast.tsx'
 
 /**
- * Google's own account chooser, anchored to the top-right of the page.
- * Renders nothing of our own. A new account is still provisioned as a candidate
- * by the database trigger.
+ * Optional Google One Tap. Skipped while the auth modal is open so it does not
+ * fight the official Continue with Google button (which keeps jobround.ai branding).
  */
 export function GoogleOneTap() {
   const { status } = useSession()
+  const { open: authModalOpen } = useAuthModal()
   const location = useLocation()
   const { pushToast } = useToast()
   const onCallback = location.pathname.startsWith('/candidate/auth/callback')
 
   useEffect(() => {
-    if (status !== 'anonymous' || onCallback) return
+    if (status !== 'anonymous' || onCallback || authModalOpen) return
     let cancelled = false
     let api: Awaited<ReturnType<typeof loadGoogleIdentity>> | null = null
 
@@ -33,7 +34,7 @@ export function GoogleOneTap() {
           cancel_on_tap_outside: false,
           context: 'signin',
           itp_support: true,
-          use_fedcm_for_prompt: true,
+          use_fedcm_for_prompt: false,
           callback: (response) => {
             if (!response.credential) return
             signInWithGoogleIdToken(response.credential, nonce.raw).catch((caught: unknown) => {
@@ -43,7 +44,7 @@ export function GoogleOneTap() {
         })
         google.prompt()
       } catch {
-        // Optional. Continue with Google uses the same GIS ID-token flow.
+        // Optional. The auth form mounts Google's official button instead.
       }
     })()
 
@@ -51,7 +52,7 @@ export function GoogleOneTap() {
       cancelled = true
       api?.cancel()
     }
-  }, [status, onCallback, pushToast])
+  }, [status, onCallback, authModalOpen, pushToast])
 
   return null
 }
