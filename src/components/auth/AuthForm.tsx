@@ -1,21 +1,18 @@
-import { useState, type FormEvent } from 'react'
+import { useCallback, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { Button } from '../ui/Button.tsx'
 import { FieldLabel, PasswordInput, TextInput } from '../ui/primitives.tsx'
-import { GoogleIcon } from '../ui/GoogleIcon.tsx'
 import { candidateDisplayTimezone } from '../../lib/candidateTimezone.ts'
 import {
-  applyDetectedTimezone,
   authErrorMessage,
   parseAuthRateLimitSeconds,
   resendSignupConfirmation,
   sendPasswordReset,
   signInCandidate,
-  signInWithGoogleIdToken,
   signUpCandidate,
 } from '../../services/auth.ts'
-import { promptGoogleIdToken } from '../../services/googleOneTap.ts'
 import { useSession } from '../../state/session.tsx'
+import { GoogleContinueButton } from './GoogleContinueButton.tsx'
 
 export function AuthForm({
   mode,
@@ -39,14 +36,16 @@ export function AuthForm({
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [submitting, setSubmitting] = useState(false)
-  const [googleSubmitting, setGoogleSubmitting] = useState(false)
   const [emailBusy, setEmailBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
   const [needsConfirmation, setNeedsConfirmation] = useState(false)
   const [resetWait, setResetWait] = useState(0)
 
-  const busy = submitting || googleSubmitting || emailBusy || status === 'loading'
+  const busy = submitting || emailBusy || status === 'loading'
+  const handleGoogleError = useCallback((message: string) => {
+    setError(message || null)
+  }, [])
 
   function startResetWait(seconds: number) {
     setResetWait(seconds)
@@ -92,25 +91,6 @@ export function AuthForm({
       if (message.includes('confirm your email')) setNeedsConfirmation(true)
     } finally {
       setSubmitting(false)
-    }
-  }
-
-  async function continueWithGoogle() {
-    setError(null)
-    setInfo(null)
-    setGoogleSubmitting(true)
-    try {
-      // GIS on this origin → Google shows "continue to jobround.ai", not supabase.co.
-      const { credential, nonce } = await promptGoogleIdToken()
-      const user = await signInWithGoogleIdToken(credential, nonce)
-      await applyDetectedTimezone(user.id)
-      await refreshAccount()
-      onSuccess?.()
-    } catch (caught) {
-      const message = caught instanceof Error ? caught.message : authErrorMessage(caught)
-      if (!/cancelled/i.test(message)) setError(message)
-    } finally {
-      setGoogleSubmitting(false)
     }
   }
 
@@ -249,10 +229,7 @@ export function AuthForm({
         <span className="h-px flex-1 bg-slate-200" />
       </div>
 
-      <Button type="button" variant="outline" fullWidth disabled={busy} onClick={() => void continueWithGoogle()}>
-        <GoogleIcon className="h-4 w-4" />
-        {googleSubmitting ? 'Connecting to Google…' : 'Continue with Google'}
-      </Button>
+      <GoogleContinueButton mode={mode} disabled={busy} onSuccess={onSuccess} onError={handleGoogleError} />
 
       {showModeLinks ? (
         <p className="mt-6 text-center text-sm text-slate-600">
