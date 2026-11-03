@@ -152,11 +152,30 @@
   animation: testimonial-marquee 45s linear infinite;
 }
 
+@keyframes resume-extract-shimmer {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(220%);
+  }
+}
+
+.resume-extract-shimmer {
+  animation: resume-extract-shimmer 1.35s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .testimonial-marquee {
     animation: none;
     flex-wrap: wrap;
     width: 100%;
     justify-content: center;
+  }
+
+  .resume-extract-shimmer {
+    animation: none;
+    width: 100%;
+    opacity: 0.85;
   }
 }
