@@ -1,5 +1,5 @@
-import { BadgeCheck, Calendar, MessageSquare, Pause, Play, Sparkles, Target, TrendingUp, Volume2, VolumeX } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { BadgeCheck, Calendar, MessageSquare, Pause, Play, Sparkles, Target, TrendingUp } from 'lucide-react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { cn } from '../../lib/cn.ts'
 import { getDemoVideoUrl, getDemoYouTubeId, youtubeEmbedUrl } from '../../lib/demoMedia.ts'
 import { useDemoNarration } from './useDemoNarration.ts'
@@ -149,63 +149,44 @@ function YouTubeDemoVideo({ videoId }: { videoId: string }) {
 function GuidedDemoWithAudio() {
   const [index, setIndex] = useState(0)
   const [playing, setPlaying] = useState(false)
-  const [muted, setMuted] = useState(false)
-  const reducedMotion =
-    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
   const { speak, cancel, supported } = useDemoNarration()
-  const advanceRef = useRef<number | null>(null)
   const scene = scenes[index]
   const Icon = scene.icon
 
-  const clearAdvance = useCallback(() => {
-    if (advanceRef.current != null) {
-      window.clearTimeout(advanceRef.current)
-      advanceRef.current = null
-    }
-  }, [])
-
-  const goNext = useCallback(() => {
-    setIndex((current) => (current + 1) % scenes.length)
-  }, [])
-
-  const playScene = useCallback(
-    (sceneIndex: number) => {
-      clearAdvance()
+  const selectStep = useCallback(
+    (nextIndex: number) => {
       cancel()
-      const item = scenes[sceneIndex]
-      if (!playing) return
-      if (muted || !supported) {
-        advanceRef.current = window.setTimeout(goNext, reducedMotion ? 8000 : 5500)
-        return
-      }
-      speak(item.narration, () => {
-        if (playing) goNext()
-      })
+      setPlaying(false)
+      setIndex(nextIndex)
     },
-    [cancel, clearAdvance, goNext, muted, playing, reducedMotion, speak, supported],
+    [cancel],
   )
 
-  useEffect(() => {
-    playScene(index)
-    return () => {
-      clearAdvance()
-      cancel()
-    }
-  }, [index, playScene, clearAdvance, cancel])
+  const stopVoice = useCallback(() => {
+    cancel()
+    setPlaying(false)
+  }, [cancel])
+
+  const playThisStep = useCallback(() => {
+    if (!supported) return
+    cancel()
+    setPlaying(true)
+    speak(scenes[index].narration, () => {
+      setPlaying(false)
+    })
+  }, [cancel, index, speak, supported])
+
+  const togglePlay = () => {
+    if (playing) stopVoice()
+    else playThisStep()
+  }
 
   useEffect(() => {
-    if (!playing) {
-      clearAdvance()
-      cancel()
-    } else {
-      playScene(index)
-    }
-  }, [playing, muted, playScene, index, clearAdvance, cancel])
-
-  const togglePlay = () => setPlaying((value) => !value)
+    return () => cancel()
+  }, [cancel])
 
   return (
-    <DemoChrome caption="Voice-guided product demo — live human booking first, then matching, prep, AI practice, and feedback.">
+    <DemoChrome caption="Step through the tour yourself — play voice on the current step only when you want it.">
       <div className="grid min-h-[22rem] bg-gradient-to-br from-white via-sky-50/40 to-violet-50/50 lg:min-h-[26rem] lg:grid-cols-[13.5rem_minmax(0,1fr)]">
         <aside className="border-b border-slate-200/80 bg-gradient-to-b from-navy-950 to-[#1a2a55] px-3 py-4 text-white lg:border-b-0 lg:border-r lg:border-white/10">
           <p className="px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-sky-300/90">Demo tour</p>
@@ -223,10 +204,7 @@ function GuidedDemoWithAudio() {
                       ? 'bg-white text-navy-950 shadow-md shadow-violet-900/20'
                       : 'text-blue-100/85 hover:bg-white/10',
                   )}
-                  onClick={() => {
-                    setIndex(i)
-                    if (!playing) setPlaying(true)
-                  }}
+                  onClick={() => selectStep(i)}
                   aria-current={active ? 'step' : undefined}
                 >
                   <ItemIcon className={cn('h-3.5 w-3.5 shrink-0', active ? 'text-violet-600' : 'text-sky-300')} aria-hidden />
@@ -252,21 +230,30 @@ function GuidedDemoWithAudio() {
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-violet-200 bg-white px-3 text-sm font-semibold text-navy-950 shadow-sm hover:bg-violet-50"
-                  onClick={togglePlay}
-                  aria-pressed={playing}
+                  className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-navy-950 shadow-sm hover:bg-slate-50 disabled:opacity-40"
+                  onClick={() => selectStep(Math.max(0, index - 1))}
+                  disabled={index === 0}
                 >
-                  {playing ? <Pause className="h-4 w-4" aria-hidden /> : <Play className="h-4 w-4 fill-current" aria-hidden />}
-                  {playing ? 'Pause demo' : 'Play demo'}
+                  Previous
                 </button>
                 <button
                   type="button"
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-                  onClick={() => setMuted((value) => !value)}
-                  aria-pressed={muted}
-                  aria-label={muted ? 'Unmute voiceover' : 'Mute voiceover'}
+                  className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-violet-200 bg-white px-3 text-sm font-semibold text-navy-950 shadow-sm hover:bg-violet-50 disabled:opacity-40"
+                  onClick={() => (supported ? togglePlay() : undefined)}
+                  aria-pressed={playing}
+                  disabled={!supported}
+                  title={supported ? undefined : 'Voice is not available in this browser'}
                 >
-                  {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+                  {playing ? <Pause className="h-4 w-4" aria-hidden /> : <Play className="h-4 w-4 fill-current" aria-hidden />}
+                  {playing ? 'Stop voice' : 'Play voice'}
+                </button>
+                <button
+                  type="button"
+                  className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-navy-950 shadow-sm hover:bg-slate-50 disabled:opacity-40"
+                  onClick={() => selectStep(Math.min(scenes.length - 1, index + 1))}
+                  disabled={index === scenes.length - 1}
+                >
+                  Next
                 </button>
               </div>
             </div>
