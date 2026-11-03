@@ -1,8 +1,7 @@
-import { BadgeCheck, Calendar, MessageSquare, Pause, Play, Sparkles, Target, TrendingUp } from 'lucide-react'
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { BadgeCheck, Calendar, MessageSquare, Play, Sparkles, Target, TrendingUp } from 'lucide-react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { cn } from '../../lib/cn.ts'
 import { getDemoVideoUrl, getDemoYouTubeId, youtubeEmbedUrl } from '../../lib/demoMedia.ts'
-import { useDemoNarration } from './useDemoNarration.ts'
 
 /** Human live booking leads; AI practice comes after matching and job prep. */
 const scenes = [
@@ -146,47 +145,13 @@ function YouTubeDemoVideo({ videoId }: { videoId: string }) {
   )
 }
 
-function GuidedDemoWithAudio() {
+function GuidedDemoTour() {
   const [index, setIndex] = useState(0)
-  const [playing, setPlaying] = useState(false)
-  const { speak, cancel, supported } = useDemoNarration()
   const scene = scenes[index]
   const Icon = scene.icon
 
-  const selectStep = useCallback(
-    (nextIndex: number) => {
-      cancel()
-      setPlaying(false)
-      setIndex(nextIndex)
-    },
-    [cancel],
-  )
-
-  const stopVoice = useCallback(() => {
-    cancel()
-    setPlaying(false)
-  }, [cancel])
-
-  const playThisStep = useCallback(() => {
-    if (!supported) return
-    cancel()
-    setPlaying(true)
-    speak(scenes[index].narration, () => {
-      setPlaying(false)
-    })
-  }, [cancel, index, speak, supported])
-
-  const togglePlay = () => {
-    if (playing) stopVoice()
-    else playThisStep()
-  }
-
-  useEffect(() => {
-    return () => cancel()
-  }, [cancel])
-
   return (
-    <DemoChrome caption="Step through the tour yourself — play voice on the current step only when you want it.">
+    <DemoChrome caption="Click any step in the tour to open that flow — nothing auto-plays or advances.">
       <div className="grid min-h-[22rem] bg-gradient-to-br from-white via-sky-50/40 to-violet-50/50 lg:min-h-[26rem] lg:grid-cols-[13.5rem_minmax(0,1fr)]">
         <aside className="border-b border-slate-200/80 bg-gradient-to-b from-navy-950 to-[#1a2a55] px-3 py-4 text-white lg:border-b-0 lg:border-r lg:border-white/10">
           <p className="px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-sky-300/90">Demo tour</p>
@@ -204,7 +169,7 @@ function GuidedDemoWithAudio() {
                       ? 'bg-white text-navy-950 shadow-md shadow-violet-900/20'
                       : 'text-blue-100/85 hover:bg-white/10',
                   )}
-                  onClick={() => selectStep(i)}
+                  onClick={() => setIndex(i)}
                   aria-current={active ? 'step' : undefined}
                 >
                   <ItemIcon className={cn('h-3.5 w-3.5 shrink-0', active ? 'text-violet-600' : 'text-sky-300')} aria-hidden />
@@ -217,46 +182,15 @@ function GuidedDemoWithAudio() {
 
         <div className="flex flex-col">
           <div className="flex flex-1 flex-col px-5 py-5 sm:px-8 sm:py-7">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <span
-                className={cn(
-                  'inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset',
-                  scene.accent,
-                )}
-              >
-                <Icon className="h-3.5 w-3.5" aria-hidden />
-                {scene.label}
-              </span>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-navy-950 shadow-sm hover:bg-slate-50 disabled:opacity-40"
-                  onClick={() => selectStep(Math.max(0, index - 1))}
-                  disabled={index === 0}
-                >
-                  Previous
-                </button>
-                <button
-                  type="button"
-                  className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-violet-200 bg-white px-3 text-sm font-semibold text-navy-950 shadow-sm hover:bg-violet-50 disabled:opacity-40"
-                  onClick={() => (supported ? togglePlay() : undefined)}
-                  aria-pressed={playing}
-                  disabled={!supported}
-                  title={supported ? undefined : 'Voice is not available in this browser'}
-                >
-                  {playing ? <Pause className="h-4 w-4" aria-hidden /> : <Play className="h-4 w-4 fill-current" aria-hidden />}
-                  {playing ? 'Stop voice' : 'Play voice'}
-                </button>
-                <button
-                  type="button"
-                  className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-navy-950 shadow-sm hover:bg-slate-50 disabled:opacity-40"
-                  onClick={() => selectStep(Math.min(scenes.length - 1, index + 1))}
-                  disabled={index === scenes.length - 1}
-                >
-                  Next
-                </button>
-              </div>
-            </div>
+            <span
+              className={cn(
+                'inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset',
+                scene.accent,
+              )}
+            >
+              <Icon className="h-3.5 w-3.5" aria-hidden />
+              {scene.label}
+            </span>
 
             <h3 className="mt-5 text-2xl font-bold tracking-tight text-navy-950 sm:text-3xl">{scene.title}</h3>
             <p className="mt-2 max-w-xl text-sm leading-6 text-slate-600 sm:text-base">{scene.body}</p>
@@ -275,12 +209,15 @@ function GuidedDemoWithAudio() {
                 </div>
                 <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-100">
                   <div
-                    className={cn('h-full rounded-full bg-gradient-to-r transition-[width] duration-700 ease-out motion-reduce:transition-none', scene.bar)}
+                    className={cn(
+                      'h-full rounded-full bg-gradient-to-r transition-[width] duration-700 ease-out motion-reduce:transition-none',
+                      scene.bar,
+                    )}
                     style={{ width: `${((index + 1) / scenes.length) * 100}%` }}
                   />
                 </div>
                 <p className="mt-2 text-xs text-slate-500">
-                  Step {index + 1} of {scenes.length} — actual product flows shown in the app after sign-in.
+                  Step {index + 1} of {scenes.length} — pick a step in the tour to open that flow.
                 </p>
               </div>
             </div>
@@ -288,7 +225,7 @@ function GuidedDemoWithAudio() {
 
           <div className="border-t border-slate-200/80 bg-white/70 px-5 py-3 sm:px-8">
             <p className="text-sm leading-snug text-slate-600" aria-live="polite">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-violet-600">Captions · </span>
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-violet-600">Overview · </span>
               {scene.narration}
             </p>
           </div>
@@ -358,5 +295,5 @@ export function ProductDemoShowcase() {
 
   if (mode === 'youtube' && youtubeId) return <YouTubeDemoVideo videoId={youtubeId} />
   if (mode === 'file' && fileUrl) return <HostedDemoVideo src={fileUrl} />
-  return <GuidedDemoWithAudio />
+  return <GuidedDemoTour />
 }
