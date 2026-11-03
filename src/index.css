@@ -123,6 +123,14 @@
     background: linear-gradient(180deg, #f5f3ff 0%, #f4f7fc 100%);
   }
 
+  .public-section-quote {
+    background:
+      radial-gradient(ellipse 55% 50% at 12% 20%, rgba(244, 63, 94, 0.12), transparent 55%),
+      radial-gradient(ellipse 50% 45% at 88% 15%, rgba(124, 58, 237, 0.16), transparent 55%),
+      radial-gradient(ellipse 45% 40% at 50% 100%, rgba(14, 165, 233, 0.12), transparent 50%),
+      linear-gradient(180deg, #f8f5ff 0%, #f0f7ff 55%, #f4f7fc 100%);
+  }
+
   .public-section-mint {
     background: linear-gradient(180deg, #ecfdf5 0%, #f4f7fc 100%);
   }

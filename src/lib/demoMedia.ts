@@ -1,8 +1,7 @@
-/** Optional hosted product demo (MP4/WebM). Set in `.env.local` as VITE_DEMO_VIDEO_URL. */
+/** Optional hosted product demo (MP4/WebM). Set in `.env.local` as VITE_DEMO_VIDEO_URL. Without it, the interactive guided tour is used. */
 export function getDemoVideoUrl(): string | null {
   const fromEnv = import.meta.env.VITE_DEMO_VIDEO_URL?.trim()
-  if (fromEnv) return fromEnv
-  return '/demo/product-demo.mp4'
+  return fromEnv || null
 }
 
 /** Optional YouTube embed (overrides file URL when set). VITE_DEMO_VIDEO_YOUTUBE_ID=abc123 */

@@ -72,15 +72,33 @@ export function PublicHomePage() {
         </div>
       </section>
 
-      <section id="quote" className="public-section-violet scroll-mt-24 border-b border-black/[0.05] py-16 sm:py-20">
+      <section id="quote" className="public-section-quote scroll-mt-24 border-b border-black/[0.05] py-16 sm:py-20">
         <div className="mx-auto max-w-4xl px-4 text-center sm:px-6">
-          <p className="text-sm font-semibold text-violet-600">Career growth</p>
-          <blockquote className="mt-4 rounded-3xl border border-violet-200/80 bg-white/80 px-6 py-8 text-2xl font-semibold leading-snug tracking-tight text-[#101c35] shadow-[0_24px_60px_-40px_rgba(124,58,237,0.45)] sm:px-10 sm:text-3xl sm:leading-tight">
-            Don&apos;t just prepare for interviews. Experience them, practise them, and improve with every conversation.
+          <p className="inline-flex items-center gap-2 rounded-full border border-violet-200/80 bg-white/90 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-violet-700 shadow-sm">
+            Career growth
+          </p>
+          <blockquote className="relative mt-6 overflow-hidden rounded-[1.75rem] border border-white/80 bg-white/90 px-6 py-10 text-left shadow-[0_28px_70px_-36px_rgba(79,70,229,0.45)] sm:px-12 sm:py-12 sm:text-center">
+            <div
+              className="pointer-events-none absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-coral-500 via-violet-500 to-sky-400"
+              aria-hidden
+            />
+            <div
+              className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-violet-400/20 blur-3xl"
+              aria-hidden
+            />
+            <div
+              className="pointer-events-none absolute -bottom-12 -left-8 h-36 w-36 rounded-full bg-sky-400/20 blur-3xl"
+              aria-hidden
+            />
+            <p className="relative text-2xl font-bold leading-snug tracking-tight text-[#101c35] sm:text-3xl sm:leading-tight">
+              Don&apos;t just prepare for interviews.{' '}
+              <span className="text-gradient-brand">Experience them, practice them,</span> and improve with every
+              conversation.
+            </p>
           </blockquote>
           <p className="mx-auto mt-6 max-w-2xl text-base leading-7 text-slate-600">
-            Confidence comes from repetition with structure — the same pressure as a hiring loop, with room to learn
-            before it counts.
+            Confidence comes from repetition with structure — live human rounds first, then focused practice before it
+            counts.
           </p>
         </div>
       </section>
