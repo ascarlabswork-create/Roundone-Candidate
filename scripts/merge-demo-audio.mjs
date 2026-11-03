@@ -4,7 +4,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 const DEMO_NARRATION =
-  'JobRound dot A I helps you prepare, practice, and book live mock interviews with confidence. Your marketing home highlights the full journey: start preparing, watch the demo, and sign in when you are ready. The platform demo shows how AI practice, matching, booking, and feedback fit together. In AI mock interviews you answer real prompts, get structured scores, and improve before your next hiring loop. Find interviewers ranked by skill overlap, compare profiles, and book a live video mock in minutes. How it works walks candidates from first visit through practice, booking, and feedback. After sign in, your dashboard surfaces upcoming mocks, practice scores, and clear next steps. Start preparing today at jobround dot A I.'
+  'JobRound dot A I helps you prepare, practice, and book live mock interviews with confidence. Your marketing home highlights the full journey: start preparing, watch the demo, and sign in when you are ready. The platform demo leads with live human booking, then matching, AI practice, and feedback. Find interviewers ranked by skill overlap, compare profiles, and book a live video mock in minutes. How it works walks candidates from matching and booking a human round through feedback. Between live bookings, AI mock interviews help you answer real prompts, get scored feedback, and improve before the next hiring loop. After sign in, your dashboard surfaces upcoming live mocks, practice scores, and clear next steps. Start preparing today at jobround dot A I.'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(__dirname, '..')

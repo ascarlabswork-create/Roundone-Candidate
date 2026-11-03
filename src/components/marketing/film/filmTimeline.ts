@@ -47,24 +47,11 @@ export const PRODUCT_FILM_SCENES: FilmScene[] = [
     kind: 'live',
     durationMs: 5500,
     path: '/#demo',
-    narration: 'The platform demo shows how AI practice, matching, booking, and feedback fit together.',
+    narration: 'The platform demo leads with live human booking, then matching, AI practice, and feedback.',
     cameras: [
       { atMs: 0, camera: { scale: 1.05, originX: 50, originY: 40 } },
       { atMs: 2000, camera: { scale: 1.2, originX: 50, originY: 48 } },
       { atMs: 6500, camera: { scale: 1.12, originX: 55, originY: 52 } },
-    ],
-  },
-  {
-    id: 'ai-round',
-    kind: 'ai-practice',
-    durationMs: 12000,
-    narration:
-      'In AI mock interviews you answer real prompts, get structured scores, and improve before your next hiring loop.',
-    cameras: [
-      { atMs: 0, camera: { scale: 1, originX: 50, originY: 45 } },
-      { atMs: 2500, camera: { scale: 1.15, originX: 38, originY: 38 } },
-      { atMs: 9000, camera: { scale: 1.22, originX: 62, originY: 55 } },
-      { atMs: 14000, camera: { scale: 1.08, originX: 50, originY: 72 } },
     ],
   },
   {
@@ -83,7 +70,7 @@ export const PRODUCT_FILM_SCENES: FilmScene[] = [
     kind: 'live',
     durationMs: 5500,
     path: '/candidate/how-it-works',
-    narration: 'How it works walks candidates from first visit through practice, booking, and feedback.',
+    narration: 'How it works walks candidates from matching and booking a human round through feedback.',
     cameras: [
       { atMs: 0, camera: { scale: 1, originX: 50, originY: 25 } },
       { atMs: 3500, camera: { scale: 1.12, originX: 50, originY: 55 } },
@@ -91,10 +78,23 @@ export const PRODUCT_FILM_SCENES: FilmScene[] = [
     ],
   },
   {
+    id: 'ai-round',
+    kind: 'ai-practice',
+    durationMs: 12000,
+    narration:
+      'Between live bookings, AI mock interviews help you answer real prompts, get scored feedback, and improve before the next hiring loop.',
+    cameras: [
+      { atMs: 0, camera: { scale: 1, originX: 50, originY: 45 } },
+      { atMs: 2500, camera: { scale: 1.15, originX: 38, originY: 38 } },
+      { atMs: 9000, camera: { scale: 1.22, originX: 62, originY: 55 } },
+      { atMs: 14000, camera: { scale: 1.08, originX: 50, originY: 72 } },
+    ],
+  },
+  {
     id: 'dashboard',
     kind: 'dashboard',
     durationMs: 7000,
-    narration: 'After sign in, your dashboard surfaces upcoming mocks, practice scores, and clear next steps.',
+    narration: 'After sign in, your dashboard surfaces upcoming live mocks, practice scores, and clear next steps.',
     cameras: [
       { atMs: 0, camera: { scale: 1, originX: 50, originY: 22 } },
       { atMs: 4000, camera: { scale: 1.1, originX: 30, originY: 55 } },
