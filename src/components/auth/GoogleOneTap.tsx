@@ -43,7 +43,7 @@ export function GoogleOneTap() {
         })
         google.prompt()
       } catch {
-        // The chooser is optional. Continue with Google still starts OAuth.
+        // Optional. Continue with Google uses the same GIS ID-token flow.
       }
     })()
 

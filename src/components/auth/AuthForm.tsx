@@ -5,14 +5,16 @@ import { FieldLabel, PasswordInput, TextInput } from '../ui/primitives.tsx'
 import { GoogleIcon } from '../ui/GoogleIcon.tsx'
 import { candidateDisplayTimezone } from '../../lib/candidateTimezone.ts'
 import {
+  applyDetectedTimezone,
   authErrorMessage,
   parseAuthRateLimitSeconds,
   resendSignupConfirmation,
   sendPasswordReset,
   signInCandidate,
-  signInWithGoogle,
+  signInWithGoogleIdToken,
   signUpCandidate,
 } from '../../services/auth.ts'
+import { promptGoogleIdToken } from '../../services/googleOneTap.ts'
 import { useSession } from '../../state/session.tsx'
 
 export function AuthForm({
@@ -98,9 +100,16 @@ export function AuthForm({
     setInfo(null)
     setGoogleSubmitting(true)
     try {
-      await signInWithGoogle(nextPath)
+      // GIS on this origin → Google shows "continue to jobround.ai", not supabase.co.
+      const { credential, nonce } = await promptGoogleIdToken()
+      const user = await signInWithGoogleIdToken(credential, nonce)
+      await applyDetectedTimezone(user.id)
+      await refreshAccount()
+      onSuccess?.()
     } catch (caught) {
-      setError(authErrorMessage(caught))
+      const message = caught instanceof Error ? caught.message : authErrorMessage(caught)
+      if (!/cancelled/i.test(message)) setError(message)
+    } finally {
       setGoogleSubmitting(false)
     }
   }
@@ -242,7 +251,7 @@ export function AuthForm({
 
       <Button type="button" variant="outline" fullWidth disabled={busy} onClick={() => void continueWithGoogle()}>
         <GoogleIcon className="h-4 w-4" />
-        {googleSubmitting ? 'Redirecting to Google…' : 'Continue with Google'}
+        {googleSubmitting ? 'Connecting to Google…' : 'Continue with Google'}
       </Button>
 
       {showModeLinks ? (
