@@ -104,18 +104,11 @@ export function ProfilePage() {
               </span>
             </p>
             <div className="mt-5 flex flex-col gap-2 sm:flex-row">
-              {interviewer.services.length > 0 ? (
-                <Link to={`/candidate/interviewers/${interviewer.id}/book`}>
-                  <Button
-                    fullWidth
-                    onClick={() => resetDraft(interviewer.id)}
-                  >
-                    Book Interview
-                  </Button>
-                </Link>
-              ) : (
-                <p className="text-sm text-slate-600">Booking not available yet</p>
-              )}
+              <Link to={`/candidate/interviewers/${interviewer.id}/book`}>
+                <Button fullWidth onClick={() => resetDraft(interviewer.id)}>
+                  Book Interview
+                </Button>
+              </Link>
               <Button
                 variant="outline"
                 onClick={() => pushToast('Messaging will be available after the interviewer accepts. Prototype only.')}
@@ -123,7 +116,7 @@ export function ProfilePage() {
                 <MessageSquare className="h-4 w-4" />
                 Message
               </Button>
-                <Button
+              <Button
                 variant={isSaved(interviewer.id) ? 'secondary' : 'ghost'}
                 onClick={() => {
                   const currentlySaved = isSaved(interviewer.id)
@@ -170,13 +163,11 @@ export function ProfilePage() {
         {tab === 'Reviews' ? <ReviewsRatings interviewer={interviewer} reviewsState={reviewsState} /> : null}
       </div>
 
-      {interviewer.services.length > 0 ? (
-        <div className="sticky bottom-0 -mx-4 border-t border-slate-200 bg-white px-4 py-3 sm:hidden">
-          <Link to={`/candidate/interviewers/${interviewer.id}/book`}>
-            <Button fullWidth>Book Interview</Button>
-          </Link>
-        </div>
-      ) : null}
+      <div className="sticky bottom-0 -mx-4 border-t border-slate-200 bg-white px-4 py-3 sm:hidden">
+        <Link to={`/candidate/interviewers/${interviewer.id}/book`}>
+          <Button fullWidth>Book Interview</Button>
+        </Link>
+      </div>
     </div>
   )
 }
@@ -285,13 +276,9 @@ function AvailabilityTab({ interviewer }: { interviewer: Interviewer }) {
         {formatTimezoneLabel(yours)}
         {interviewerZone ? `, converted from ${formatTimezoneLabel(interviewerZone)}` : ''}.
       </p>
-      {interviewer.services.length > 0 ? (
-        <Link to={`/candidate/interviewers/${interviewer.id}/book`}>
-          <Button>Book this interviewer</Button>
-        </Link>
-      ) : (
-        <p className="text-sm text-slate-600">Booking not available yet</p>
-      )}
+      <Link to={`/candidate/interviewers/${interviewer.id}/book`}>
+        <Button>Book this interviewer</Button>
+      </Link>
     </div>
   )
 }
