@@ -35,6 +35,7 @@ import {
   TermsPage,
 } from '../pages/LegalPages.tsx'
 import { HowItWorksPage, NotFoundPage, ResourcesPage } from '../pages/SupportingPages.tsx'
+import { ProductFilmPage } from '../pages/ProductFilmPage.tsx'
 import { AuthModalProvider } from '../state/authModal.tsx'
 
 export function AppRouter() {
@@ -43,6 +44,7 @@ export function AppRouter() {
       <AuthModalProvider>
         <BookingCallListener />
         <Routes>
+        <Route path="/product-film" element={<ProductFilmPage />} />
         <Route element={<CandidateLayout />}>
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/cookies" element={<CookiePolicyPage />} />

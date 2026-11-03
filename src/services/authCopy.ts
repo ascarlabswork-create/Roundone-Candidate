@@ -21,7 +21,7 @@ export function authErrorMessage(error: unknown): string {
     message.includes('incorrect password') ||
     message.includes('invalid password')
   ) {
-    return 'Incorrect email or password. Please try again.'
+    return 'Incorrect email or password. If you created this account with Google, use Continue with Google. To sign in with email, choose Forgot password and set a password.'
   }
   if (message.includes('email not confirmed') || message.includes('not confirmed')) {
     return 'Please confirm your email from the link we sent, then sign in.'

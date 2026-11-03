@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { Card } from '../components/ui/primitives.tsx'
 import { Button } from '../components/ui/Button.tsx'
+import { applyDetectedTimezone } from '../services/auth.ts'
 import { useSession } from '../state/session.tsx'
 
 function safeNextPath(value: string | null) {
@@ -22,6 +23,7 @@ export function AuthCallbackPage() {
   const nextPath = safeNextPath(params.get('next'))
   const oauthError = params.get('error_description') ?? params.get('error')
   const [timedOut, setTimedOut] = useState(false)
+  const timezoneApplied = useRef(false)
   const hashType = typeof window === 'undefined' ? null : new URLSearchParams(window.location.hash.replace(/^#/, '')).get('type')
   const isRecovery = hashType === 'recovery' || params.get('type') === 'recovery'
 
@@ -29,6 +31,12 @@ export function AuthCallbackPage() {
     const id = window.setTimeout(() => setTimedOut(true), 10_000)
     return () => window.clearTimeout(id)
   }, [])
+
+  useEffect(() => {
+    if (status !== 'authenticated' || !account || timezoneApplied.current) return
+    timezoneApplied.current = true
+    void applyDetectedTimezone(account.profile.id)
+  }, [status, account])
 
   useEffect(() => {
     if (status !== 'authenticated' || !account) return

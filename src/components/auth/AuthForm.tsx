@@ -1,9 +1,9 @@
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { Button } from '../ui/Button.tsx'
-import { FieldLabel, PasswordInput, SelectInput, TextInput } from '../ui/primitives.tsx'
+import { FieldLabel, PasswordInput, TextInput } from '../ui/primitives.tsx'
 import { GoogleIcon } from '../ui/GoogleIcon.tsx'
-import { timezoneSelectOptions } from '../../lib/candidateTimezone.ts'
+import { candidateDisplayTimezone } from '../../lib/candidateTimezone.ts'
 import {
   authErrorMessage,
   parseAuthRateLimitSeconds,
@@ -36,7 +36,6 @@ export function AuthForm({
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
-  const [timezone, setTimezone] = useState('Asia/Kolkata')
   const [submitting, setSubmitting] = useState(false)
   const [googleSubmitting, setGoogleSubmitting] = useState(false)
   const [emailBusy, setEmailBusy] = useState(false)
@@ -68,7 +67,12 @@ export function AuthForm({
     setSubmitting(true)
     try {
       if (isRegister) {
-        const result = await signUpCandidate({ email, password, fullName, timezone })
+        const result = await signUpCandidate({
+          email,
+          password,
+          fullName,
+          timezone: candidateDisplayTimezone(),
+        })
         if (result.needsEmailConfirmation) {
           setNeedsConfirmation(true)
           setInfo('We sent a confirmation link to your email. Check your inbox and spam folder, then sign in.')
@@ -207,23 +211,6 @@ export function AuthForm({
             />
           </div>
         ) : null}
-        {isRegister ? (
-          <div>
-            <FieldLabel htmlFor={`${idPrefix}-timezone`}>Timezone</FieldLabel>
-            <SelectInput
-              id={`${idPrefix}-timezone`}
-              value={timezone}
-              onChange={(event) => setTimezone(event.target.value)}
-            >
-              {timezoneSelectOptions(timezone).map((zone) => (
-                <option key={zone.id} value={zone.id}>
-                  {zone.label}
-                </option>
-              ))}
-            </SelectInput>
-          </div>
-        ) : null}
-
         {!isRegister ? (
           <p className="text-xs text-slate-500">
             Accounts created with Google have no password. Use Continue with Google, or Forgot password to set one.
