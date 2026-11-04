@@ -12,7 +12,7 @@ import { Chip, FieldLabel, PageHeader, SelectInput, TextInput } from '../compone
 import { preferredDateRangeError } from '../lib/dates.ts'
 import { isCanonicalSkillDuplicate, uniqueCandidateSkillWording } from '../matching/skills.ts'
 import { toNormalizationInput, type NormalizationPatch } from '../matching/normalizeModel.ts'
-import { updateCandidatePreferences } from '../services/candidateProfile.ts'
+import { updateCandidatePreferences, updateCandidateSkills } from '../services/candidateProfile.ts'
 import { usePreferenceNormalization } from '../matching/usePreferenceNormalization.ts'
 import { requestResumeSkillPlan } from '../resume/aiAssist.ts'
 import { canAnalyzeResume, type ResumeSkillPlan } from '../resume/aiModel.ts'
@@ -211,14 +211,18 @@ export function FindPage() {
       language: '',
     }
     try {
-      await updateCandidatePreferences({
-        skills,
-        preferredDate: form.preferredDate || null,
-        preferredDateEnd: form.preferredDateEnd || null,
-        preferredTimeWindow: form.preferredTime || null,
-      })
+      await Promise.all([
+        updateCandidatePreferences({
+          skills,
+          preferredDate: form.preferredDate || null,
+          preferredDateEnd: form.preferredDateEnd || null,
+          preferredTimeWindow: form.preferredTime || null,
+        }),
+        // Persist Find skills so Matches / profile use the same skill set.
+        skills.length > 0 ? updateCandidateSkills(skills) : Promise.resolve([]),
+      ])
     } catch {
-      // Matching still uses the range on this page if the preference row cannot be saved.
+      // Matching still uses the in-session skills if the preference row cannot be saved.
     }
     setPreferences(next)
     navigate('/candidate/matches')

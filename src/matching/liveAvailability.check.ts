@@ -12,6 +12,16 @@ const person = {
   ],
 } as MatchingCatalogPerson
 
-expect(pickServiceForAvailability(person, 'System Design').id === 'design', 'Prefers a service matching the requested interview type')
-expect(pickServiceForAvailability(person, '').id === 'design', 'Without a type, uses the shortest service')
+expect(
+  pickServiceForAvailability(person, 'System Design')?.id === 'design',
+  'Prefers a service matching the requested interview type',
+)
+expect(
+  pickServiceForAvailability(person, '')?.id === 'design',
+  'Without a type, uses the shortest service',
+)
+expect(
+  pickServiceForAvailability({ services: [] } as MatchingCatalogPerson, 'Coding') === undefined,
+  'No published services still allows skill-only matching',
+)
 console.log('matching availability checks passed')
