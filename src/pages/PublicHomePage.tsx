@@ -63,7 +63,7 @@ export function PublicHomePage() {
             <p className="text-sm font-semibold text-violet-600">Platform demo</p>
             <h2 className="mt-2 text-3xl font-bold tracking-tight text-[#101c35]">See how JobRound.ai works</h2>
             <p className="mt-3 text-slate-600">
-              Auto-playing walkthrough with zoom — live human booking first, then matching, AI practice, and feedback.
+              Auto-playing walkthrough — live human booking first, then matching, AI practice, and feedback.
             </p>
           </div>
           <div className="mt-10">
