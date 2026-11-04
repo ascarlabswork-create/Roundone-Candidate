@@ -27,11 +27,6 @@ const scenes = [
     icon: Calendar,
     accent: 'bg-violet-100 text-violet-700 ring-violet-200',
     bar: 'from-violet-500 to-sky-400',
-    cameras: [
-      { scale: 1, originX: 48, originY: 42 },
-      { scale: 1.16, originX: 62, originY: 55 },
-      { scale: 1.08, originX: 40, originY: 48 },
-    ],
   },
   {
     id: 'match',
@@ -41,11 +36,6 @@ const scenes = [
     icon: BadgeCheck,
     accent: 'bg-emerald-100 text-emerald-700 ring-emerald-200',
     bar: 'from-emerald-500 to-mint-500',
-    cameras: [
-      { scale: 1.02, originX: 35, originY: 40 },
-      { scale: 1.18, originX: 28, originY: 52 },
-      { scale: 1.1, originX: 70, originY: 45 },
-    ],
   },
   {
     id: 'job',
@@ -55,11 +45,6 @@ const scenes = [
     icon: Target,
     accent: 'bg-sky-100 text-sky-700 ring-sky-200',
     bar: 'from-sky-500 to-violet-400',
-    cameras: [
-      { scale: 1, originX: 50, originY: 35 },
-      { scale: 1.2, originX: 55, originY: 60 },
-      { scale: 1.08, originX: 45, originY: 40 },
-    ],
   },
   {
     id: 'ai',
@@ -69,11 +54,6 @@ const scenes = [
     icon: Sparkles,
     accent: 'bg-coral-100 text-coral-700 ring-coral-200',
     bar: 'from-coral-500 to-amber-400',
-    cameras: [
-      { scale: 1.04, originX: 42, originY: 38 },
-      { scale: 1.22, originX: 58, originY: 55 },
-      { scale: 1.1, originX: 50, originY: 48 },
-    ],
   },
   {
     id: 'feedback',
@@ -83,18 +63,12 @@ const scenes = [
     icon: TrendingUp,
     accent: 'bg-amber-100 text-amber-800 ring-amber-200',
     bar: 'from-amber-500 to-rose-400',
-    cameras: [
-      { scale: 1, originX: 50, originY: 40 },
-      { scale: 1.14, originX: 35, originY: 50 },
-      { scale: 1.2, originX: 65, originY: 42 },
-    ],
   },
 ] as const
 
 const POSTER = '/demo/poster.svg'
 
 type DemoMode = 'loading' | 'file' | 'youtube' | 'guided'
-type Camera = { scale: number; originX: number; originY: number }
 
 function DemoChrome({ children, caption }: { children: ReactNode; caption: string }) {
   return (
@@ -344,11 +318,9 @@ function GuidedDemoTour() {
   const rootRef = useRef<HTMLDivElement | null>(null)
   const [index, setIndex] = useState(0)
   const [playing, setPlaying] = useState(false)
-  const [cameraIndex, setCameraIndex] = useState(0)
   const [reducedMotion, setReducedMotion] = useState(false)
   const scene = scenes[index]
   const Icon = scene.icon
-  const camera: Camera = scene.cameras[Math.min(cameraIndex, scene.cameras.length - 1)]
 
   useEffect(() => {
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
@@ -375,30 +347,14 @@ function GuidedDemoTour() {
     if (!playing || reducedMotion) return
     const timer = window.setTimeout(() => {
       setIndex((current) => (current + 1) % scenes.length)
-      setCameraIndex(0)
     }, SCENE_MS)
     return () => window.clearTimeout(timer)
   }, [playing, index, reducedMotion])
 
-  useEffect(() => {
-    if (!playing || reducedMotion) return
-    const step = Math.max(1200, Math.floor(SCENE_MS / scene.cameras.length))
-    const timer = window.setInterval(() => {
-      setCameraIndex((current) => (current + 1) % scene.cameras.length)
-    }, step)
-    return () => window.clearInterval(timer)
-  }, [playing, index, reducedMotion, scene.cameras.length])
-
   return (
-    <DemoChrome caption="Auto-playing product demo with zoom — live human booking first, then matching, prep, AI practice, and feedback.">
+    <DemoChrome caption="Auto-playing product demo — live human booking first, then matching, prep, AI practice, and feedback.">
       <div ref={rootRef} className="relative aspect-[16/10] w-full overflow-hidden bg-gradient-to-br from-[#0b1220] via-[#152447] to-[#3b1d6e] sm:aspect-video">
-        <div
-          className="demo-camera absolute inset-0 will-change-transform"
-          style={{
-            transform: `scale(${reducedMotion ? 1 : camera.scale})`,
-            transformOrigin: `${camera.originX}% ${camera.originY}%`,
-          }}
-        >
+        <div className="absolute inset-0">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(124,58,237,0.35),transparent_55%),radial-gradient(ellipse_at_bottom_right,rgba(14,165,233,0.25),transparent_45%)]" />
           <div className="absolute inset-0 flex items-center justify-center p-4 sm:p-6 lg:p-8">
             <div className="grid w-full max-w-5xl overflow-hidden rounded-2xl border border-white/15 bg-white/95 shadow-[0_30px_80px_-40px_rgba(0,0,0,0.65)] backdrop-blur-sm lg:grid-cols-[12.5rem_minmax(0,1fr)]">
@@ -420,7 +376,6 @@ function GuidedDemoTour() {
                         )}
                         onClick={() => {
                           setIndex(i)
-                          setCameraIndex(0)
                           setPlaying(false)
                         }}
                         aria-current={active ? 'step' : undefined}

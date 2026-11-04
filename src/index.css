@@ -173,10 +173,6 @@
   animation: resume-extract-shimmer 1.35s ease-in-out infinite;
 }
 
-.demo-camera {
-  transition: transform 1.65s cubic-bezier(0.33, 1, 0.68, 1);
-}
-
 @keyframes demo-scene-enter {
   0% {
     opacity: 0;
@@ -218,10 +214,6 @@
     animation: none;
     width: 100%;
     opacity: 0.85;
-  }
-
-  .demo-camera {
-    transition: none;
   }
 
   .demo-scene-enter,
