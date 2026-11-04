@@ -139,7 +139,7 @@ export function FindPage() {
       const text = await extractResumeText(file)
       if (!canAnalyzeResume(text)) {
         throw new Error(
-          'That resume did not contain enough readable text. Please try another PDF, or paste a longer resume.',
+          'That resume did not contain enough readable text. Please try another file, or paste a longer resume.',
         )
       }
 
@@ -300,7 +300,7 @@ export function FindPage() {
               ) : null}
               {!resumeFileName && !resumeExtracting ? (
                 <span className="text-sm text-slate-500">
-                  PDF or plain text, up to 8 MB. We extract all skills found in the resume.
+                  Any file (PDF, Word, text, and more), up to 8 MB. We extract skills from readable resumes.
                 </span>
               ) : null}
             </div>

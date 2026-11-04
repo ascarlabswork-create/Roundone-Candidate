@@ -346,7 +346,7 @@ export function ResumeSkillsPage() {
       {phase === 'input' ? (
         <div className="mt-8 space-y-5 rounded-xl border border-slate-200 bg-white p-5 sm:p-8">
           <div>
-            <FieldLabel htmlFor="resume-file">Upload resume (PDF or .txt)</FieldLabel>
+            <FieldLabel htmlFor="resume-file">Upload resume</FieldLabel>
             <div className="flex flex-wrap items-center gap-3">
               <input
                 ref={fileInputRef}
@@ -368,7 +368,7 @@ export function ResumeSkillsPage() {
                   Loaded <span className="font-medium text-navy-950">{fileName}</span>
                 </span>
               ) : (
-                <span className="text-sm text-slate-500">PDF or plain text, up to 8 MB.</span>
+                <span className="text-sm text-slate-500">Any file (PDF, Word, text, and more), up to 8 MB.</span>
               )}
             </div>
           </div>
