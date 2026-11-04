@@ -62,12 +62,20 @@ export async function recommendMatchedInterviewers(
     }
   })
 
+  // Booking readiness is additive — never fail the skill-match page if slots lookup errors.
   const booking = await Promise.all(
-    recommended.map((item) => describeBookingReadiness(item.interviewer, prefs, displayTimezone)),
+    recommended.map(async (item) => {
+      try {
+        return await describeBookingReadiness(item.interviewer, prefs, displayTimezone)
+      } catch (error) {
+        console.error('booking readiness failed', item.interviewer.id, error)
+        return 'no_availability' as BookingReadiness
+      }
+    }),
   )
 
   return recommended.map((item, index) => ({
     ...item,
-    booking: booking[index] ?? 'no_service',
+    booking: booking[index] ?? 'no_availability',
   }))
 }

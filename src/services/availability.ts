@@ -48,7 +48,14 @@ export async function getBookableSlots(input: GetBookableSlotsInput): Promise<Ut
     p_to: input.to.toISOString(),
   })
 
-  failAvailability(error)
+  if (error) {
+    // Availability-only lookups (null service) must not break skill-match pages.
+    if (!serviceId) {
+      console.error('list_bookable_slots without service failed', error)
+      return []
+    }
+    failAvailability(error)
+  }
   return parseBookableSlotRows(data)
 }
 

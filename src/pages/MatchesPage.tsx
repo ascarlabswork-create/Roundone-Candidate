@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { SkillMatchCard, SkillMatchCardSkeleton } from '../components/interviewer/SkillMatchCard.tsx'
 import { Button } from '../components/ui/Button.tsx'
@@ -11,11 +12,12 @@ import { useSession } from '../state/session.tsx'
 export function MatchesPage() {
   const { preferences } = useMatching()
   const { account } = useSession()
+  const [retryNonce, setRetryNonce] = useState(0)
   const displayTimezone = candidateDisplayTimezone(account?.profile.timezone)
   const ready = Boolean(preferences)
   const state = useAsync(
     () => (preferences ? recommendMatchedInterviewers(preferences, displayTimezone) : Promise.resolve([])),
-    [JSON.stringify(preferences), displayTimezone],
+    [JSON.stringify(preferences), displayTimezone, retryNonce],
   )
 
   return (
@@ -57,7 +59,8 @@ export function MatchesPage() {
         <div className="mt-8">
           <ErrorState
             title="Couldn't load skill matches"
-            body="Couldn't load skill matches. Please try again."
+            body={state.error || "Couldn't load skill matches. Please try again."}
+            onRetry={() => setRetryNonce((value) => value + 1)}
           />
         </div>
       ) : null}
