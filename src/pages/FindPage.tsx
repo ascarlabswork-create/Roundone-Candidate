@@ -349,72 +349,83 @@ export function FindPage() {
           </div>
         </div>
 
-        <div className="grid gap-5 sm:grid-cols-2">
-          <div className="sm:col-span-2">
-            <FieldLabel htmlFor="date-from">Preferred Date</FieldLabel>
-            <div className="grid gap-3 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
-              <TextInput
-                id="date-from"
-                type="date"
-                value={form.preferredDate}
-                onChange={(event) => {
-                  const nextStart = event.target.value
-                  setForm((prev) => ({
-                    ...prev,
-                    preferredDate: nextStart,
-                    preferredDateEnd:
-                      prev.preferredDateEnd && nextStart && prev.preferredDateEnd < nextStart
-                        ? nextStart
-                        : prev.preferredDateEnd,
-                  }))
-                }}
-              />
-              <span className="hidden text-center text-sm text-slate-500 sm:block">to</span>
-              <div>
-                <label htmlFor="date-to" className="sr-only">
-                  Preferred date end
-                </label>
+        <div className="space-y-4">
+          <div>
+            <p className="text-sm font-medium text-navy-950">
+              Preferred mock interview date and time{' '}
+              <span className="font-normal text-slate-500">(optional)</span>
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              Choose when you want to sit a live mock interview. You can leave both blank and browse any open slot.
+            </p>
+          </div>
+          <div className="grid gap-5 sm:grid-cols-2">
+            <div className="sm:col-span-2">
+              <FieldLabel htmlFor="date-from">Date range</FieldLabel>
+              <div className="grid gap-3 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
                 <TextInput
-                  id="date-to"
+                  id="date-from"
                   type="date"
-                  min={form.preferredDate || undefined}
-                  value={form.preferredDateEnd || form.preferredDate}
+                  value={form.preferredDate}
                   onChange={(event) => {
-                    const nextEnd = event.target.value
+                    const nextStart = event.target.value
                     setForm((prev) => ({
                       ...prev,
-                      preferredDateEnd: nextEnd,
-                      preferredDate:
-                        prev.preferredDate && nextEnd && nextEnd < prev.preferredDate
-                          ? nextEnd
-                          : prev.preferredDate || nextEnd,
+                      preferredDate: nextStart,
+                      preferredDateEnd:
+                        prev.preferredDateEnd && nextStart && prev.preferredDateEnd < nextStart
+                          ? nextStart
+                          : prev.preferredDateEnd,
                     }))
                   }}
                 />
+                <span className="hidden text-center text-sm text-slate-500 sm:block">to</span>
+                <div>
+                  <label htmlFor="date-to" className="sr-only">
+                    Preferred mock interview date end
+                  </label>
+                  <TextInput
+                    id="date-to"
+                    type="date"
+                    min={form.preferredDate || undefined}
+                    value={form.preferredDateEnd || form.preferredDate}
+                    onChange={(event) => {
+                      const nextEnd = event.target.value
+                      setForm((prev) => ({
+                        ...prev,
+                        preferredDateEnd: nextEnd,
+                        preferredDate:
+                          prev.preferredDate && nextEnd && nextEnd < prev.preferredDate
+                            ? nextEnd
+                            : prev.preferredDate || nextEnd,
+                      }))
+                    }}
+                  />
+                </div>
               </div>
+              <p className="mt-1 text-xs text-slate-500">
+                Optional — pick a range (for example 01-10-2026 to 15-10-2026), or leave empty for any day. Open times
+                outside this range stay on the interviewer&apos;s calendar and are hidden here.
+              </p>
+              {dateError ? <p className="mt-1 text-sm text-red-700">{dateError}</p> : null}
             </div>
-            <p className="mt-1 text-xs text-slate-500">
-              Pick a range (for example 01-10-2026 to 15-10-2026). Leave empty for any day. Open times outside this
-              range stay on the interviewer’s calendar and are hidden here.
-            </p>
-            {dateError ? <p className="mt-1 text-sm text-red-700">{dateError}</p> : null}
-          </div>
-          <div className="sm:col-span-2 sm:max-w-xs">
-            <FieldLabel htmlFor="time">Preferred Time</FieldLabel>
-            <SelectInput
-              id="time"
-              value={form.preferredTime}
-              onChange={(event) =>
-                setForm({ ...form, preferredTime: event.target.value as TimeWindow | '' })
-              }
-            >
-              <option value="">Any time</option>
-              {TIME_WINDOWS.map((window) => (
-                <option key={window.id} value={window.id}>
-                  {window.label}
-                </option>
-              ))}
-            </SelectInput>
+            <div className="sm:col-span-2 sm:max-w-xs">
+              <FieldLabel htmlFor="time">Time of day</FieldLabel>
+              <SelectInput
+                id="time"
+                value={form.preferredTime}
+                onChange={(event) =>
+                  setForm({ ...form, preferredTime: event.target.value as TimeWindow | '' })
+                }
+              >
+                <option value="">Any time (optional)</option>
+                {TIME_WINDOWS.map((window) => (
+                  <option key={window.id} value={window.id}>
+                    {window.label}
+                  </option>
+                ))}
+              </SelectInput>
+            </div>
           </div>
         </div>
 

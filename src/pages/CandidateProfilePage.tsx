@@ -570,10 +570,16 @@ export function CandidateProfilePage() {
         </Card>
 
         <Card className="p-6">
-          <h2 className="font-semibold text-navy-950">Preferences</h2>
+          <h2 className="font-semibold text-navy-950">
+            Preferred mock interview date and time{' '}
+            <span className="text-sm font-normal text-slate-500">(optional)</span>
+          </h2>
+          <p className="mt-1 text-sm text-slate-600">
+            Choose when you prefer to sit a live mock interview. Leave blank to keep any day or time.
+          </p>
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
             <div className="sm:col-span-2">
-              <FieldLabel htmlFor="preferredDate">Preferred dates</FieldLabel>
+              <FieldLabel htmlFor="preferredDate">Date range</FieldLabel>
               <div className="grid gap-3 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
                 <TextInput
                   id="preferredDate"
@@ -595,19 +601,18 @@ export function CandidateProfilePage() {
                 <TextInput
                   id="preferredDateEnd"
                   type="date"
-                  aria-label="Preferred end date"
+                  aria-label="Preferred mock interview end date"
                   min={form.preferredDate || undefined}
                   value={form.preferredDateEnd}
                   onChange={(event) => setForm({ ...form, preferredDateEnd: event.target.value })}
                 />
               </div>
               <p className="mt-1 text-xs text-slate-500">
-                Interviews you prefer between these dates. Example: 01-10-2026 to 15-10-2026. Leave both empty for
-                any day.
+                Optional — example 01-10-2026 to 15-10-2026. Leave both empty for any day.
               </p>
             </div>
             <div>
-              <FieldLabel htmlFor="preferredTime">Preferred time</FieldLabel>
+              <FieldLabel htmlFor="preferredTime">Time of day</FieldLabel>
               <SelectInput
                 id="preferredTime"
                 value={form.preferredTime}
@@ -615,7 +620,7 @@ export function CandidateProfilePage() {
                   setForm({ ...form, preferredTime: event.target.value as TimeWindow | '' })
                 }
               >
-                <option value="">Any time</option>
+                <option value="">Any time (optional)</option>
                 {TIME_WINDOWS.map((window) => (
                   <option key={window.id} value={window.id}>
                     {window.label}
