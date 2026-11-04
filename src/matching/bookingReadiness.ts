@@ -10,7 +10,7 @@ export function classifyBookingReadiness(input: {
   preferredDate?: string | null
   preferredDateEnd?: string | null
 }): BookingReadiness {
-  if (input.serviceCount <= 0) return 'no_service'
+  // Services are optional: open times from availability alone are bookable.
   if (input.slots.length === 0) return 'no_availability'
   if (!input.preferredDate) return 'ready'
   const inRange = filterSlotsByPreferredRange(
@@ -25,7 +25,7 @@ export function classifyBookingReadiness(input: {
 export function bookingStatusMessage(readiness: BookingReadiness): { headline: string; detail: string } | null {
   if (readiness === 'ready') return null
   if (readiness === 'no_service') {
-    return { headline: 'Matched by skills', detail: 'Session details may still be setting up — you can open booking anytime.' }
+    return { headline: 'Matched by skills', detail: 'Open booking to pick a time from their calendar.' }
   }
   if (readiness === 'no_availability') {
     return { headline: 'Matched by skills', detail: 'Availability not configured yet — open booking to check again.' }
