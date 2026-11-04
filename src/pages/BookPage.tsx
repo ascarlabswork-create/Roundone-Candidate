@@ -7,9 +7,9 @@ import {
   isoDateInZone,
 } from '../availability/index.ts'
 import { Button } from '../components/ui/Button.tsx'
-import { Card, EmptyState, ErrorState, FieldLabel, SelectInput, Skeleton } from '../components/ui/primitives.tsx'
+import { Card, EmptyState, ErrorState, Skeleton } from '../components/ui/primitives.tsx'
 import { Avatar, VerifiedBadge } from '../components/ui/identity.tsx'
-import { formatTimezoneLabel, timezoneSelectOptions } from '../lib/candidateTimezone.ts'
+import { candidateDisplayTimezone, formatTimezoneLabel } from '../lib/candidateTimezone.ts'
 import { formatMoneyFromPaise } from '../lib/format.ts'
 import { useAsync } from '../lib/useAsync.ts'
 import { isUuid } from '../lib/uuid.ts'
@@ -98,7 +98,6 @@ export function BookPage() {
   const [retryNonce, setRetryNonce] = useState(0)
   const [pageNonce, setPageNonce] = useState(0)
   const [rechecking, setRechecking] = useState(false)
-  const timezoneTouched = useRef(false)
   const creatingRef = useRef(false)
 
   const requestedStep = Number(params.get('step') ?? '1')
@@ -112,18 +111,15 @@ export function BookPage() {
 
   useEffect(() => {
     if (draft.interviewerId === id) return
-    timezoneTouched.current = false
     setWindowIndex(0)
     setStaleMessage('')
-    resetDraft(id, account?.profile.timezone)
+    resetDraft(id, candidateDisplayTimezone(account?.profile.timezone))
   }, [account?.profile.timezone, draft.interviewerId, id, resetDraft])
 
   useEffect(() => {
-    if (timezoneTouched.current) return
     if (draft.interviewerId !== id) return
     if (draft.startsAtUtc) return
-    const candidateTz = account?.profile.timezone
-    if (!candidateTz) return
+    const candidateTz = candidateDisplayTimezone(account?.profile.timezone)
     if (draft.timezone === candidateTz && draft.displayTimezone === candidateTz) return
     updateDraft({ timezone: candidateTz, displayTimezone: candidateTz })
   }, [
@@ -163,8 +159,9 @@ export function BookPage() {
     })
   }, [draft.serviceId, preselectedService, publicState.data?.services, publicState.status, updateDraft])
 
-  const displayTimeZone =
-    draft.displayTimezone || draft.timezone || account?.profile.timezone || 'Asia/Kolkata'
+  const displayTimeZone = candidateDisplayTimezone(
+    draft.displayTimezone || draft.timezone || account?.profile.timezone,
+  )
 
   const availabilityState = useAsync(async (): Promise<AvailabilityQueryResult> => {
     if (step !== 1 || !service) {
@@ -244,18 +241,6 @@ export function BookPage() {
       timezone: displayTimeZone,
       displayTimezone: displayTimeZone,
     })
-  }
-
-  function changeTimezone(nextZone: string) {
-    timezoneTouched.current = true
-    const nextDate = selectedSlot ? civilDateForSlot(selectedSlot, nextZone) : ''
-    updateDraft({
-      timezone: nextZone,
-      displayTimezone: nextZone,
-      selectedDate: nextDate,
-      selectedSlot: selectedSlot ? formatBookingTime(selectedSlot.startsAtUtc, nextZone) : draft.selectedSlot,
-    })
-    if (nextDate) setSelectedDay(nextDate)
   }
 
   async function continueToReview() {
@@ -442,21 +427,13 @@ export function BookPage() {
                 cannot enter a custom time.
               </p>
               <div className="mt-4">
-                <FieldLabel htmlFor="timezone">Your timezone</FieldLabel>
-                <SelectInput
-                  id="timezone"
-                  value={displayTimeZone}
-                  onChange={(event) => changeTimezone(event.target.value)}
-                >
-                  {timezoneSelectOptions(displayTimeZone).map((zone) => (
-                    <option key={zone.id} value={zone.id}>
-                      {zone.label}
-                    </option>
-                  ))}
-                </SelectInput>
+                <p className="text-sm font-medium text-navy-950">Your timezone</p>
+                <p className="mt-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-navy-950">
+                  {formatTimezoneLabel(displayTimeZone)}
+                </p>
                 <p className="mt-2 text-xs text-slate-500">
-                  Open times are shown in {formatTimezoneLabel(displayTimeZone)}
-                  {header.timezone ? `, converted from the interviewer’s ${formatTimezoneLabel(header.timezone)}` : ''}.
+                  Detected automatically. Open times are shown in this timezone
+                  {header.timezone ? `, converted from the interviewer's ${formatTimezoneLabel(header.timezone)}` : ''}.
                 </p>
               </div>
               <p className="mt-4 text-sm text-slate-600">
