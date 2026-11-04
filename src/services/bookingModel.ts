@@ -23,18 +23,20 @@ export class BookingError extends Error {
 }
 
 export type CreateBookingInput = {
-  serviceId: string
+  /** Empty when booking from availability without a published service. */
+  serviceId?: string | null
   startsAtUtc: string
   displayTimezone: string
   endsAtUtc?: string
   interviewerProfileId?: string
+  durationMin?: number
 }
 
 export type CandidateBooking = {
   id: string
   candidateProfileId: string
   interviewerProfileId: string
-  serviceId: string
+  serviceId: string | null
   status: string
   startsAtUtc: string
   endsAtUtc: string
@@ -70,8 +72,13 @@ export function isHoldExpired(booking: Pick<CandidateBooking, 'status' | 'holdEx
 }
 
 export function validateCreateBookingInput(input: CreateBookingInput): string | null {
-  if (!isUuid(input.serviceId)) return 'Select an active interview service before confirming.'
-  if (input.interviewerProfileId && !isUuid(input.interviewerProfileId)) {
+  const serviceId = input.serviceId?.trim() || ''
+  const interviewerId = input.interviewerProfileId?.trim() || ''
+  if (serviceId && !isUuid(serviceId)) return 'Select an active interview service before confirming.'
+  if (!serviceId && !isUuid(interviewerId)) {
+    return 'Select an interviewer before confirming.'
+  }
+  if (interviewerId && !isUuid(interviewerId)) {
     return 'Select an interviewer before confirming.'
   }
   const startsAtUtc = toUtcIso(input.startsAtUtc)
@@ -137,7 +144,7 @@ export function parseCandidateBooking(value: unknown): CandidateBooking | null {
   const id = readString(row, 'id')
   const candidateProfileId = readString(row, 'candidate_profile_id')
   const interviewerProfileId = readString(row, 'interviewer_profile_id')
-  const serviceId = readString(row, 'service_id')
+  const serviceId = readNullableString(row, 'service_id')
   const status = readString(row, 'status')
   const startsAtUtc = toUtcIso(row.starts_at)
   const endsAtUtc = toUtcIso(row.ends_at)
@@ -153,7 +160,6 @@ export function parseCandidateBooking(value: unknown): CandidateBooking | null {
     !id ||
     !candidateProfileId ||
     !interviewerProfileId ||
-    !serviceId ||
     !status ||
     !startsAtUtc ||
     !endsAtUtc ||
@@ -188,9 +194,10 @@ export function parseCandidateBooking(value: unknown): CandidateBooking | null {
 
 export function sameHeldSlot(booking: CandidateBooking, input: CreateBookingInput) {
   const start = toUtcIso(input.startsAtUtc)
+  const inputServiceId = input.serviceId?.trim() || null
   return (
     booking.status === 'pending_payment' &&
-    booking.serviceId === input.serviceId &&
+    (booking.serviceId || null) === inputServiceId &&
     Boolean(start) &&
     booking.startsAtUtc === start &&
     !isHoldExpired(booking)

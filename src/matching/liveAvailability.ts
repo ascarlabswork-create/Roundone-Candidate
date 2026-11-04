@@ -12,14 +12,12 @@ export async function describeBookingReadiness(
   prefs: MatchingPreferences,
   displayTimezone?: string | null,
 ): Promise<BookingReadiness> {
-  if (person.services.length === 0) return 'no_service'
   const service = pickServiceForAvailability(person, prefs.interviewType)
-  if (!service) return 'no_service'
   const { from, to } = getBookableWindow(0)
   try {
     const slots = await getBookableSlots({
       interviewerProfileId: person.id,
-      serviceId: service.id,
+      serviceId: service?.id ?? null,
       from,
       to,
     })

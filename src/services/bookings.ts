@@ -50,14 +50,24 @@ export async function createBooking(input: CreateBookingInput): Promise<Candidat
   const startsAtUtc = toUtcIso(input.startsAtUtc)
   if (!startsAtUtc) throw new BookingError('validation', 'Select a date and time before confirming.')
 
-  const { data, error } = await supabase.rpc('create_booking', {
-    p_service_id: input.serviceId,
-    p_starts_at: startsAtUtc,
-    p_display_timezone: input.displayTimezone.trim(),
-  })
+  const serviceId = input.serviceId?.trim() || ''
+  const interviewerProfileId = input.interviewerProfileId?.trim() || ''
+
+  const { data, error } = serviceId
+    ? await supabase.rpc('create_booking', {
+        p_service_id: serviceId,
+        p_starts_at: startsAtUtc,
+        p_display_timezone: input.displayTimezone.trim(),
+      })
+    : await supabase.rpc('create_booking_from_availability', {
+        p_interviewer_profile_id: interviewerProfileId,
+        p_starts_at: startsAtUtc,
+        p_display_timezone: input.displayTimezone.trim(),
+        p_duration_min: input.durationMin ?? 45,
+      })
 
   if (error) {
-    console.error('create_booking failed', error)
+    console.error(serviceId ? 'create_booking failed' : 'create_booking_from_availability failed', error)
     throw mapBookingError(error)
   }
 
@@ -153,15 +163,15 @@ export async function getCandidateBookingView(bookingId: string): Promise<Candid
   const booking = await getCandidateBooking(bookingId)
   let interviewerName = 'Interviewer'
   let interviewerPhoto: string | null = null
-  let serviceName = 'Interview'
+  let serviceName = booking.serviceId ? 'Interview' : 'Mock interview'
   try {
-    const [interviewer, service] = await Promise.all([
-      getPublicInterviewer(booking.interviewerProfileId),
-      getPublicInterviewerService(booking.serviceId),
-    ])
+    const interviewer = await getPublicInterviewer(booking.interviewerProfileId)
     interviewerName = interviewer?.name ?? interviewerName
     interviewerPhoto = interviewer?.photo ?? null
-    serviceName = service?.name ?? serviceName
+    if (booking.serviceId) {
+      const service = await getPublicInterviewerService(booking.serviceId)
+      serviceName = service?.name ?? serviceName
+    }
   } catch (error) {
     console.error('getCandidateBookingView extras failed', error)
   }

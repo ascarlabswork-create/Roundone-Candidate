@@ -61,20 +61,23 @@ async function decorateBookings(
 ): Promise<CandidateInterview[]> {
   if (bookings.length === 0) return []
 
+  const serviceIds = bookings
+    .map((booking) => booking.serviceId)
+    .filter((id): id is string => typeof id === 'string' && id.length > 0)
   const [interviewers, services] = await Promise.all([
     getPublicInterviewersByIds(bookings.map((booking) => booking.interviewerProfileId)),
-    getPublicServicesByIds(bookings.map((booking) => booking.serviceId)),
+    getPublicServicesByIds(serviceIds),
   ])
 
   return bookings.map((booking) => {
     const interviewer = interviewers.get(booking.interviewerProfileId)
-    const service = services.get(booking.serviceId)
+    const service = booking.serviceId ? services.get(booking.serviceId) : undefined
     return {
       ...booking,
       interviewerName: interviewer?.name ?? 'Interviewer',
       interviewerPhoto: interviewer?.photo ?? null,
       interviewerCompany: interviewer?.company ?? null,
-      serviceName: service?.name ?? 'Interview',
+      serviceName: service?.name ?? (booking.serviceId ? 'Interview' : 'Mock interview'),
       interviewType: service?.interviewType ?? 'Interview',
       session: sessions.get(booking.id) ?? null,
       hasFeedback: feedbackIds.has(booking.id),

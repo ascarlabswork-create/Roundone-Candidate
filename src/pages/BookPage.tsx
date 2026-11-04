@@ -49,6 +49,8 @@ type BookingHeader = {
   company: string
   timezone: string | null
   verified: boolean
+  listPricePaise: number | null
+  currency: string
 }
 
 function headerFromLive(interviewer: PublicInterviewer): BookingHeader {
@@ -60,6 +62,8 @@ function headerFromLive(interviewer: PublicInterviewer): BookingHeader {
     company: interviewer.company ?? '',
     timezone: interviewer.timezone,
     verified: interviewer.identityVerified && interviewer.employmentVerified,
+    listPricePaise: interviewer.listPricePaise,
+    currency: interviewer.currency || 'INR',
   }
 }
 
@@ -137,11 +141,29 @@ export function BookPage() {
   const header: BookingHeader | null = liveInterviewer ? headerFromLive(liveInterviewer) : null
 
   const service = services.find((item) => item.id === draft.serviceId) ?? null
+  const interviewerId = liveInterviewer?.id || draft.interviewerProfileId || draft.interviewerId || id
+  const canLoadSlots = Boolean(header) && isUuid(interviewerId)
+  const availabilityKey = service?.id ?? `availability:${interviewerId}`
+  const durationMin = service?.durationMin ?? 45
+  const pricePaise = service?.pricePaise ?? header?.listPricePaise ?? 0
+  const currency = service?.currency ?? header?.currency ?? 'INR'
 
   useEffect(() => {
     if (publicState.status !== 'success') return
     const available = publicState.data?.services ?? EMPTY_SERVICES
-    if (available.length === 0) return
+    if (available.length === 0) {
+      if (!liveInterviewer) return
+      if (draft.interviewerProfileId === liveInterviewer.id && !draft.serviceId) return
+      setWindowIndex(0)
+      setSelectedDay('')
+      updateDraft({
+        serviceId: '',
+        interviewerId: liveInterviewer.id,
+        interviewerProfileId: liveInterviewer.id,
+        ...emptySlotPatch(),
+      })
+      return
+    }
     const preferred = preselectedService
       ? available.find((item) => item.id === preselectedService)
       : null
@@ -157,35 +179,43 @@ export function BookPage() {
       interviewerProfileId: picked.interviewerProfileId,
       ...emptySlotPatch(),
     })
-  }, [draft.serviceId, preselectedService, publicState.data?.services, publicState.status, updateDraft])
+  }, [
+    draft.interviewerProfileId,
+    draft.serviceId,
+    liveInterviewer,
+    preselectedService,
+    publicState.data?.services,
+    publicState.status,
+    updateDraft,
+  ])
 
   const displayTimeZone = candidateDisplayTimezone(
     draft.displayTimezone || draft.timezone || account?.profile.timezone,
   )
 
   const availabilityState = useAsync(async (): Promise<AvailabilityQueryResult> => {
-    if (step !== 1 || !service) {
+    if (step !== 1 || !canLoadSlots) {
       return { serviceId: '', windowIndex, slots: EMPTY_SLOTS }
     }
     const { from, to } = getBookableWindow(windowIndex)
     const nextSlots = await getBookableSlots({
-      interviewerProfileId: service.interviewerProfileId,
-      serviceId: service.id,
+      interviewerProfileId: interviewerId,
+      serviceId: service?.id ?? null,
       from,
       to,
     })
-    return { serviceId: service.id, windowIndex, slots: nextSlots }
-  }, [service?.id, service?.interviewerProfileId, step, windowIndex, retryNonce])
+    return { serviceId: availabilityKey, windowIndex, slots: nextSlots }
+  }, [availabilityKey, canLoadSlots, interviewerId, service?.id, step, windowIndex, retryNonce])
 
   const preferenceState = useAsync(() => getCandidatePreferencesIfPresent(), [])
   const availabilityReady =
     availabilityState.status === 'success' &&
-    Boolean(service) &&
-    availabilityState.data.serviceId === service?.id &&
+    canLoadSlots &&
+    availabilityState.data.serviceId === availabilityKey &&
     availabilityState.data.windowIndex === windowIndex
   const availabilityLoading =
     step === 1 &&
-    Boolean(service) &&
+    canLoadSlots &&
     (availabilityState.status === 'loading' ||
       preferenceState.status === 'loading' ||
       (!availabilityReady && availabilityState.status !== 'error'))
@@ -222,7 +252,7 @@ export function BookPage() {
         : (days[0]?.date ?? '')
   const visibleSlots = days.find((day) => day.date === activeDay)?.slots ?? EMPTY_SLOTS
 
-  const priceLabel = service ? formatMoneyFromPaise(service.pricePaise, service.currency) : '—'
+  const priceLabel = formatMoneyFromPaise(pricePaise, currency)
 
   function go(next: number) {
     const copy = new URLSearchParams(params)
@@ -244,14 +274,14 @@ export function BookPage() {
   }
 
   async function continueToReview() {
-    if (!service || !selectedSlot) return
+    if (!canLoadSlots || !selectedSlot) return
     setRechecking(true)
     setError('')
     setStaleMessage('')
     try {
       const stillOpen = await isSlotStillBookable({
-        interviewerProfileId: service.interviewerProfileId,
-        serviceId: service.id,
+        interviewerProfileId: interviewerId,
+        serviceId: service?.id ?? null,
         slot: selectedSlot,
       })
       if (!stillOpen) {
@@ -291,14 +321,16 @@ export function BookPage() {
       return
     }
 
-    const interviewerProfileId = draft.interviewerProfileId || service?.interviewerProfileId || draft.interviewerId
+    const interviewerProfileId =
+      draft.interviewerProfileId || service?.interviewerProfileId || draft.interviewerId || interviewerId
     const displayZone = draft.displayTimezone || displayTimeZone
     const validation = validateCreateBookingInput({
-      serviceId: draft.serviceId,
+      serviceId: draft.serviceId || null,
       startsAtUtc: draft.startsAtUtc,
       endsAtUtc: draft.endsAtUtc,
       displayTimezone: displayZone,
       interviewerProfileId,
+      durationMin,
     })
     if (validation) {
       setError(validation)
@@ -306,11 +338,12 @@ export function BookPage() {
     }
 
     const input = {
-      serviceId: draft.serviceId,
+      serviceId: draft.serviceId || null,
       startsAtUtc: draft.startsAtUtc,
       displayTimezone: displayZone,
       endsAtUtc: draft.endsAtUtc,
       interviewerProfileId,
+      durationMin,
     }
 
     creatingRef.current = true
@@ -436,32 +469,21 @@ export function BookPage() {
                   {header.timezone ? `, converted from the interviewer's ${formatTimezoneLabel(header.timezone)}` : ''}.
                 </p>
               </div>
-              <p className="mt-4 text-sm text-slate-600">
-                Duration: {service?.durationMin ?? '—'} min
-              </p>
+              <p className="mt-4 text-sm text-slate-600">Duration: {durationMin} min</p>
               <p className="text-sm text-slate-600">Price: {priceLabel}</p>
-
               {!service ? (
-                <div className="mt-6">
-                  <EmptyState
-                    title="Session setup in progress"
-                    body="This interviewer has not published a bookable session type yet. Open booking again after they finish setup, or go back to their profile."
-                    action={
-                      <Link to={`/candidate/interviewers/${header.id}`}>
-                        <Button variant="outline">Back to profile</Button>
-                      </Link>
-                    }
-                  />
-                </div>
+                <p className="mt-2 text-xs text-slate-500">
+                  Showing open times from this interviewer&apos;s calendar (no session package published yet).
+                </p>
               ) : null}
 
-              {service && availabilityLoading ? (
+              {canLoadSlots && availabilityLoading ? (
                 <div className="mt-6 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-16 text-center">
                   <p className="text-sm font-medium text-navy-950">Checking available times...</p>
                 </div>
               ) : null}
 
-              {service && availabilityState.status === 'error' ? (
+              {canLoadSlots && availabilityState.status === 'error' ? (
                 <div className="mt-6">
                   <ErrorState
                     title="Unable to load availability."
@@ -472,7 +494,7 @@ export function BookPage() {
                 </div>
               ) : null}
 
-              {service && availabilityReady ? (
+              {canLoadSlots && availabilityReady ? (
                 days.length ? (
                   <>
                     <h3 className="mt-6 text-sm font-semibold text-navy-950">Available dates</h3>
@@ -599,7 +621,7 @@ export function BookPage() {
                 </div>
                 <div>
                   <dt className="text-slate-500">Duration</dt>
-                  <dd className="font-medium text-navy-950">{service?.durationMin} min</dd>
+                  <dd className="font-medium text-navy-950">{durationMin} min</dd>
                 </div>
                 <div>
                   <dt className="text-slate-500">Date</dt>
@@ -628,7 +650,7 @@ export function BookPage() {
               <div className="mt-6 space-y-2 rounded-lg bg-slate-50 p-4 text-sm">
                 <div className="flex justify-between">
                   <span>Listed session fee</span>
-                  <span>{service ? formatMoneyFromPaise(service.pricePaise, service.currency) : '—'}</span>
+                  <span>{priceLabel}</span>
                 </div>
                 <p className="text-xs text-slate-500">
                   The amount due is confirmed by the server after your slot is held.
@@ -646,7 +668,7 @@ export function BookPage() {
                 </Button>
                 <Button
                   className="flex-1"
-                  disabled={!service || !selectedSlot || creating || status === 'loading'}
+                  disabled={!canLoadSlots || !selectedSlot || creating || status === 'loading'}
                   onClick={() => void confirmBooking()}
                 >
                   {creating ? 'Holding slot…' : status === 'authenticated' ? 'Confirm booking' : 'Sign in to confirm'}

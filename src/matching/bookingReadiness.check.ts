@@ -15,8 +15,8 @@ expect(
     serviceCount: 0,
     slots: [pythonSlot],
     timezone: 'Asia/Kolkata',
-  }) === 'no_service',
-  'no service stays a skill match that cannot be booked',
+  }) === 'ready',
+  'availability without a published service is still bookable',
 )
 
 expect(
@@ -80,6 +80,14 @@ expect(
 expect(
   Boolean(bookingStatusMessage('no_service')?.detail?.toLowerCase().includes('booking')),
   'no-service copy still points candidates to booking',
+)
+expect(
+  classifyBookingReadiness({
+    serviceCount: 0,
+    slots: [],
+    timezone: 'Asia/Kolkata',
+  }) === 'no_availability',
+  'no slots without a service means availability is missing',
 )
 expect(
   Boolean(bookingStatusMessage('no_availability')?.detail?.toLowerCase().includes('availability')),

@@ -16,7 +16,8 @@ const AVAILABILITY_ERROR = 'Unable to load availability.'
 
 export type GetBookableSlotsInput = {
   interviewerProfileId: string
-  serviceId: string
+  /** When omitted, slots come from interviewer availability with a default duration. */
+  serviceId?: string | null
   from: Date
   to: Date
 }
@@ -26,7 +27,11 @@ function failAvailability(error: { message: string } | null): void {
 }
 
 export async function getBookableSlots(input: GetBookableSlotsInput): Promise<UtcBookableSlot[]> {
-  if (!isUuid(input.interviewerProfileId) || !isUuid(input.serviceId)) {
+  if (!isUuid(input.interviewerProfileId)) {
+    return []
+  }
+  const serviceId = input.serviceId?.trim() || null
+  if (serviceId && !isUuid(serviceId)) {
     return []
   }
   if (!(input.from instanceof Date) || Number.isNaN(input.from.getTime())) {
@@ -38,7 +43,7 @@ export async function getBookableSlots(input: GetBookableSlotsInput): Promise<Ut
 
   const { data, error } = await supabase.rpc('list_bookable_slots', {
     p_interviewer_profile_id: input.interviewerProfileId,
-    p_service_id: input.serviceId,
+    p_service_id: serviceId,
     p_from: input.from.toISOString(),
     p_to: input.to.toISOString(),
   })
@@ -49,7 +54,7 @@ export async function getBookableSlots(input: GetBookableSlotsInput): Promise<Ut
 
 export async function isSlotStillBookable(input: {
   interviewerProfileId: string
-  serviceId: string
+  serviceId?: string | null
   slot: UtcBookableSlot
 }): Promise<boolean> {
   const start = new Date(input.slot.startsAtUtc)
