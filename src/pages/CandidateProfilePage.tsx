@@ -21,7 +21,7 @@ import {
   SKILLS,
   TIME_WINDOWS,
 } from '../data/catalogs.ts'
-import { timezoneSelectOptions } from '../lib/candidateTimezone.ts'
+import { candidateDisplayTimezone, formatTimezoneLabel } from '../lib/candidateTimezone.ts'
 import { preferredDateRangeError } from '../lib/dates.ts'
 import { isUuid } from '../lib/uuid.ts'
 import { useAsync } from '../lib/useAsync.ts'
@@ -245,7 +245,7 @@ export function CandidateProfilePage() {
     try {
       await updateCandidateProfile({
         fullName: form.fullName,
-        timezone: form.timezone,
+        timezone: candidateDisplayTimezone(form.timezone),
         headline: form.headline.trim() || null,
         bio: form.bio.trim() || null,
         targetRole: form.targetRole.trim() || null,
@@ -339,7 +339,7 @@ export function CandidateProfilePage() {
 
   const isEmpty = !form.targetCompany && form.skills.length === 0 && !form.headline
 
-  const timezoneOptions = timezoneSelectOptions(form.timezone)
+  const detectedTimezone = candidateDisplayTimezone(form.timezone)
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
@@ -386,18 +386,11 @@ export function CandidateProfilePage() {
               />
             </div>
             <div>
-              <FieldLabel htmlFor="timezone">Timezone</FieldLabel>
-              <SelectInput
-                id="timezone"
-                value={form.timezone}
-                onChange={(event) => setForm({ ...form, timezone: event.target.value })}
-              >
-                {timezoneOptions.map((zone) => (
-                  <option key={zone.id} value={zone.id}>
-                    {zone.label}
-                  </option>
-                ))}
-              </SelectInput>
+              <p className="text-sm font-medium text-navy-950">Timezone</p>
+              <p className="mt-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-navy-950">
+                {formatTimezoneLabel(detectedTimezone)}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">Detected automatically from your device. No manual selection.</p>
             </div>
             <div className="sm:col-span-2">
               <FieldLabel htmlFor="headline">Headline</FieldLabel>
