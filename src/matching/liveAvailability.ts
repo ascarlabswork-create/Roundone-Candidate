@@ -12,9 +12,10 @@ export async function describeBookingReadiness(
   prefs: MatchingPreferences,
   displayTimezone?: string | null,
 ): Promise<BookingReadiness> {
-  const service = pickServiceForAvailability(person, prefs.interviewType)
   const { from, to } = getBookableWindow(0)
   try {
+    // Services are optional — availability-only interviewers must still match and book.
+    const service = pickServiceForAvailability(person, prefs.interviewType)
     const slots = await getBookableSlots({
       interviewerProfileId: person.id,
       serviceId: service?.id ?? null,
