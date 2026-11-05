@@ -79,10 +79,12 @@ function PriceBreakdown({
         <span className="text-slate-600">Session fee</span>
         <span className="font-medium text-navy-950">{formatMoneyFromPaise(sessionFeePaise, currency)}</span>
       </div>
-      <div className="flex justify-between">
-        <span className="text-slate-600">Platform fee</span>
-        <span className="font-medium text-navy-950">{formatMoneyFromPaise(platformFeePaise, currency)}</span>
-      </div>
+      {platformFeePaise > 0 ? (
+        <div className="flex justify-between">
+          <span className="text-slate-600">Platform fee</span>
+          <span className="font-medium text-navy-950">{formatMoneyFromPaise(platformFeePaise, currency)}</span>
+        </div>
+      ) : null}
       <div className="flex justify-between border-t border-slate-200 pt-2 font-semibold text-navy-950">
         <span>Total</span>
         <span>{formatMoneyFromPaise(totalPaise, currency)}</span>

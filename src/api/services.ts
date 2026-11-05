@@ -282,8 +282,8 @@ export async function getBooking(id: string) {
   return booking
 }
 
-export function platformFeeFor(sessionFee: number) {
-  return Math.max(49, Math.round(sessionFee * 0.05))
+export function platformFeeFor(_sessionFee: number) {
+  return 0
 }
 
 export async function createBooking(draft: BookingDraft, paymentMethod: PaymentMethod) {
