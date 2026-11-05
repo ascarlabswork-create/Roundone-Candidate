@@ -52,7 +52,7 @@ expect(privacy.includes('does not claim that the provider never stores'), 'AI re
 
 const pricing = textOf(pricingSections)
 expect(pricing.includes('does not charge a card'), 'pricing says payment is not live')
-expect(pricing.includes('greater of ₹49 and 5%'), 'pricing matches the fee calculation')
+expect(pricing.includes('No platform fee is added'), 'pricing does not add a platform fee')
 
 const refund = textOf(refundSections)
 expect(refund.includes('does not create a refund'), 'captured payments are not auto-refunded')

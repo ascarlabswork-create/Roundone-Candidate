@@ -253,11 +253,7 @@ export const pricingSections: LegalSection[] = [
     blocks: [
       {
         type: 'p',
-        text: 'There is no single public price list in this application. Each bookable service stores its own session price in paise and a currency, usually INR. The booking screen shows that session price. At checkout the total is the session fee plus a platform fee.',
-      },
-      {
-        type: 'p',
-        text: 'The current code sets the platform fee to the greater of ₹49 and 5% of the session fee. That figure is what the software calculates. It is not a final commercial tariff until the company approves it.',
+        text: 'There is no single public price list in this application. Each bookable service stores its own session price in paise and a currency, usually INR. The booking screen shows that session price. At checkout the total is the session fee. No platform fee is added.',
       },
     ],
   },
