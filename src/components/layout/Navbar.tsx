@@ -66,7 +66,7 @@ function PublicNavItem({
 
 export function Navbar() {
   const { pathname } = useLocation()
-  const { account, status, signOut } = useSession()
+  const { account, status } = useSession()
   const { unreadCount } = useNotifications()
   const { openAuth } = useAuthModal()
   const [open, setOpen] = useState(false)
@@ -81,9 +81,10 @@ export function Navbar() {
   if (signedIn) {
     return (
       <header className="sticky top-0 z-40 border-b border-black/[0.06] bg-white/90 backdrop-blur-md lg:hidden">
-        <div className="flex h-14 items-center justify-between gap-3 px-4">
+        <div className="flex h-14 items-center justify-between gap-2 px-3 sm:px-4">
           <Logo compact />
-          <div className="flex items-center gap-1">
+          <div className="flex min-w-0 items-center gap-1">
+            <AccountMenu compact />
             <Link
               to="/candidate/notifications"
               className="relative inline-flex h-11 w-11 items-center justify-center rounded-xl text-navy-800 hover:bg-black/[0.04]"
@@ -116,7 +117,7 @@ export function Navbar() {
               onClick={() => setOpen(false)}
             />
             <div className="absolute inset-y-0 left-0 w-[min(100%,18rem)] shadow-xl">
-              <Sidebar unreadBadge={unreadBadge} onNavigate={() => setOpen(false)} onSignOut={() => void signOut()} />
+              <Sidebar unreadBadge={unreadBadge} onNavigate={() => setOpen(false)} />
             </div>
           </div>
         ) : null}
@@ -178,23 +179,38 @@ export function Navbar() {
   )
 }
 
-export function SignedInDesktopBar() {
+function AccountMenu({ compact = false }: { compact?: boolean }) {
   const { account, signOut } = useSession()
+  const name = account?.profile.full_name || 'Profile'
+
   return (
-    <div className="hidden h-16 items-center justify-end gap-1 border-b border-black/[0.06] bg-white px-6 lg:flex">
-      <Link to="/candidate/profile" className="inline-flex items-center gap-2 rounded-xl px-2 py-1 hover:bg-black/[0.04]" aria-label="Profile">
-        <Avatar src={account?.profile.avatar_url ?? ''} name={account?.profile.full_name || 'Profile'} size="sm" />
-        <span className="max-w-[12rem] truncate text-sm font-medium text-navy-950">
-          {account?.profile.full_name || 'Profile'}
+    <div className="flex min-w-0 items-center gap-2">
+      <Link
+        to="/candidate/profile"
+        className="inline-flex min-w-0 items-center gap-2 rounded-xl px-1.5 py-1 hover:bg-black/[0.04]"
+        aria-label="Profile"
+      >
+        <Avatar src={account?.profile.avatar_url ?? ''} name={name} size="sm" />
+        <span
+          className={cn(
+            'truncate text-sm font-medium text-navy-950',
+            compact ? 'max-w-[8rem] max-sm:hidden' : 'max-w-[12rem]',
+          )}
+        >
+          {name}
         </span>
       </Link>
-      <button
-        type="button"
-        onClick={() => void signOut()}
-        className="rounded-xl px-3 py-2 text-sm font-medium text-slate-600 hover:bg-black/[0.04] hover:text-navy-950"
-      >
+      <Button variant="outline" size="sm" className="shrink-0 whitespace-nowrap px-3" onClick={() => void signOut()}>
         Sign out
-      </button>
+      </Button>
+    </div>
+  )
+}
+
+export function SignedInDesktopBar() {
+  return (
+    <div className="hidden h-16 items-center justify-end border-b border-black/[0.06] bg-white px-6 lg:flex">
+      <AccountMenu />
     </div>
   )
 }
