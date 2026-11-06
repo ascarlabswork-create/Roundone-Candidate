@@ -1,5 +1,18 @@
-import { Eye, EyeOff } from 'lucide-react'
-import { useState, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react'
+import { ChevronDown, Eye, EyeOff } from 'lucide-react'
+import {
+  Children,
+  isValidElement,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type CSSProperties,
+  type InputHTMLAttributes,
+  type ReactNode,
+  type SelectHTMLAttributes,
+  type TextareaHTMLAttributes,
+} from 'react'
 import { cn } from '../../lib/cn.ts'
 
 export function Card({
@@ -110,8 +123,157 @@ export function PasswordInput({ className, ...props }: InputHTMLAttributes<HTMLI
   )
 }
 
-export function SelectInput(props: SelectHTMLAttributes<HTMLSelectElement>) {
-  return <select {...props} className={cn(fieldClass, props.className)} />
+type SelectOption = { value: string; label: string; disabled: boolean }
+
+function optionLabel(children: ReactNode, fallback: string) {
+  if (typeof children === 'string' || typeof children === 'number') return String(children)
+  return fallback
+}
+
+function readSelectOptions(children: ReactNode): SelectOption[] {
+  const options: SelectOption[] = []
+  const walk = (node: ReactNode) => {
+    Children.forEach(node, (child) => {
+      if (!isValidElement(child)) return
+      const props = child.props as { value?: string | number; disabled?: boolean; children?: ReactNode }
+      if (child.type === 'option') {
+        const value = props.value != null ? String(props.value) : optionLabel(props.children, '')
+        options.push({
+          value,
+          label: optionLabel(props.children, value),
+          disabled: Boolean(props.disabled),
+        })
+        return
+      }
+      if (props.children) walk(props.children)
+    })
+  }
+  walk(children)
+  return options
+}
+
+export function SelectInput({
+  className,
+  children,
+  value,
+  onChange,
+  id,
+  disabled,
+  required,
+  name,
+  'aria-label': ariaLabel,
+}: SelectHTMLAttributes<HTMLSelectElement>) {
+  const options = readSelectOptions(children)
+  const current = String(value ?? '')
+  const selected = options.find((option) => option.value === current) ?? options[0]
+  const [open, setOpen] = useState(false)
+  const [menuStyle, setMenuStyle] = useState<CSSProperties>({})
+  const rootRef = useRef<HTMLDivElement>(null)
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const listId = useId()
+
+  function placeMenu() {
+    const rect = buttonRef.current?.getBoundingClientRect()
+    if (!rect) return
+    const spaceBelow = window.innerHeight - rect.bottom - 8
+    const spaceAbove = rect.top - 8
+    const openUp = spaceBelow < 180 && spaceAbove > spaceBelow
+    const maxHeight = Math.max(120, Math.min(240, openUp ? spaceAbove : spaceBelow))
+    setMenuStyle({
+      position: 'fixed',
+      left: rect.left,
+      width: rect.width,
+      maxHeight,
+      zIndex: 50,
+      top: openUp ? Math.max(8, rect.top - maxHeight - 4) : rect.bottom + 4,
+    })
+  }
+
+  useEffect(() => {
+    if (!open) return
+    placeMenu()
+    function onPointer(event: MouseEvent) {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false)
+    }
+    function onKey(event: KeyboardEvent) {
+      if (event.key === 'Escape') setOpen(false)
+    }
+    function onReflow() {
+      placeMenu()
+    }
+    document.addEventListener('mousedown', onPointer)
+    document.addEventListener('keydown', onKey)
+    window.addEventListener('resize', onReflow)
+    window.addEventListener('scroll', onReflow, true)
+    return () => {
+      document.removeEventListener('mousedown', onPointer)
+      document.removeEventListener('keydown', onKey)
+      window.removeEventListener('resize', onReflow)
+      window.removeEventListener('scroll', onReflow, true)
+    }
+  }, [open])
+
+  function choose(next: string) {
+    setOpen(false)
+    onChange?.({
+      target: { value: next, name },
+      currentTarget: { value: next, name },
+    } as ChangeEvent<HTMLSelectElement>)
+    buttonRef.current?.focus({ preventScroll: true })
+  }
+
+  return (
+    <div ref={rootRef} className="relative">
+      <button
+        ref={buttonRef}
+        type="button"
+        id={id}
+        disabled={disabled}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls={open ? listId : undefined}
+        aria-label={ariaLabel}
+        aria-required={required || undefined}
+        className={cn(fieldClass, 'flex items-center justify-between gap-2 text-left', className)}
+        onClick={() => setOpen((currentOpen) => !currentOpen)}
+      >
+        <span className="truncate">{selected?.label || 'Select'}</span>
+        <ChevronDown className={cn('h-4 w-4 shrink-0 text-slate-500 transition', open && 'rotate-180')} aria-hidden />
+      </button>
+      {open ? (
+        <ul
+          id={listId}
+          role="listbox"
+          style={menuStyle}
+          className="overflow-y-auto rounded-xl border border-black/10 bg-white py-1 shadow-lg"
+        >
+          {options.map((option, index) => {
+            const isSelected = option.value === selected?.value
+            return (
+              <li key={`${option.value}:${index}`}>
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={isSelected}
+                  disabled={option.disabled}
+                  className={cn(
+                    'flex w-full px-3 py-2 text-left text-sm text-navy-950 hover:bg-violet-50 disabled:text-slate-400',
+                    isSelected && 'bg-violet-50 font-medium text-violet-800',
+                  )}
+                  onClick={() => choose(option.value)}
+                >
+                  {option.label}
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+      ) : null}
+      {name || required ? (
+        <input type="hidden" name={name} value={current} required={required} />
+      ) : null}
+    </div>
+  )
 }
 
 export function TextArea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
