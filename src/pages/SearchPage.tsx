@@ -120,7 +120,7 @@ export function SearchPage() {
   const compareIds = compared.map((person) => person.id)
 
   function updateFilters(next: InterviewerFilters) {
-    setParams(filtersToParams(next), { replace: true })
+    setParams(filtersToParams(next), { replace: true, preventScrollReset: true })
   }
 
   function toggleCompare(person: Interviewer) {
@@ -187,7 +187,7 @@ export function SearchPage() {
             <FilterPanel
               filters={filters}
               onChange={updateFilters}
-              onClear={() => setParams(new URLSearchParams(), { replace: true })}
+              onClear={() => setParams(new URLSearchParams(), { replace: true, preventScrollReset: true })}
             />
           </div>
         </div>
@@ -214,7 +214,7 @@ export function SearchPage() {
               title="No interviewers match these filters"
               body="Clear a few filters or browse all verified interviewers."
               action={
-                <Button variant="outline" onClick={() => setParams(new URLSearchParams())}>
+                <Button variant="outline" onClick={() => setParams(new URLSearchParams(), { replace: true, preventScrollReset: true })}>
                   Clear filters
                 </Button>
               }
@@ -245,7 +245,7 @@ export function SearchPage() {
             <FilterPanel
               filters={filters}
               onChange={updateFilters}
-              onClear={() => setParams(new URLSearchParams(), { replace: true })}
+              onClear={() => setParams(new URLSearchParams(), { replace: true, preventScrollReset: true })}
             />
             <Button className="mt-6" fullWidth onClick={() => setDrawerOpen(false)}>
               Show results
