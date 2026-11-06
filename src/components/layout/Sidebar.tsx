@@ -7,11 +7,9 @@ import { signedInLinks } from './nav.ts'
 export function Sidebar({
   unreadBadge,
   onNavigate,
-  onSignOut,
 }: {
   unreadBadge: string | null
   onNavigate?: () => void
-  onSignOut?: () => void
 }) {
   return (
     <aside className="flex h-full w-64 shrink-0 flex-col border-r border-violet-100/80 bg-gradient-to-b from-white via-violet-50/30 to-sky-50/40">
@@ -50,11 +48,6 @@ export function Sidebar({
             Find My Interviewer
           </Button>
         </NavLink>
-        {onSignOut ? (
-          <Button variant="ghost" size="sm" fullWidth onClick={onSignOut}>
-            Sign out
-          </Button>
-        ) : null}
       </div>
     </aside>
   )
