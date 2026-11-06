@@ -2,15 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { Card } from '../components/ui/primitives.tsx'
 import { Button } from '../components/ui/Button.tsx'
+import { postAuthPath } from '../lib/postAuthPath.ts'
 import { applyDetectedTimezone } from '../services/auth.ts'
 import { useSession } from '../state/session.tsx'
-
-function safeNextPath(value: string | null) {
-  if (!value || !value.startsWith('/') || value.startsWith('//') || value.includes('\\')) {
-    return '/'
-  }
-  return value
-}
 
 /**
  * Handles Google OAuth, email confirmation, and password-recovery redirects.
@@ -20,7 +14,7 @@ function safeNextPath(value: string | null) {
 export function AuthCallbackPage() {
   const { status, account, error } = useSession()
   const [params] = useSearchParams()
-  const nextPath = safeNextPath(params.get('next'))
+  const nextPath = postAuthPath(params.get('next'))
   const oauthError = params.get('error_description') ?? params.get('error')
   const [timedOut, setTimedOut] = useState(false)
   const timezoneApplied = useRef(false)
