@@ -1,4 +1,4 @@
-import { Bell, Menu, X } from 'lucide-react'
+import { Bell, LogOut, Menu, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
 import { cn } from '../../lib/cn.ts'
@@ -200,9 +200,14 @@ function AccountMenu({ compact = false }: { compact?: boolean }) {
           {name}
         </span>
       </Link>
-      <Button variant="outline" size="sm" className="shrink-0 whitespace-nowrap px-3" onClick={() => void signOut()}>
-        Sign out
-      </Button>
+      <button
+        type="button"
+        onClick={() => void signOut()}
+        className="inline-flex shrink-0 items-center gap-1.5 rounded-xl px-2.5 py-2 text-sm font-medium text-slate-700 hover:bg-black/[0.04] hover:text-navy-950"
+      >
+        <LogOut className="h-4 w-4" aria-hidden />
+        Logout
+      </button>
     </div>
   )
 }
