@@ -9,7 +9,7 @@ import { Sidebar } from './Sidebar.tsx'
 
 export function CandidateLayout() {
   const { toasts, dismissToast } = useToast()
-  const { account, status, signOut } = useSession()
+  const { account, status } = useSession()
   const { unreadCount } = useNotifications()
   const signedIn = status === 'authenticated' && Boolean(account)
   const unreadBadge = unreadCount != null && unreadCount > 0 ? (unreadCount > 99 ? '99+' : String(unreadCount)) : null
@@ -18,7 +18,7 @@ export function CandidateLayout() {
     <div className={signedIn ? 'flex min-h-svh studio-grid' : 'flex min-h-svh flex-col public-surface'}>
       {signedIn ? (
         <div className="sticky top-0 hidden h-svh lg:flex">
-          <Sidebar unreadBadge={unreadBadge} onSignOut={() => void signOut()} />
+          <Sidebar unreadBadge={unreadBadge} />
         </div>
       ) : null}
       <div className="flex min-w-0 flex-1 flex-col">

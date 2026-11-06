@@ -179,15 +179,22 @@ export function Navbar() {
 }
 
 export function SignedInDesktopBar() {
-  const { account } = useSession()
+  const { account, signOut } = useSession()
   return (
-    <div className="hidden h-16 items-center justify-end gap-3 border-b border-black/[0.06] bg-white px-6 lg:flex">
+    <div className="hidden h-16 items-center justify-end gap-1 border-b border-black/[0.06] bg-white px-6 lg:flex">
       <Link to="/candidate/profile" className="inline-flex items-center gap-2 rounded-xl px-2 py-1 hover:bg-black/[0.04]" aria-label="Profile">
         <Avatar src={account?.profile.avatar_url ?? ''} name={account?.profile.full_name || 'Profile'} size="sm" />
         <span className="max-w-[12rem] truncate text-sm font-medium text-navy-950">
           {account?.profile.full_name || 'Profile'}
         </span>
       </Link>
+      <button
+        type="button"
+        onClick={() => void signOut()}
+        className="rounded-xl px-3 py-2 text-sm font-medium text-slate-600 hover:bg-black/[0.04] hover:text-navy-950"
+      >
+        Sign out
+      </button>
     </div>
   )
 }
