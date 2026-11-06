@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { attachJobContext, jobPracticeRules, readSafeJobContext } from "./jobPractice.ts";
+import { localResumeSkillPlan } from "./localResume.ts";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -905,10 +906,14 @@ async function handleResumeSkillPlan(
     baseUrl,
     system,
     { resume_text: resumeText },
-    16000,
+    12000,
     0.15,
   );
-  if (completed instanceof Response) return completed;
+  if (completed instanceof Response) {
+    const local = localResumeSkillPlan(resumeText);
+    if (local) return json(200, local);
+    return completed;
+  }
 
   const profileSummary = readString(completed.profile_summary ?? completed.profileSummary, 400);
 
@@ -1029,6 +1034,11 @@ async function handleResumeSkillPlan(
     projects.length === 0 &&
     experiences.length === 0
   ) {
+    const local = localResumeSkillPlan(resumeText);
+    if (local) {
+      console.log(JSON.stringify({ event: "resume_skill_plan_local" }));
+      return json(200, local);
+    }
     console.log(JSON.stringify({ event: "resume_skill_plan_empty" }));
     return json(502, { error: "insufficient_resume_evidence" });
   }

@@ -13,6 +13,7 @@ import {
   Toggle,
 } from '../components/ui/primitives.tsx'
 import { requestResumeSkillPlan } from '../resume/aiAssist.ts'
+import { localResumeSkillPlan } from '../resume/localSkillPlan.ts'
 import {
   canAnalyzeResume,
   evidenceTypeLabel,
@@ -214,6 +215,14 @@ export function ResumeSkillsPage() {
     submittingRef.current = false
     setAnalyzing(false)
     if (!outcome.ok) {
+      const local = localResumeSkillPlan(resumeText)
+      if (local) {
+        applyPlan(local)
+        setLoadedExisting(false)
+        setPhase('review')
+        setNotice('AI analysis was unavailable, so these skills were taken from the text in your resume. Review them before saving.')
+        return
+      }
       setError(outcome.reason === 'insufficient_evidence' ? INSUFFICIENT : UNAVAILABLE)
       return
     }

@@ -1,6 +1,6 @@
 export const RESUME_AI_FUNCTION = 'assist-matching'
 export const RESUME_AI_MODE = 'resume_skill_plan'
-export const RESUME_AI_TIMEOUT_MS = 20_000
+export const RESUME_AI_TIMEOUT_MS = 30_000
 export const RESUME_TEXT_MAX = 14_000
 export const RESUME_TEXT_MIN = 60
 
