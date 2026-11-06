@@ -2,12 +2,10 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { Button } from '../components/ui/Button.tsx'
 import { Card, FieldLabel, TextInput } from '../components/ui/primitives.tsx'
-import { CANDIDATE_LEVELS, INTERVIEW_TYPES } from '../data/catalogs.ts'
 import { dedupeSkills } from '../matching/skills.ts'
 import { localResumeSkillPlan } from '../resume/localSkillPlan.ts'
 import { extractResumeText } from '../resume/resumeText.ts'
 import {
-  getCandidatePreferencesIfPresent,
   getCandidateProfile,
   getCandidateSkills,
   updateCandidatePreferences,
@@ -17,11 +15,7 @@ import {
 import { useMatching } from '../state/matching.tsx'
 
 const INTENT_READY_KEY = 'roundone.intentReady'
-const QUICK_SKILLS = ['Python', 'Java', 'SQL', 'React', 'Machine Learning', 'System Design', 'AWS', 'DSA'] as const
-
-function toggle(list: string[], item: string) {
-  return list.includes(item) ? list.filter((entry) => entry !== item) : [...list, item]
-}
+const QUICK_SKILLS = ['Python', 'Java', 'SQL', 'React', 'Machine Learning', 'System Design'] as const
 
 function pillClass(selected: boolean) {
   return selected
@@ -39,9 +33,6 @@ export function WelcomePage() {
   const [readingResume, setReadingResume] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [role, setRole] = useState('')
-  const [company, setCompany] = useState('')
-  const [level, setLevel] = useState('')
-  const [interviewTypes, setInterviewTypes] = useState<string[]>([])
   const [skills, setSkills] = useState<string[]>([])
   const [skillDraft, setSkillDraft] = useState('')
 
@@ -49,11 +40,7 @@ export function WelcomePage() {
     let cancelled = false
     void (async () => {
       try {
-        const [account, savedSkills, preferences] = await Promise.all([
-          getCandidateProfile(),
-          getCandidateSkills(),
-          getCandidatePreferencesIfPresent(),
-        ])
+        const [account, savedSkills] = await Promise.all([getCandidateProfile(), getCandidateSkills()])
         if (cancelled) return
         const roleValue = account.candidate.target_role?.trim() ?? ''
         const saved = dedupeSkills(savedSkills)
@@ -63,14 +50,6 @@ export function WelcomePage() {
           return
         }
         setRole(roleValue)
-        setCompany(account.candidate.target_company ?? '')
-        setLevel(account.candidate.candidate_level ?? '')
-        setInterviewTypes(
-          (preferences?.interview_type ?? '')
-            .split(',')
-            .map((item) => item.trim())
-            .filter(Boolean),
-        )
         setSkills(saved)
       } catch (caught) {
         if (!cancelled) setError(caught instanceof Error ? caught.message : 'Could not load your profile.')
@@ -86,7 +65,7 @@ export function WelcomePage() {
   function addSkill(raw: string) {
     const next = dedupeSkills([...skills, raw])
     if (next.length === skills.length && raw.trim()) {
-      setError('Add a recognisable skill, such as Python, SQL, or System Design.')
+      setError('Add a skill such as Python, SQL, or System Design.')
       return
     }
     setError(null)
@@ -99,10 +78,9 @@ export function WelcomePage() {
     setReadingResume(true)
     try {
       const text = await extractResumeText(file)
-      const plan = localResumeSkillPlan(text)
-      const found = plan?.extractedSkills.map((item) => item.skill) ?? []
+      const found = localResumeSkillPlan(text)?.extractedSkills.map((item) => item.skill) ?? []
       if (found.length === 0) {
-        setError('No skills stood out in that resume. Type a few below.')
+        setError('No skills stood out in that resume. Pick a few below.')
         return
       }
       setSkills((current) => dedupeSkills([...current, ...found]))
@@ -119,36 +97,23 @@ export function WelcomePage() {
     const nextRole = role.trim()
     const nextSkills = dedupeSkills(skills)
     if (!nextRole) {
-      setError('Add the role you are preparing for.')
-      return
-    }
-    if (interviewTypes.length === 0) {
-      setError('Choose at least one kind of interview you want to practice.')
+      setError('Add the role you want.')
       return
     }
     if (nextSkills.length === 0) {
-      setError('Add at least one skill from your resume.')
+      setError('Add at least one skill.')
       return
     }
     setSaving(true)
     try {
-      const focus = interviewTypes.join(', ')
-      await updateCandidateProfile({
-        targetRole: nextRole,
-        candidateLevel: level || null,
-        targetCompany: company.trim() || null,
-        headline: `${nextRole} · ${focus}`,
-      })
+      await updateCandidateProfile({ targetRole: nextRole, headline: nextRole })
       await updateCandidateSkills(nextSkills)
-      await updateCandidatePreferences({
-        interviewType: focus,
-        skills: nextSkills,
-      })
+      await updateCandidatePreferences({ skills: nextSkills })
       setPreferences({
         targetRole: nextRole,
-        candidateLevel: level,
-        interviewType: interviewTypes[0] ?? '',
-        targetCompany: company.trim(),
+        candidateLevel: '',
+        interviewType: '',
+        targetCompany: '',
         skills: nextSkills,
         preferredDate: '',
         preferredDateEnd: '',
@@ -168,114 +133,33 @@ export function WelcomePage() {
   if (alreadySet) return <Navigate to="/" replace />
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
+    <div className="mx-auto max-w-xl px-4 py-10 sm:px-6">
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-coral-700">Before your dashboard</p>
       <h1 className="mt-2 text-2xl font-semibold tracking-tight text-navy-950 sm:text-3xl">What are you preparing for?</h1>
-      <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-        Interviewers are matched to you from this. Tell us the role you want, the interviews you came to practice, and
-        a few skills from your resume. You can change it later from your profile.
+      <p className="mt-2 text-sm leading-6 text-slate-600">
+        Add your role and a few skills. You can change this later from your profile.
       </p>
 
       <Card className="mt-8 p-6 sm:p-8">
         {loading ? (
           <p className="text-sm text-slate-600">Loading your profile…</p>
         ) : (
-          <form className="grid gap-8" onSubmit={(event) => void save(event)}>
-            <fieldset className="grid gap-4 sm:grid-cols-2">
-              <legend className="col-span-full text-sm font-semibold text-navy-950">Your background</legend>
-              <div>
-                <FieldLabel htmlFor="welcome-role">Role you want</FieldLabel>
-                <TextInput
-                  id="welcome-role"
-                  required
-                  autoComplete="organization-title"
-                  placeholder="Software Engineer"
-                  value={role}
-                  onChange={(event) => setRole(event.target.value)}
-                />
-              </div>
-              <div>
-                <FieldLabel htmlFor="welcome-company">Company you are targeting</FieldLabel>
-                <TextInput
-                  id="welcome-company"
-                  autoComplete="organization"
-                  placeholder="Optional"
-                  value={company}
-                  onChange={(event) => setCompany(event.target.value)}
-                />
-              </div>
-              <div className="sm:col-span-2">
-                <FieldLabel>Your level</FieldLabel>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {CANDIDATE_LEVELS.map((item) => (
-                    <button
-                      key={item}
-                      type="button"
-                      aria-pressed={level === item}
-                      onClick={() => setLevel((current) => (current === item ? '' : item))}
-                      className={pillClass(level === item)}
-                    >
-                      {item}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </fieldset>
+          <form className="grid gap-6" onSubmit={(event) => void save(event)}>
+            <div>
+              <FieldLabel htmlFor="welcome-role">Role you want</FieldLabel>
+              <TextInput
+                id="welcome-role"
+                required
+                autoComplete="organization-title"
+                placeholder="Software Engineer"
+                value={role}
+                onChange={(event) => setRole(event.target.value)}
+              />
+            </div>
 
             <fieldset>
-              <legend className="text-sm font-semibold text-navy-950">Interviews you came to practice</legend>
-              <p className="mt-1 text-xs text-slate-500">Pick every format you want to be interviewed on.</p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {INTERVIEW_TYPES.map((item) => (
-                  <button
-                    key={item}
-                    type="button"
-                    aria-pressed={interviewTypes.includes(item)}
-                    onClick={() => setInterviewTypes((current) => toggle(current, item))}
-                    className={pillClass(interviewTypes.includes(item))}
-                  >
-                    {item}
-                  </button>
-                ))}
-              </div>
-            </fieldset>
-
-            <fieldset>
-              <legend className="text-sm font-semibold text-navy-950">Skills from your resume</legend>
-              <p className="mt-1 text-xs text-slate-500">
-                Upload a resume to pull skills out, or add the ones you want to be interviewed on.
-              </p>
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept=".pdf,.docx,.txt,application/pdf"
-                  className="sr-only"
-                  onChange={(event) => {
-                    const file = event.target.files?.[0]
-                    event.target.value = ''
-                    if (file) void readResume(file)
-                  }}
-                />
-                <Button type="button" variant="outline" disabled={readingResume} onClick={() => fileRef.current?.click()}>
-                  {readingResume ? 'Reading resume…' : 'Upload resume'}
-                </Button>
-                <TextInput
-                  id="welcome-skill"
-                  value={skillDraft}
-                  placeholder="Add a skill, e.g. Python"
-                  onChange={(event) => setSkillDraft(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') {
-                      event.preventDefault()
-                      addSkill(skillDraft)
-                    }
-                  }}
-                />
-                <Button type="button" variant="outline" onClick={() => addSkill(skillDraft)} disabled={!skillDraft.trim()}>
-                  Add
-                </Button>
-              </div>
+              <legend className="text-sm font-semibold text-navy-950">Skills</legend>
+              <p className="mt-1 text-xs text-slate-500">Pick a few, type one, or upload a resume.</p>
               <div className="mt-3 flex flex-wrap gap-2">
                 {QUICK_SKILLS.map((skill) => {
                   const selected = skills.some((item) => item.toLowerCase() === skill.toLowerCase())
@@ -314,6 +198,37 @@ export function WelcomePage() {
                     ))}
                 </div>
               ) : null}
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept=".pdf,.docx,.txt,application/pdf"
+                  className="sr-only"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0]
+                    event.target.value = ''
+                    if (file) void readResume(file)
+                  }}
+                />
+                <TextInput
+                  id="welcome-skill"
+                  value={skillDraft}
+                  placeholder="Add a skill"
+                  onChange={(event) => setSkillDraft(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault()
+                      addSkill(skillDraft)
+                    }
+                  }}
+                />
+                <Button type="button" variant="outline" onClick={() => addSkill(skillDraft)} disabled={!skillDraft.trim()}>
+                  Add
+                </Button>
+                <Button type="button" variant="outline" disabled={readingResume} onClick={() => fileRef.current?.click()}>
+                  {readingResume ? 'Reading…' : 'Upload resume'}
+                </Button>
+              </div>
             </fieldset>
 
             {error ? <p className="text-sm text-red-700">{error}</p> : null}
