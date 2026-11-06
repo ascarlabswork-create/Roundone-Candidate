@@ -600,7 +600,7 @@ export function ResumeSkillsPage() {
           ) : null}
 
           <div className="flex flex-col gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
-            <Button variant="ghost" onClick={startOver}>
+            <Button variant="outline" onClick={startOver}>
               {loadedExisting ? 'Analyze a new resume' : 'Start over'}
             </Button>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
