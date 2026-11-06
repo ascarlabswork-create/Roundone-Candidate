@@ -21,7 +21,7 @@ expect(
   'Without a type, uses the shortest service',
 )
 expect(
-  pickServiceForAvailability({ services: [] } as MatchingCatalogPerson, 'Coding') === undefined,
+  pickServiceForAvailability({ services: [] } as unknown as MatchingCatalogPerson, 'Coding') === undefined,
   'No published services still allows skill-only matching',
 )
 console.log('matching availability checks passed')
