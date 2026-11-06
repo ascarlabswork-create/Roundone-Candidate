@@ -23,11 +23,11 @@ export function HomePage() {
     void (async () => {
       try {
         const [account, skills] = await Promise.all([getCandidateProfile(), getCandidateSkills()])
-        const ready = Boolean(account.candidate.target_role?.trim()) || skills.length > 0
+        const ready = Boolean(account.candidate.target_role?.trim()) && skills.length > 0
         if (ready) sessionStorage.setItem(INTENT_READY_KEY, '1')
         if (!cancelled) setIntent(ready ? 'ready' : 'needed')
       } catch {
-        if (!cancelled) setIntent('ready')
+        if (!cancelled) setIntent('needed')
       }
     })()
     return () => {
