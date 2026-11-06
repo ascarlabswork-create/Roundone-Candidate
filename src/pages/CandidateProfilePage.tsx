@@ -283,11 +283,7 @@ export function CandidateProfilePage() {
       navigate('/candidate/login', { replace: true })
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : 'Could not delete your account.'
-      setDeleteError(
-        message.toLowerCase().includes('interview_in_progress')
-          ? 'Finish or cancel your live interview before deleting your account.'
-          : message,
-      )
+      setDeleteError(message)
       setDeleting(false)
     }
   }
@@ -647,8 +643,8 @@ export function CandidateProfilePage() {
       <Card className="mt-8 border-red-200 p-6">
         <h2 className="font-semibold text-navy-950">Delete account</h2>
         <p className="mt-1 text-sm text-slate-600">
-          This removes your profile, skills, preferences, and practice data. Shared booking records stay for the
-          interviewer without your personal profile. Type DELETE to confirm.
+          This deletes your account even if you have upcoming or live interviews. Those interviews are cancelled.
+          Type DELETE to confirm.
         </p>
         <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
           <TextInput
