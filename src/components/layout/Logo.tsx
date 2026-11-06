@@ -5,13 +5,15 @@ export function Logo({
   className,
   compact = false,
   inverted = false,
+  to = '/',
 }: {
   className?: string
   compact?: boolean
   inverted?: boolean
+  to?: string
 }) {
   return (
-    <Link to="/" className={cn('inline-flex items-center gap-2', className)} aria-label="jobround.ai home">
+    <Link to={to} className={cn('inline-flex items-center gap-2', className)} aria-label="jobround.ai home">
       <span
         className={cn(
           'flex h-8 w-8 items-center justify-center rounded-xl text-sm font-black shadow-sm',
