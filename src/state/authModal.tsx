@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { CANDIDATE_WELCOME_PATH, postAuthPath } from '../lib/postAuthPath.ts'
 
 export type AuthModalTab = 'login' | 'register'
 
@@ -14,21 +15,14 @@ type AuthModalContextValue = {
 
 const AuthModalContext = createContext<AuthModalContextValue | null>(null)
 
-function safeNextPath(value: string | null) {
-  if (!value || !value.startsWith('/') || value.startsWith('//') || value.includes('\\')) {
-    return '/'
-  }
-  return value
-}
-
 export function AuthModalProvider({ children }: { children: ReactNode }) {
   const [params, setParams] = useSearchParams()
   const authParam = params.get('auth')
-  const nextFromUrl = safeNextPath(params.get('next'))
+  const nextFromUrl = postAuthPath(params.get('next'))
 
   const [open, setOpen] = useState(false)
   const [tab, setTabState] = useState<AuthModalTab>('login')
-  const [nextPath, setNextPath] = useState('/')
+  const [nextPath, setNextPath] = useState(CANDIDATE_WELCOME_PATH)
 
   useEffect(() => {
     if (authParam === 'login' || authParam === 'register') {
@@ -49,9 +43,9 @@ export function AuthModalProvider({ children }: { children: ReactNode }) {
   }, [authParam, params, setParams])
 
   const openAuth = useCallback(
-    (nextTab: AuthModalTab = 'login', next: string = '/') => {
+    (nextTab: AuthModalTab = 'login', next: string = CANDIDATE_WELCOME_PATH) => {
       setTabState(nextTab)
-      setNextPath(safeNextPath(next))
+      setNextPath(postAuthPath(next))
       setOpen(true)
     },
     [],

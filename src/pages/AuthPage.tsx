@@ -1,19 +1,13 @@
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { AuthForm } from '../components/auth/AuthForm.tsx'
 import { Card, PageHeader } from '../components/ui/primitives.tsx'
+import { postAuthPath } from '../lib/postAuthPath.ts'
 import { useSession } from '../state/session.tsx'
-
-function safeNextPath(value: string | null) {
-  if (!value || !value.startsWith('/') || value.startsWith('//') || value.includes('\\')) {
-    return '/'
-  }
-  return value
-}
 
 export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
   const { status, user, error: sessionError } = useSession()
   const [params] = useSearchParams()
-  const nextPath = safeNextPath(params.get('next'))
+  const nextPath = postAuthPath(params.get('next'))
   const isRegister = mode === 'register'
 
   if (status === 'authenticated' && user) {

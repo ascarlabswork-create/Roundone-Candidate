@@ -26,6 +26,7 @@ import { PreparationPage } from '../pages/PreparationPage.tsx'
 import { ResumeSkillsPage } from '../pages/ResumeSkillsPage.tsx'
 import { ProgressPage } from '../pages/ProgressPage.tsx'
 import { SearchPage } from '../pages/SearchPage.tsx'
+import { WelcomePage } from '../pages/WelcomePage.tsx'
 import {
   ContactPage,
   CookiePolicyPage,
@@ -59,6 +60,7 @@ export function AppRouter() {
           <Route path="/candidate/auth/callback" element={<AuthCallbackPage />} />
           <Route path="/candidate/update-password" element={<UpdatePasswordPage />} />
           <Route element={<RequireCandidateAuth />}>
+            <Route path="/candidate/welcome" element={<WelcomePage />} />
             <Route path="/candidate/find" element={<FindPage />} />
             <Route path="/candidate/job-match" element={<JobMatchPage />} />
             <Route path="/candidate/matches" element={<MatchesPage />} />
