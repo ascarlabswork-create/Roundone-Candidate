@@ -16,7 +16,6 @@ import { requestResumeSkillPlan } from '../resume/aiAssist.ts'
 import { localResumeSkillPlan } from '../resume/localSkillPlan.ts'
 import {
   canAnalyzeResume,
-  evidenceTypeLabel,
   RESUME_TEXT_MAX,
   RESUME_TEXT_MIN,
   type ResumeEvidenceType,
@@ -475,14 +474,6 @@ export function ResumeSkillsPage() {
                           >
                             <div className="min-w-0">
                               <p className="text-sm font-semibold text-navy-950">{item.skill}</p>
-                              {item.evidenceType || item.evidenceDetail ? (
-                                <p className="mt-1 text-xs text-slate-500">
-                                  <span className="font-medium text-slate-600">
-                                    {evidenceTypeLabel(item.evidenceType)}
-                                  </span>
-                                  {item.evidenceDetail ? <span> · {item.evidenceDetail}</span> : null}
-                                </p>
-                              ) : null}
                               {item.inferredFrom ? (
                                 <p className="mt-1 text-xs italic text-slate-500">
                                   Inferred from: “{item.inferredFrom}”
