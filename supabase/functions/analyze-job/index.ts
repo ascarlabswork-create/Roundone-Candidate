@@ -33,14 +33,15 @@ async function requireCandidate(req: Request) {
   const user = asRecord(await userResponse.json());
   const userId = typeof user?.id === "string" ? user.id : "";
   if (!userId) return json(401, { error: "not_authenticated" });
-  const profileResponse = await fetch(
-    `${supabaseUrl}/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}&select=role`,
+  const candidateResponse = await fetch(
+    `${supabaseUrl}/rest/v1/candidate_profiles?profile_id=eq.${encodeURIComponent(userId)}&select=id`,
     { headers: { ...headers, Accept: "application/json" } },
   );
-  if (!profileResponse.ok) return json(403, { error: "not_a_candidate" });
-  const profiles = await profileResponse.json();
-  const role = Array.isArray(profiles) ? profiles[0]?.role : null;
-  if (role !== "candidate") return json(403, { error: "not_a_candidate" });
+  if (!candidateResponse.ok) return json(403, { error: "not_a_candidate" });
+  const candidates = await candidateResponse.json();
+  if (!Array.isArray(candidates) || candidates.length === 0) {
+    return json(403, { error: "not_a_candidate" });
+  }
   return null;
 }
 

@@ -643,8 +643,8 @@ export function CandidateProfilePage() {
       <Card className="mt-8 border-red-200 p-6">
         <h2 className="font-semibold text-navy-950">Delete account</h2>
         <p className="mt-1 text-sm text-slate-600">
-          This deletes your account even if you have upcoming or live interviews. Those interviews are cancelled.
-          Type DELETE to confirm.
+          This deletes your candidate account even if you have upcoming or live interviews. Those interviews are
+          cancelled. If this email is also an interviewer account, that interviewer login stays. Type DELETE to confirm.
         </p>
         <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
           <TextInput
