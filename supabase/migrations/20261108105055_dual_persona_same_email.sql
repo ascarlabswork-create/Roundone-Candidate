@@ -221,19 +221,9 @@ BEGIN
   WHERE decided_by = v_user;
 
   IF v_has_interviewer THEN
+    -- Leave profiles.role alone; only admins may change it.
     DELETE FROM public.candidate_profiles
     WHERE id = v_candidate;
-
-    UPDATE public.profiles
-    SET role = 'interviewer'::public.user_role,
-        updated_at = now()
-    WHERE id = v_user;
-
-    UPDATE auth.users
-    SET raw_app_meta_data =
-          COALESCE(raw_app_meta_data, '{}'::jsonb)
-          || jsonb_build_object('role', 'interviewer')
-    WHERE id = v_user;
   ELSE
     DELETE FROM auth.users
     WHERE id = v_user;
