@@ -105,6 +105,13 @@ export async function signInCandidate(input: SignInInput) {
   return data.user
 }
 
+/** Ensure this signed-in email also has a candidate persona (same login can be an interviewer). */
+export async function claimCandidatePersona(): Promise<boolean> {
+  const { data, error } = await supabase.rpc('claim_candidate_persona')
+  if (error) return false
+  return data === true
+}
+
 /**
  * Start Google OAuth. The browser goes to Google’s account chooser, then
  * returns to `/candidate/auth/callback`. Role is never set client-side: the

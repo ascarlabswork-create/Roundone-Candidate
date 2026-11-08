@@ -1,6 +1,6 @@
 import { uniqueCandidateSkillWording } from '../matching/skills.ts'
 import { supabase } from '../lib/supabase.ts'
-import { requireUser } from './auth.ts'
+import { claimCandidatePersona, requireUser } from './auth.ts'
 
 export type ProfileRecord = {
   id: string
@@ -84,10 +84,10 @@ export async function getCandidateProfile(options?: { retries?: number }): Promi
 
     if (!profile) {
       lastError = new Error('Your account profile is not ready yet. Try again in a moment.')
-    } else if (profile.role !== 'candidate') {
+    } else if (profile.role === 'admin') {
       throw new Error('This Candidate app only supports candidate accounts.')
     } else {
-      const { data: candidate, error: candidateError } = await supabase
+      let { data: candidate, error: candidateError } = await supabase
         .from('candidate_profiles')
         .select(
           'id, profile_id, headline, bio, target_role, candidate_level, target_company, languages',
@@ -95,6 +95,20 @@ export async function getCandidateProfile(options?: { retries?: number }): Promi
         .eq('profile_id', user.id)
         .maybeSingle()
       fail(candidateError)
+
+      if (!candidate) {
+        const claimed = await claimCandidatePersona()
+        if (!claimed) throw new Error('This Candidate app only supports candidate accounts.')
+        const retry = await supabase
+          .from('candidate_profiles')
+          .select(
+            'id, profile_id, headline, bio, target_role, candidate_level, target_company, languages',
+          )
+          .eq('profile_id', user.id)
+          .maybeSingle()
+        fail(retry.error)
+        candidate = retry.data
+      }
 
       if (candidate) {
         return {
