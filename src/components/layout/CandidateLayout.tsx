@@ -20,17 +20,17 @@ export function CandidateLayout() {
   if (onWelcome) {
     return (
       <div className="flex min-h-svh flex-col">
-        <header className="sticky top-0 z-40 border-b border-navy-950/8 bg-white/80 backdrop-blur-xl">
-          <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
+        <header className="sticky top-0 z-40 border-b border-navy-950/8 bg-white/80 pt-[env(safe-area-inset-top)] backdrop-blur-xl">
+          <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:h-16 sm:px-6">
             <Logo to="/candidate/welcome" />
             {signedIn ? (
-              <Button size="sm" variant="ghost" onClick={() => void signOut()}>
+              <Button size="sm" variant="ghost" className="min-h-11 px-3" onClick={() => void signOut()}>
                 Logout
               </Button>
             ) : null}
           </div>
         </header>
-        <main className="studio-grid min-w-0 flex-1">
+        <main className="studio-grid min-w-0 flex-1 overflow-x-hidden">
           <Outlet />
         </main>
         <AuthModal />
