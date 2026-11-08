@@ -652,9 +652,15 @@ export function CandidateProfilePage() {
             value={deletePhrase}
             onChange={(event) => setDeletePhrase(event.target.value)}
             placeholder="DELETE"
+            className="text-base"
+            autoCapitalize="characters"
+            autoCorrect="off"
+            spellCheck={false}
           />
           <Button
             variant="danger"
+            fullWidth
+            className="sm:w-auto"
             disabled={!accountDeletionConfirmed(deletePhrase) || deleting}
             onClick={() => void deleteAccount()}
           >
