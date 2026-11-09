@@ -280,7 +280,7 @@ export function CandidateProfilePage() {
     try {
       await deleteMyCandidateAccount()
       await signOut()
-      navigate('/candidate/login', { replace: true })
+      navigate('/candidate/login?deleted=1', { replace: true })
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : 'Could not delete your account.'
       setDeleteError(message)
