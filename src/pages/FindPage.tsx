@@ -186,14 +186,7 @@ export function FindPage() {
     return () => window.clearTimeout(intentTimer.current)
   }, [])
 
-  async function submit(event: FormEvent) {
-    event.preventDefault()
-    const rangeError = preferredDateRangeError(form.preferredDate, form.preferredDateEnd)
-    if (rangeError) {
-      setDateError(rangeError)
-      return
-    }
-    setDateError(null)
+  async function persistFindPreferences() {
     const skills = uniqueCandidateSkillWording(form.skills)
     const next = {
       ...form,
@@ -212,14 +205,41 @@ export function FindPage() {
           preferredDateEnd: form.preferredDateEnd || null,
           preferredTimeWindow: form.preferredTime || null,
         }),
-        // Persist Find skills so Matches / profile use the same skill set.
+        // Persist Find skills so Matches / browse / profile use the same skill set.
         skills.length > 0 ? updateCandidateSkills(skills) : Promise.resolve([]),
       ])
     } catch {
       // Matching still uses the in-session skills if the preference row cannot be saved.
     }
     setPreferences(next)
+    return next
+  }
+
+  async function submit(event: FormEvent) {
+    event.preventDefault()
+    const rangeError = preferredDateRangeError(form.preferredDate, form.preferredDateEnd)
+    if (rangeError) {
+      setDateError(rangeError)
+      return
+    }
+    setDateError(null)
+    await persistFindPreferences()
     navigate('/candidate/matches')
+  }
+
+  async function browseInstead() {
+    if (form.skills.length === 0) return
+    const rangeError = preferredDateRangeError(form.preferredDate, form.preferredDateEnd)
+    if (rangeError) {
+      setDateError(rangeError)
+      return
+    }
+    setDateError(null)
+    const next = await persistFindPreferences()
+    const params = new URLSearchParams()
+    for (const skill of next.skills) params.append('skills', skill)
+    if (next.targetCompany.trim()) params.append('companies', next.targetCompany.trim())
+    navigate(`/candidate/interviewers?${params.toString()}`)
   }
 
   const canSubmit =
@@ -227,13 +247,14 @@ export function FindPage() {
     Boolean(form.targetCompany) ||
     Boolean(form.naturalLanguageQuery && form.naturalLanguageQuery.trim().length >= 12) ||
     Boolean(resumeFileName)
+  const canBrowse = form.skills.length > 0
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
       <PageHeader
         eyebrow="Match"
         title="Tell us about your interview"
-        subtitle="We’ll rank interviewers against this goal. You can still browse everyone afterwards."
+        subtitle="We’ll rank interviewers against this goal. Browse only shows people who share your skills."
         actions={
           <Link
             to="/candidate/job-match"
@@ -491,13 +512,16 @@ export function FindPage() {
         </div>
 
         <div className="flex flex-col gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:justify-end">
-          <Button variant="outline" onClick={() => navigate('/candidate/interviewers')}>
+          <Button type="button" variant="outline" disabled={!canBrowse} onClick={() => void browseInstead()}>
             Browse instead
           </Button>
           <Button type="submit" disabled={!canSubmit}>
             Find My Matches
           </Button>
         </div>
+        {!canBrowse ? (
+          <p className="text-right text-xs text-slate-500">Add at least one skill to browse matching interviewers.</p>
+        ) : null}
       </form>
     </div>
   )
