@@ -66,6 +66,7 @@ export function PracticeConversation({
   const interviewerSpeaking = interviewerHasFloor(voiceState)
   const yourTurn = voiceState === 'listening' || voiceState === 'idle'
   const showQuestionFallback = voiceState === 'error'
+  const micOff = micMuted || voiceState === 'error'
   const topicLine = [targetRole.trim(), ...skills.slice(0, 4)].filter(Boolean).join(' · ')
 
   return (
@@ -105,7 +106,7 @@ export function PracticeConversation({
           active={yourTurn}
           status={candidateStatus(voiceState)}
           speaking={yourTurn && Boolean(currentAnswer.trim())}
-          micMuted={micMuted || voiceState === 'error'}
+          showMicBadge={micOff}
         />
       </div>
 
@@ -126,12 +127,12 @@ export function PracticeConversation({
             <div className="flex items-center justify-between gap-3">
               <p className="text-xs font-medium uppercase tracking-wide text-emerald-400">Your turn</p>
               <span className="inline-flex items-center gap-1.5 text-xs text-neutral-400">
-                {micMuted || voiceState === 'error' ? (
+                {micOff ? (
                   <MicOff className="h-3.5 w-3.5" aria-hidden />
                 ) : (
                   <Mic className="h-3.5 w-3.5 text-emerald-400" aria-hidden />
                 )}
-                Mic {micMuted || voiceState === 'error' ? 'off' : 'live'}
+                Mic {micOff ? 'off' : 'live'}
               </span>
             </div>
             <textarea
@@ -187,7 +188,7 @@ function ParticipantTile({
   status,
   large = false,
   speaking = false,
-  micMuted = false,
+  showMicBadge = false,
 }: {
   name: string
   detail: string
@@ -195,7 +196,7 @@ function ParticipantTile({
   status?: string
   large?: boolean
   speaking?: boolean
-  micMuted?: boolean
+  showMicBadge?: boolean
 }) {
   const initial = name.trim().charAt(0).toUpperCase() || '?'
   return (
@@ -229,7 +230,7 @@ function ParticipantTile({
           {status}
         </p>
       ) : null}
-      {micMuted ? (
+      {showMicBadge ? (
         <span className="absolute bottom-3 right-3 inline-flex h-8 w-8 items-center justify-center rounded-full bg-red-500/90 text-white">
           <MicOff className="h-4 w-4" aria-hidden />
         </span>
