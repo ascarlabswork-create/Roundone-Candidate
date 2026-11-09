@@ -16,7 +16,9 @@ import { updateCandidatePreferences, updateCandidateSkills } from '../services/c
 import { usePreferenceNormalization } from '../matching/usePreferenceNormalization.ts'
 import { requestResumeSkillPlan } from '../resume/aiAssist.ts'
 import { canAnalyzeResume, type ResumeSkillPlan } from '../resume/aiModel.ts'
+import { keepTechnicalSkillsOnly } from '../resume/localSkillPlan.ts'
 import { extractResumeText, RESUME_ACCEPT } from '../resume/resumeText.ts'
+import { extractTechnicalSkillsFromText, filterTechnicalResumeSkills } from '../resume/technicalSkills.ts'
 import { emptyPreferences, useMatching } from '../state/matching.tsx'
 import type { TimeWindow } from '../data/catalogs.ts'
 import type { MatchingPreferences } from '../types.ts'
@@ -32,28 +34,20 @@ function mergeUniqueSkills(existing: string[], incoming: string[]) {
   return uniqueCandidateSkillWording(next)
 }
 
-/** Collect every skill/technology grounded in the resume skill plan. */
+/** Collect every technical skill/technology grounded in the resume skill plan. */
 function skillsFromResumePlan(plan: ResumeSkillPlan, existing: string[]) {
+  const technical = keepTechnicalSkillsOnly(plan)
   const incoming: string[] = []
-  for (const item of plan.extractedSkills) incoming.push(item.skill)
-  for (const item of plan.inferredSkills) incoming.push(item.skill)
-  for (const project of plan.projects) incoming.push(...project.technologies)
-  for (const experience of plan.experiences) incoming.push(...experience.technologies)
-  return mergeUniqueSkills(existing, incoming)
+  for (const item of technical.extractedSkills) incoming.push(item.skill)
+  for (const item of technical.inferredSkills) incoming.push(item.skill)
+  for (const project of technical.projects) incoming.push(...project.technologies)
+  for (const experience of technical.experiences) incoming.push(...experience.technologies)
+  return mergeUniqueSkills(existing, filterTechnicalResumeSkills(incoming))
 }
 
-/** Fallback when AI is unavailable: match all catalog skills found in the resume text. */
+/** Fallback when AI is unavailable: match technical skills found in the resume text. */
 function skillsFromResumeText(text: string, existing: string[]) {
-  const haystack = ` ${text.toLowerCase().replace(/\s+/g, ' ')} `
-  const found: string[] = []
-  for (const skill of SKILLS) {
-    const needle = skill.toLowerCase()
-    const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    const boundary = new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`)
-    if (!boundary.test(haystack)) continue
-    found.push(skill)
-  }
-  return mergeUniqueSkills(existing, found)
+  return mergeUniqueSkills(existing, extractTechnicalSkillsFromText(text))
 }
 
 export function FindPage() {

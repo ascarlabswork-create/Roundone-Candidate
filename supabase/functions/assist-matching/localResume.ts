@@ -1,3 +1,30 @@
+const NON_TECHNICAL = new Set([
+  "communication",
+  "communications",
+  "verbal communication",
+  "written communication",
+  "leadership",
+  "teamwork",
+  "collaboration",
+  "problem solving",
+  "critical thinking",
+  "time management",
+  "adaptability",
+  "creativity",
+  "presentation",
+  "presentations",
+  "mentoring",
+  "management",
+  "stakeholder management",
+  "product sense",
+  "agile",
+  "scrum",
+  "kanban",
+  "english",
+  "hindi",
+  "spanish",
+]);
+
 const SKILL_PHRASES = [
   "Distributed Systems",
   "Logistic Regression",
@@ -13,6 +40,11 @@ const SKILL_PHRASES = [
   "Natural Language Processing",
   "Computer Vision",
   "Data Analysis",
+  "GitHub Actions",
+  "Shell Scripting",
+  "Spring Boot",
+  "CloudFormation",
+  "Elasticsearch",
   "Power BI",
   "JavaScript",
   "TypeScript",
@@ -20,8 +52,6 @@ const SKILL_PHRASES = [
   "PostgreSQL",
   "TensorFlow",
   "PyTorch",
-  "Product Sense",
-  "Communication",
   "Matplotlib",
   "Streamlit",
   "MongoDB",
@@ -29,6 +59,30 @@ const SKILL_PHRASES = [
   "Snowflake",
   "FastAPI",
   "Node.js",
+  "Prometheus",
+  "Terraform",
+  "OpenShift",
+  "Hibernate",
+  "Selenium",
+  "PowerShell",
+  "Bitbucket",
+  "CircleCI",
+  "GitLab CI",
+  "REST API",
+  "GraphQL",
+  "RabbitMQ",
+  "Ansible",
+  "Grafana",
+  "Jenkins",
+  "Cypress",
+  "Ubuntu",
+  "Maven",
+  "Gradle",
+  "Nginx",
+  "Apache",
+  "Tomcat",
+  "Azure",
+  "DevOps",
   "React",
   "Python",
   "Java",
@@ -38,18 +92,25 @@ const SKILL_PHRASES = [
   "Docker",
   "OpenCV",
   "GitHub",
+  "GitLab",
   "Tableau",
   "Hadoop",
   "Spark",
+  "Kafka",
   "Django",
   "Flask",
   "Spring",
   "MySQL",
   "SQLite",
+  "Oracle",
   "Linux",
+  "Redis",
+  "Helm",
+  "Bash",
+  "Kotlin",
+  "Scala",
+  "JUnit",
   "Figma",
-  "Agile",
-  "Scrum",
   "Keras",
   "Jupyter",
   "FAISS",
@@ -64,9 +125,15 @@ const SKILL_PHRASES = [
   "SVM",
   "DSA",
   "Git",
+  "PHP",
+  "Ruby",
+  "C#",
+  ".NET",
+  "CI/CD",
+  "SRE",
   "Go",
   "C++",
-];
+].filter((skill) => !NON_TECHNICAL.has(skill.toLowerCase()));
 
 function projectTitle(chunk: string) {
   const name = chunk.replace(/\s+/g, " ").trim();
@@ -82,10 +149,10 @@ function grounded(term: string, rawLower: string) {
   const lower = term.trim().toLowerCase();
   if (lower.length < 2) return false;
   const escaped = lower.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`).test(rawLower);
+  return new RegExp(`(^|[^a-z0-9+#./])${escaped}([^a-z0-9+#./]|$)`).test(rawLower);
 }
 
-/** Skills and projects copied from the resume text when the model is unavailable. */
+/** Technical skills and projects copied from the resume text when the model is unavailable. */
 export function localResumeSkillPlan(resumeText: string) {
   const rawLower = ` ${resumeText.toLowerCase().replace(/\s+/g, " ")} `;
   const phrases = [...SKILL_PHRASES].sort((a, b) => b.length - a.length);
@@ -94,12 +161,13 @@ export function localResumeSkillPlan(resumeText: string) {
   for (const skill of phrases) {
     if (!grounded(skill, rawLower)) continue;
     const key = skill.toLowerCase();
-    if (seen.has(key)) continue;
+    if (seen.has(key) || NON_TECHNICAL.has(key)) continue;
     seen.add(key);
     const at = rawLower.indexOf(key);
     const evidence = rawLower.slice(Math.max(0, at - 30), at + key.length + 50).trim();
     extractedSkills.push({
       skill,
+      category: "extracted",
       evidence_type: "skills_section",
       evidence_detail: evidence.slice(0, 160),
     });
@@ -111,15 +179,17 @@ export function localResumeSkillPlan(resumeText: string) {
     const name = projectTitle(chunk);
     if (!name) continue;
     if (projects.some((project) => String(project.name).toLowerCase() === name.toLowerCase())) continue;
-    const technologies = extractedSkills
-      .map((row) => row.skill)
-      .filter((skill) => name.toLowerCase().includes(skill.toLowerCase()));
-    projects.push({ name, description: "", technologies });
+    projects.push({
+      name: name.slice(0, 120),
+      description: "",
+      technologies: extractedSkills
+        .map((item) => item.skill)
+        .filter((skill) => name.toLowerCase().includes(skill.toLowerCase())),
+    });
     if (projects.length >= 8) break;
   }
 
   if (extractedSkills.length === 0 && projects.length === 0) return null;
-
   return {
     profile_summary: "",
     extracted_skills: extractedSkills,
