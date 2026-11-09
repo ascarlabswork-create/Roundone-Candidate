@@ -71,8 +71,8 @@ export function MatchesPage() {
             title="No skill matches found yet"
             body="We couldn't find interviewers who share your current skills."
             action={
-              <Link to="/candidate/interviewers">
-                <Button>Browse Interviewers</Button>
+              <Link to="/candidate/find">
+                <Button>Edit skills</Button>
               </Link>
             }
           />

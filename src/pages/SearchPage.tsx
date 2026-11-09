@@ -8,12 +8,13 @@ import { Button } from '../components/ui/Button.tsx'
 import { EmptyState, ErrorState, SelectInput, TextInput } from '../components/ui/primitives.tsx'
 import { SORT_OPTIONS, type SortOption } from '../data/catalogs.ts'
 import { useAsync } from '../lib/useAsync.ts'
-import { filterPublicInterviewers } from '../matching/browseFilter.ts'
+import { filterInterviewersForCandidateBrowse } from '../matching/browseFilter.ts'
+import { resolveMatchingCandidateSkills } from '../matching/candidateSkills.ts'
 import { loadMatchingCatalog } from '../matching/catalog.ts'
-import { hasMeaningfulPreferences, looksLikeNaturalLanguage, scoreInterviewer } from '../matching/index.ts'
-import { useMatching } from '../state/matching.tsx'
+import { hasMatchingSkills, looksLikeNaturalLanguage, scoreInterviewer } from '../matching/index.ts'
+import { emptyPreferences, useMatching } from '../state/matching.tsx'
 import { useToast } from '../state/toast.tsx'
-import type { Interviewer, InterviewerFilters } from '../types.ts'
+import type { Interviewer, InterviewerFilters, MatchingPreferences } from '../types.ts'
 
 const defaultFilters: InterviewerFilters = {
   query: '',
@@ -82,14 +83,19 @@ function sortInterviewers(
       // Live bookable times are selected on the booking page; keep stable secondary sort.
       return b.rating - a.rating || a.name.localeCompare(b.name)
     }
-    const aMatch = matchById.get(a.id) ?? a.rating * 20
-    const bMatch = matchById.get(b.id) ?? b.rating * 20
+    const aMatch = matchById.get(a.id) ?? 0
+    const bMatch = matchById.get(b.id) ?? 0
     if (sort === 'recommended') {
       return bMatch * 0.7 + b.rating * 6 - (aMatch * 0.7 + a.rating * 6)
     }
-    return bMatch - aMatch
+    return bMatch - aMatch || b.rating - a.rating
   })
   return copy
+}
+
+type BrowseCatalog = {
+  people: Interviewer[]
+  candidateSkills: string[]
 }
 
 export function SearchPage() {
@@ -100,24 +106,42 @@ export function SearchPage() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [compared, setCompared] = useState<Interviewer[]>([])
 
-  const state = useAsync(async () => {
+  const sessionSkillsKey = JSON.stringify(preferences?.skills ?? [])
+  const state = useAsync(async (): Promise<BrowseCatalog> => {
+    const sessionSkills = filters.skills.length > 0 ? filters.skills : (preferences?.skills ?? [])
+    const candidateSkills = await resolveMatchingCandidateSkills(sessionSkills)
+    if (candidateSkills.length === 0) {
+      return { people: [], candidateSkills }
+    }
     const catalog = await loadMatchingCatalog()
-    return filterPublicInterviewers(catalog, filters)
-  }, [params.toString()])
+    return {
+      people: filterInterviewersForCandidateBrowse(catalog, candidateSkills, filters),
+      candidateSkills,
+    }
+  }, [params.toString(), sessionSkillsKey])
+
+  const scorePrefs = useMemo<MatchingPreferences | null>(() => {
+    if (state.status !== 'success' || state.data.candidateSkills.length === 0) return null
+    return {
+      ...(preferences ?? emptyPreferences),
+      skills: state.data.candidateSkills,
+    }
+  }, [preferences, state])
 
   const matchById = useMemo(() => {
     const map = new Map<string, number>()
-    if (!hasMeaningfulPreferences(preferences)) return map
-    const people = state.status === 'success' ? state.data : []
+    if (!scorePrefs || !hasMatchingSkills(scorePrefs)) return map
+    const people = state.status === 'success' ? state.data.people : []
     const extra = compared.filter((person) => !people.some((item) => item.id === person.id))
     for (const person of [...people, ...extra]) {
-      map.set(person.id, scoreInterviewer(person, preferences!).score)
+      map.set(person.id, scoreInterviewer(person, scorePrefs).score)
     }
     return map
-  }, [preferences, state, compared])
+  }, [scorePrefs, state, compared])
 
-  const visible = state.status === 'success' ? sortInterviewers(state.data, filters.sort, matchById) : []
+  const visible = state.status === 'success' ? sortInterviewers(state.data.people, filters.sort, matchById) : []
   const compareIds = compared.map((person) => person.id)
+  const needsSkills = state.status === 'success' && state.data.candidateSkills.length === 0
 
   function updateFilters(next: InterviewerFilters) {
     setParams(filtersToParams(next), { replace: true, preventScrollReset: true })
@@ -181,13 +205,31 @@ export function SearchPage() {
         </div>
       </div>
 
+      {state.status === 'success' && state.data.candidateSkills.length > 0 ? (
+        <p className="mt-4 text-sm text-slate-600">
+          Showing interviewers who share your skills
+          {state.data.candidateSkills.slice(0, 6).length > 0
+            ? `: ${state.data.candidateSkills.slice(0, 6).join(', ')}${state.data.candidateSkills.length > 6 ? '…' : ''}`
+            : ''}
+          . Zero-overlap profiles stay hidden.
+        </p>
+      ) : null}
+
       <div className="mt-6 grid gap-8 lg:grid-cols-[280px_minmax(0,1fr)]">
         <div className="hidden lg:block">
           <div className="sticky top-24 rounded-2xl border border-black/[0.06] bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
             <FilterPanel
               filters={filters}
               onChange={updateFilters}
-              onClear={() => setParams(new URLSearchParams(), { replace: true, preventScrollReset: true })}
+              onClear={() =>
+                setParams(
+                  filtersToParams({
+                    ...defaultFilters,
+                    skills: state.status === 'success' ? state.data.candidateSkills : filters.skills,
+                  }),
+                  { replace: true, preventScrollReset: true },
+                )
+              }
             />
           </div>
         </div>
@@ -209,14 +251,41 @@ export function SearchPage() {
             </>
           ) : null}
           {state.status === 'error' ? <ErrorState body={state.error} /> : null}
-          {state.status === 'success' && visible.length === 0 ? (
+          {needsSkills ? (
             <EmptyState
-              title="No interviewers match these filters"
-              body="Clear a few filters or browse all verified interviewers."
+              title="Add skills to browse interviewers"
+              body="Browse only shows interviewers who overlap with your skills — not the full directory."
               action={
-                <Button variant="outline" onClick={() => setParams(new URLSearchParams(), { replace: true, preventScrollReset: true })}>
-                  Clear filters
-                </Button>
+                <Link to="/candidate/find">
+                  <Button>Add skills on Find</Button>
+                </Link>
+              }
+            />
+          ) : null}
+          {state.status === 'success' && !needsSkills && visible.length === 0 ? (
+            <EmptyState
+              title="No interviewers match these skills"
+              body="Try different skills on Find, or clear extra filters. We still hide profiles with zero skill overlap."
+              action={
+                <div className="flex flex-wrap justify-center gap-2">
+                  <Link to="/candidate/find">
+                    <Button>Edit skills</Button>
+                  </Link>
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      setParams(
+                        filtersToParams({
+                          ...defaultFilters,
+                          skills: state.data.candidateSkills,
+                        }),
+                        { replace: true, preventScrollReset: true },
+                      )
+                    }
+                  >
+                    Clear extra filters
+                  </Button>
+                </div>
               }
             />
           ) : null}
@@ -245,7 +314,15 @@ export function SearchPage() {
             <FilterPanel
               filters={filters}
               onChange={updateFilters}
-              onClear={() => setParams(new URLSearchParams(), { replace: true, preventScrollReset: true })}
+              onClear={() =>
+                setParams(
+                  filtersToParams({
+                    ...defaultFilters,
+                    skills: state.status === 'success' ? state.data.candidateSkills : filters.skills,
+                  }),
+                  { replace: true, preventScrollReset: true },
+                )
+              }
             />
             <Button className="mt-6" fullWidth onClick={() => setDrawerOpen(false)}>
               Show results
