@@ -13,7 +13,7 @@ import {
   Toggle,
 } from '../components/ui/primitives.tsx'
 import { requestResumeSkillPlan } from '../resume/aiAssist.ts'
-import { localResumeSkillPlan } from '../resume/localSkillPlan.ts'
+import { keepTechnicalSkillsOnly, localResumeSkillPlan } from '../resume/localSkillPlan.ts'
 import {
   canAnalyzeResume,
   RESUME_TEXT_MAX,
@@ -231,10 +231,11 @@ export function ResumeSkillsPage() {
   }
 
   function applyPlan(plan: ResumeSkillPlan) {
-    setProfileSummary(plan.profileSummary)
-    setItems(planToItems(plan))
+    const technical = keepTechnicalSkillsOnly(plan)
+    setProfileSummary(technical.profileSummary)
+    setItems(planToItems(technical))
     setProjects(
-      plan.projects.map((p, i) => ({
+      technical.projects.map((p, i) => ({
         key: keyFor('project', p.name, i),
         name: p.name,
         description: p.description,
@@ -242,7 +243,7 @@ export function ResumeSkillsPage() {
         accepted: true,
       })),
     )
-    setCertifications(plan.certifications)
+    setCertifications(technical.certifications)
   }
 
   function toggleItem(key: string, accepted: boolean) {
