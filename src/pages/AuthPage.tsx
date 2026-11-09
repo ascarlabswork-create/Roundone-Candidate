@@ -9,6 +9,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
   const [params] = useSearchParams()
   const nextPath = postAuthPath(params.get('next'))
   const isRegister = mode === 'register'
+  const accountDeleted = !isRegister && params.get('deleted') === '1'
 
   if (status === 'authenticated' && user) {
     return <Navigate to={nextPath} replace />
@@ -25,6 +26,11 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
               : 'Sign in to view and edit your candidate profile.'
           }
         />
+        {accountDeleted ? (
+          <p className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+            Your candidate account has been deleted. You can create a new account anytime.
+          </p>
+        ) : null}
         {sessionError && status !== 'loading' ? (
           <p className="mt-4 text-sm text-red-700">{sessionError}</p>
         ) : null}
