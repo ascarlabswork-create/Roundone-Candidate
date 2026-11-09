@@ -784,8 +784,8 @@ export function AiPracticePage() {
           ← Back to setup
         </button>
         <PageHeader
-          title="You're about to start your AI Interview"
-          subtitle="Answer naturally as you would in a real interview."
+          title="You're about to start a one-to-one AI interview"
+          subtitle="One interviewer. Your role and skills. Answer out loud like a real call."
         />
         {session.setup.jobContext ? (
           <div className="mt-6">
@@ -845,11 +845,12 @@ export function AiPracticePage() {
             <h3 className="text-sm font-semibold text-navy-950">Voice Interview Guidelines</h3>
             <ul className="mt-2 list-disc space-y-1.5 pl-5 text-xs text-slate-600">
               <li>
-                <strong>{interviewer.name}</strong> speaks each question. The question stays off the screen, like a real
-                conversation.
+                This is a one-to-one call with <strong>{interviewer.name}</strong>. They ask about{' '}
+                {session.setup.targetRole || 'your role'}
+                {session.setup.skills.length > 0 ? ` and ${session.setup.skills.slice(0, 3).join(', ')}` : ''}.
               </li>
-              <li>Answer out loud. If you pause to think and then continue, it is still the same answer.</li>
-              <li>There is no pause or stop control during the question. The interviewer waits, then moves on.</li>
+              <li>Questions are spoken, not shown as a quiz. Listen, then answer out loud when it is your turn.</li>
+              <li>A short pause to think is fine. When you finish, the interviewer continues to the next question.</li>
             </ul>
           </div>
 
@@ -885,6 +886,8 @@ export function AiPracticePage() {
         <PracticeConversation
           interviewerName={interviewer.name}
           interviewerTitle={interviewer.title}
+          targetRole={session.setup.targetRole}
+          skills={session.setup.skills}
           questionNumber={session.index + 1}
           totalQuestions={totalQuestions}
           currentQuestion={question.question}
@@ -939,7 +942,7 @@ export function AiPracticePage() {
       </button>
       <PageHeader
         title="AI Interview setup"
-        subtitle="Choose your role, type, topics, and difficulty. You will see an introduction before the interview starts."
+        subtitle="Set the role and skills this one-to-one interview will cover. The AI interviewer asks about that role only."
       />
       {waitingForJob ? <p className="mt-4 text-sm text-slate-600">Loading saved job...</p> : null}
       {jobNotice ? <p className="mt-4 text-sm text-slate-600">{jobNotice}</p> : null}
@@ -951,7 +954,7 @@ export function AiPracticePage() {
       <div className="mt-6 rounded-xl border border-blue-100 bg-blue-50/70 px-4 py-3 text-sm text-slate-700 sm:flex sm:items-center sm:justify-between sm:gap-4">
         <p>
           Want questions based on your resume?{' '}
-          <span className="text-slate-600">Upload it first so topics and projects stay grounded in your experience.</span>
+          <span className="text-slate-600">Upload it first so skills and projects stay grounded in your experience.</span>
         </p>
         <Link
           to="/candidate/resume-skills"
@@ -961,124 +964,97 @@ export function AiPracticePage() {
         </Link>
       </div>
       <form
-        className="mt-5 space-y-5 rounded-xl border border-slate-200 bg-white p-5 sm:p-8"
+        className="mt-5 space-y-6 rounded-xl border border-slate-200 bg-white p-5 sm:p-8"
         onSubmit={goToIntro}
       >
-        <div className="grid gap-5 sm:grid-cols-2">
-          <div>
-            <FieldLabel htmlFor="practice-role">Role</FieldLabel>
-            <TextInput
-              id="practice-role"
-              required
-              list="practice-role-options"
-              value={session.setup.targetRole}
-              onChange={(event) => updateSetup({ targetRole: event.target.value })}
-              placeholder="Select or type a role"
-            />
-            <datalist id="practice-role-options">
-              {TARGET_ROLES.map((role) => (
-                <option key={role} value={role} />
-              ))}
-            </datalist>
-          </div>
-          <div>
-            <FieldLabel htmlFor="practice-type">Interview type</FieldLabel>
-            <SelectInput
-              id="practice-type"
-              required
-              value={session.setup.interviewType}
-              onChange={(event) => updateSetup({ interviewType: event.target.value })}
-            >
-              <option value="">Select a type</option>
-              {INTERVIEW_TYPES.map((type) => (
-                <option key={type} value={type}>
-                  {type}
-                </option>
-              ))}
-            </SelectInput>
-          </div>
-          <div>
-            <FieldLabel htmlFor="practice-difficulty">Difficulty</FieldLabel>
-            <SelectInput
-              id="practice-difficulty"
-              value={session.setup.difficulty}
-              onChange={(event) =>
-                updateSetup({ difficulty: event.target.value as PracticeDifficulty })
-              }
-            >
-              {PRACTICE_DIFFICULTIES.map((item) => (
-                <option key={item} value={item}>
-                  {difficultyLabel(item)}
-                </option>
-              ))}
-            </SelectInput>
-          </div>
-          <div>
-            <FieldLabel htmlFor="practice-count">Questions</FieldLabel>
-            <SelectInput
-              id="practice-count"
-              value={String(session.setup.questionCount)}
-              onChange={(event) =>
-                updateSetup({
-                  questionCount: Number(event.target.value) as PracticeQuestionCount,
-                })
-              }
-            >
-              {PRACTICE_QUESTION_COUNTS.map((count) => (
-                <option key={count} value={count}>
-                  {count} · ~{estimatedInterviewMinutes(count)} min
-                </option>
-              ))}
-            </SelectInput>
-          </div>
-        </div>
-
-        {/* AI Interviewer Persona & Voice Selection */}
-        <div>
-          <FieldLabel>AI Interviewer & Voice</FieldLabel>
-          <p className="mb-3 text-xs text-slate-500">
-            Select your AI interviewer. Each interviewer has a distinct speaking voice and interview style.
+        <fieldset className="space-y-4">
+          <legend className="text-sm font-semibold text-navy-950">What this interview is for</legend>
+          <p className="text-xs text-slate-500">
+            The AI will interview you as a candidate for this role, using only the skills you list below.
           </p>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {INTERVIEWER_PERSONAS.map((persona) => {
-              const selected = (session.setup.interviewerId || 'john') === persona.id
-              return (
-                <button
-                  key={persona.id}
-                  type="button"
-                  onClick={() => updateSetup({ interviewerId: persona.id })}
-                  className={`flex flex-col rounded-xl border p-3.5 text-left transition-all ${
-                    selected
-                      ? 'border-coral-600 bg-coral-50/70 ring-2 ring-coral-600/20'
-                      : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-semibold text-navy-950">{persona.name}</span>
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
-                        selected ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'
-                      }`}
-                    >
-                      Voice: {persona.voice}
-                    </span>
-                  </div>
-                  <span className="mt-0.5 text-xs font-medium text-coral-700">{persona.title}</span>
-                  <p className="mt-1 text-xs text-slate-600 leading-normal">{persona.style}</p>
-                </button>
-              )
-            })}
+          <div className="grid gap-5 sm:grid-cols-2">
+            <div className="sm:col-span-2">
+              <FieldLabel htmlFor="practice-role">Role they are hiring for</FieldLabel>
+              <TextInput
+                id="practice-role"
+                required
+                list="practice-role-options"
+                value={session.setup.targetRole}
+                onChange={(event) => updateSetup({ targetRole: event.target.value })}
+                placeholder="Software Engineer, ML Engineer, Backend Engineer…"
+                className="text-base"
+              />
+              <datalist id="practice-role-options">
+                {TARGET_ROLES.map((role) => (
+                  <option key={role} value={role} />
+                ))}
+              </datalist>
+            </div>
+            <div>
+              <FieldLabel htmlFor="practice-type">Interview round</FieldLabel>
+              <SelectInput
+                id="practice-type"
+                required
+                value={session.setup.interviewType}
+                onChange={(event) => updateSetup({ interviewType: event.target.value })}
+              >
+                <option value="">Select a round</option>
+                {INTERVIEW_TYPES.map((type) => (
+                  <option key={type} value={type}>
+                    {type}
+                  </option>
+                ))}
+              </SelectInput>
+            </div>
+            <div>
+              <FieldLabel htmlFor="practice-difficulty">Difficulty</FieldLabel>
+              <SelectInput
+                id="practice-difficulty"
+                value={session.setup.difficulty}
+                onChange={(event) =>
+                  updateSetup({ difficulty: event.target.value as PracticeDifficulty })
+                }
+              >
+                {PRACTICE_DIFFICULTIES.map((item) => (
+                  <option key={item} value={item}>
+                    {difficultyLabel(item)}
+                  </option>
+                ))}
+              </SelectInput>
+            </div>
+            <div className="sm:col-span-2">
+              <FieldLabel htmlFor="practice-count">Questions</FieldLabel>
+              <SelectInput
+                id="practice-count"
+                value={String(session.setup.questionCount)}
+                onChange={(event) =>
+                  updateSetup({
+                    questionCount: Number(event.target.value) as PracticeQuestionCount,
+                  })
+                }
+              >
+                {PRACTICE_QUESTION_COUNTS.map((count) => (
+                  <option key={count} value={count}>
+                    {count} questions · about {estimatedInterviewMinutes(count)} min
+                  </option>
+                ))}
+              </SelectInput>
+            </div>
           </div>
-        </div>
+        </fieldset>
 
-        <div>
-          <FieldLabel htmlFor="practice-skills">Topics</FieldLabel>
-          <div className="flex gap-2">
+        <fieldset>
+          <legend className="text-sm font-semibold text-navy-950">Skills they will ask about</legend>
+          <p className="mt-1 text-xs text-slate-500">
+            Add the technologies and topics this interview should cover. Keep it focused — up to 6.
+          </p>
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
             <TextInput
               id="practice-skills"
               list="practice-skill-options"
               placeholder="Python, React, System Design"
               value={skillDraft}
+              className="text-base"
               onChange={(event) => setSkillDraft(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === 'Enter') {
@@ -1087,7 +1063,7 @@ export function AiPracticePage() {
                 }
               }}
             />
-            <Button variant="outline" onClick={() => addSkill(skillDraft)}>
+            <Button type="button" variant="outline" onClick={() => addSkill(skillDraft)} disabled={!skillDraft.trim()}>
               Add
             </Button>
           </div>
@@ -1097,8 +1073,23 @@ export function AiPracticePage() {
             ))}
           </datalist>
           <div className="mt-3 flex flex-wrap gap-2">
+            {SKILLS.filter((skill) => !session.setup.skills.includes(skill))
+              .slice(0, 10)
+              .map((skill) => (
+                <button
+                  key={skill}
+                  type="button"
+                  disabled={session.setup.skills.length >= 6}
+                  onClick={() => addSkill(skill)}
+                  className="rounded-full border border-dashed border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-600 hover:border-navy-700 hover:text-navy-900 disabled:opacity-40"
+                >
+                  + {skill}
+                </button>
+              ))}
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
             {session.setup.skills.length === 0 ? (
-              <p className="text-sm text-slate-500">Add at least one topic.</p>
+              <p className="text-sm text-slate-500">Add at least one skill for the interviewer to ask about.</p>
             ) : (
               session.setup.skills.map((skill) => (
                 <Chip
@@ -1115,7 +1106,67 @@ export function AiPracticePage() {
               ))
             )}
           </div>
-        </div>
+        </fieldset>
+
+        <fieldset>
+          <legend className="text-sm font-semibold text-navy-950">Your interviewer</legend>
+          <p className="mt-1 mb-3 text-xs text-slate-500">
+            One interviewer joins this call. Pick the voice and style you want for this practice round.
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {INTERVIEWER_PERSONAS.map((persona) => {
+              const selected = (session.setup.interviewerId || 'john') === persona.id
+              return (
+                <button
+                  key={persona.id}
+                  type="button"
+                  onClick={() => updateSetup({ interviewerId: persona.id })}
+                  className={`flex flex-col rounded-xl border p-3.5 text-left transition-all ${
+                    selected
+                      ? 'border-coral-600 bg-coral-50/70 ring-2 ring-coral-600/20'
+                      : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-semibold text-navy-950">{persona.name}</span>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                        selected ? 'bg-navy-950 text-white' : 'bg-slate-100 text-slate-600'
+                      }`}
+                    >
+                      {persona.voice}
+                    </span>
+                  </div>
+                  <span className="mt-0.5 text-xs font-medium text-coral-700">{persona.title}</span>
+                  <p className="mt-1 text-xs leading-normal text-slate-600">{persona.style}</p>
+                </button>
+              )
+            })}
+          </div>
+        </fieldset>
+
+        {(session.setup.targetRole.trim() || session.setup.skills.length > 0) && (
+          <div className="rounded-xl border border-violet-100 bg-violet-50/60 px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-violet-700">Interview brief</p>
+            <p className="mt-1 text-sm text-navy-950">
+              {getInterviewerPersona(session.setup.interviewerId).name} will run a one-to-one{' '}
+              {session.setup.interviewType || 'practice'} interview
+              {session.setup.targetRole.trim() ? (
+                <>
+                  {' '}
+                  for <span className="font-semibold">{session.setup.targetRole.trim()}</span>
+                </>
+              ) : null}
+              {session.setup.skills.length > 0 ? (
+                <>
+                  , focused on {session.setup.skills.join(', ')}.
+                </>
+              ) : (
+                '.'
+              )}
+            </p>
+          </div>
+        )}
 
         {error ? <p className="text-sm text-red-700">{error}</p> : null}
 
@@ -1124,7 +1175,7 @@ export function AiPracticePage() {
             <Button variant="outline">Cancel</Button>
           </Link>
           <Button type="submit" disabled={!canStart}>
-            Start AI Interview
+            Continue to interview
           </Button>
         </div>
       </form>

@@ -43,6 +43,8 @@ export function AiPracticeFilmScene() {
         <PracticeConversation
           interviewerName="Jordan Lee"
           interviewerTitle="Senior engineering manager · AI persona"
+          targetRole="Backend Engineer"
+          skills={['System Design', 'Python', 'AWS']}
           questionNumber={2}
           totalQuestions={5}
           currentQuestion={QUESTION}
