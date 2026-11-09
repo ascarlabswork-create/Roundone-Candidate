@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { DataUseConsent } from '../components/legal/DataUseConsent.tsx'
+import { ResumeExtractingBanner } from '../components/matching/ResumeExtractingBanner.tsx'
 import { Button } from '../components/ui/Button.tsx'
 import {
   Badge,
@@ -354,74 +355,95 @@ export function ResumeSkillsPage() {
 
       {phase === 'input' ? (
         <div className="mt-8 space-y-5 rounded-xl border border-slate-200 bg-white p-5 sm:p-8">
-          <div>
-            <FieldLabel htmlFor="resume-file">Upload resume</FieldLabel>
-            <div className="flex flex-wrap items-center gap-3">
-              <input
-                ref={fileInputRef}
-                id="resume-file"
-                type="file"
-                accept={RESUME_ACCEPT}
-                className="hidden"
-                onChange={(event) => void onFileSelected(event.target.files?.[0] ?? null)}
-              />
-              <Button
-                variant="outline"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={extracting}
-              >
-                {extracting ? 'Reading file…' : 'Choose file'}
-              </Button>
-              {fileName ? (
-                <span className="text-sm text-slate-600">
-                  Loaded <span className="font-medium text-navy-950">{fileName}</span>
-                </span>
-              ) : (
-                <span className="text-sm text-slate-500">Any file (PDF, Word, text, and more), up to 8 MB.</span>
-              )}
-            </div>
-          </div>
-
-          <div className="relative">
-            <div className="flex items-center gap-3 py-1">
-              <span className="h-px flex-1 bg-slate-200" />
-              <span className="text-xs font-medium uppercase tracking-wide text-slate-400">or paste text</span>
-              <span className="h-px flex-1 bg-slate-200" />
-            </div>
-          </div>
-
-          <div>
-            <FieldLabel htmlFor="resume-text">Resume text</FieldLabel>
-            <TextArea
-              id="resume-text"
-              className="min-h-52"
-              value={resumeText}
-              onChange={(event) => setResumeText(event.target.value.slice(0, RESUME_TEXT_MAX))}
-              placeholder="Paste your full resume text here. Include your skills, projects (with the technologies used), work/internship experience, education, and certifications so the analysis has real evidence to work from."
+          {extracting || analyzing ? (
+            <ResumeExtractingBanner
+              fileName={fileName || 'Pasted resume text'}
+              status={extracting ? 'Reading your resume file…' : 'Analyzing resume and extracting technical skills…'}
             />
-            <p className="mt-1 text-xs text-slate-500">
-              {resumeText.trim().length}/{RESUME_TEXT_MAX} · Minimum {RESUME_TEXT_MIN} characters · Sent only to your
-              secure analysis endpoint; not stored as a public document.
-            </p>
-          </div>
-
-          <DataUseConsent id="resume-analysis-consent" checked={analysisConsent} onChange={setAnalysisConsent}>
-            I agree to send this resume text for optional AI analysis. It is not published. I can skip this step.{' '}
-            <Link to="/privacy" className="underline">
-              Privacy Policy
-            </Link>
-          </DataUseConsent>
-
-          {error ? <p className="text-sm text-red-700">{error}</p> : null}
-
-          <div className="flex flex-col gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:justify-end">
-            <Button onClick={() => void analyze()} disabled={!canAnalyze || !analysisConsent || analyzing}>
-              {analyzing ? 'Analyzing resume…' : 'Analyze Resume'}
-            </Button>
-          </div>
-          {!canAnalyze && resumeText.trim().length > 0 ? (
-            <p className="text-xs text-slate-500">Add a bit more detail to analyze.</p>
           ) : null}
+
+          <div className={extracting || analyzing ? 'pointer-events-none opacity-55' : undefined}>
+            <div>
+              <FieldLabel htmlFor="resume-file">Upload resume</FieldLabel>
+              <div className="flex flex-wrap items-center gap-3">
+                <input
+                  ref={fileInputRef}
+                  id="resume-file"
+                  type="file"
+                  accept={RESUME_ACCEPT}
+                  className="hidden"
+                  onChange={(event) => void onFileSelected(event.target.files?.[0] ?? null)}
+                />
+                <Button
+                  variant="outline"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={extracting || analyzing}
+                >
+                  {extracting ? 'Reading file…' : 'Choose file'}
+                </Button>
+                {fileName ? (
+                  <span className="text-sm text-slate-600">
+                    Loaded <span className="font-medium text-navy-950">{fileName}</span>
+                  </span>
+                ) : (
+                  <span className="text-sm text-slate-500">Any file (PDF, Word, text, and more), up to 8 MB.</span>
+                )}
+              </div>
+            </div>
+
+            <div className="relative mt-5">
+              <div className="flex items-center gap-3 py-1">
+                <span className="h-px flex-1 bg-slate-200" />
+                <span className="text-xs font-medium uppercase tracking-wide text-slate-400">or paste text</span>
+                <span className="h-px flex-1 bg-slate-200" />
+              </div>
+            </div>
+
+            <div className="mt-5">
+              <FieldLabel htmlFor="resume-text">Resume text</FieldLabel>
+              <TextArea
+                id="resume-text"
+                className="min-h-52"
+                value={resumeText}
+                disabled={extracting || analyzing}
+                onChange={(event) => setResumeText(event.target.value.slice(0, RESUME_TEXT_MAX))}
+                placeholder="Paste your full resume text here. Include your skills, projects (with the technologies used), work/internship experience, education, and certifications so the analysis has real evidence to work from."
+              />
+              <p className="mt-1 text-xs text-slate-500">
+                {resumeText.trim().length}/{RESUME_TEXT_MAX} · Minimum {RESUME_TEXT_MIN} characters · Sent only to your
+                secure analysis endpoint; not stored as a public document.
+              </p>
+            </div>
+
+            <div className="mt-5">
+              <DataUseConsent
+                id="resume-analysis-consent"
+                checked={analysisConsent}
+                onChange={setAnalysisConsent}
+              >
+                I agree to send this resume text for optional AI analysis. It is not published. I can skip this step.{' '}
+                <Link to="/privacy" className="underline">
+                  Privacy Policy
+                </Link>
+              </DataUseConsent>
+            </div>
+
+            {error ? <p className="mt-4 text-sm text-red-700">{error}</p> : null}
+
+            <div className="mt-5 flex flex-col gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:justify-end">
+              <Button
+                fullWidth
+                className="sm:w-auto"
+                onClick={() => void analyze()}
+                disabled={!canAnalyze || !analysisConsent || analyzing || extracting}
+              >
+                {analyzing ? 'Analyzing resume…' : 'Analyze Resume'}
+              </Button>
+            </div>
+            {!canAnalyze && resumeText.trim().length > 0 ? (
+              <p className="mt-2 text-xs text-slate-500">Add a bit more detail to analyze.</p>
+            ) : null}
+          </div>
         </div>
       ) : (
         <div className="mt-8 space-y-5">
