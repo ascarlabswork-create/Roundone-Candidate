@@ -28,7 +28,7 @@ function fakePerson(id: string, skills: string[], company = 'Acme'): Interviewer
     bio: '',
     timezone: 'UTC',
     isOnline: false,
-    verification: { identity: true, employment: true },
+    verification: { identity: true, employment: true, linkedin: true },
     services: [],
     availability: { timezone: 'UTC', bookingBufferMin: 0, recurring: [], custom: [], blocked: [] },
   }
