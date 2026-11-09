@@ -35,7 +35,8 @@ import {
   RefundPolicyPage,
   TermsPage,
 } from '../pages/LegalPages.tsx'
-import { HowItWorksPage, NotFoundPage, ResourcesPage } from '../pages/SupportingPages.tsx'
+import { ResourcesPage } from '../pages/ResourcesPage.tsx'
+import { HowItWorksPage, NotFoundPage } from '../pages/SupportingPages.tsx'
 import { ProductFilmPage } from '../pages/ProductFilmPage.tsx'
 import { AuthModalProvider } from '../state/authModal.tsx'
 

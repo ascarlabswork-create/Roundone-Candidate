@@ -32,32 +32,6 @@ export function InterviewTypesPage() {
   )
 }
 
-export function ResourcesPage() {
-  const items = [
-    { title: 'How to structure a 45-minute system design', type: 'Guide' },
-    { title: 'A scorecard you can reuse after every mock', type: 'Template' },
-    { title: 'What “SDE 2 bar” usually means', type: 'Article' },
-    { title: 'Turning feedback into a two-week plan', type: 'Guide' },
-  ]
-
-  return (
-    <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
-      <PageHeader title="Resources" subtitle="Short reads for candidates preparing with jobround.ai." />
-      <div className="mt-8 space-y-3">
-        {items.map((item) => (
-          <Card key={item.title} className="p-5">
-            <p className="text-xs font-medium text-coral-700">{item.type}</p>
-            <h2 className="mt-1 font-semibold text-navy-950">{item.title}</h2>
-            <p className="mt-2 text-sm text-slate-600">
-              Placeholder content for the candidate prototype. Replace with CMS or MDX later.
-            </p>
-          </Card>
-        ))}
-      </div>
-    </div>
-  )
-}
-
 export function HowItWorksPage() {
   const { status } = useSession()
   const steps = [
