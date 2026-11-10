@@ -1,14 +1,20 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
 import { Link } from 'react-router-dom'
+import {
+  CheckCircle2,
+  ClipboardPaste,
+  FileUp,
+  FolderKanban,
+  Sparkles,
+  Upload,
+} from 'lucide-react'
 import { DataUseConsent } from '../components/legal/DataUseConsent.tsx'
 import { ResumeExtractingBanner } from '../components/matching/ResumeExtractingBanner.tsx'
 import { Button } from '../components/ui/Button.tsx'
 import {
   Badge,
-  Card,
   EmptyState,
   FieldLabel,
-  PageHeader,
   TextArea,
   TextInput,
   Toggle,
@@ -145,6 +151,7 @@ export function ResumeSkillsPage() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [loadedExisting, setLoadedExisting] = useState(false)
+  const [dragOver, setDragOver] = useState(false)
 
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const submittingRef = useRef(false)
@@ -344,301 +351,452 @@ export function ResumeSkillsPage() {
   }
 
   const canAnalyze = canAnalyzeResume(resumeText)
+  const textLen = resumeText.trim().length
+  const textProgress = Math.min(100, Math.round((textLen / RESUME_TEXT_MIN) * 100))
+  const busy = extracting || analyzing
+
+  function onDrop(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault()
+    setDragOver(false)
+    if (busy) return
+    const file = event.dataTransfer.files?.[0] ?? null
+    void onFileSelected(file)
+  }
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
-      <PageHeader
-        eyebrow="Resume-based"
-        title="Resume Interview Skills"
-        subtitle="Upload your resume and we build an interview skill plan strictly from what it actually says. Nothing is invented — you review and accept every skill before it is saved to your profile."
+    <div className="relative isolate overflow-hidden">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 h-[26rem] bg-[radial-gradient(ellipse_70%_55%_at_12%_0%,rgba(0,122,255,0.14),transparent_55%),radial-gradient(ellipse_55%_45%_at_92%_8%,rgba(124,58,237,0.14),transparent_50%)]"
       />
 
-      {phase === 'input' ? (
-        <div className="mt-8 space-y-5 rounded-xl border border-slate-200 bg-white p-5 sm:p-8">
-          {extracting || analyzing ? (
-            <ResumeExtractingBanner
-              fileName={fileName || 'Pasted resume text'}
-              status={extracting ? 'Reading your resume file…' : 'Analyzing resume and extracting technical skills…'}
-            />
-          ) : null}
-
-          <div className={extracting || analyzing ? 'pointer-events-none opacity-55' : undefined}>
-            <div>
-              <FieldLabel htmlFor="resume-file">Upload resume</FieldLabel>
-              <div className="flex flex-wrap items-center gap-3">
-                <input
-                  ref={fileInputRef}
-                  id="resume-file"
-                  type="file"
-                  accept={RESUME_ACCEPT}
-                  className="hidden"
-                  onChange={(event) => void onFileSelected(event.target.files?.[0] ?? null)}
-                />
-                <Button
-                  variant="outline"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={extracting || analyzing}
-                >
-                  {extracting ? 'Reading file…' : 'Choose file'}
-                </Button>
-                {fileName ? (
-                  <span className="text-sm text-slate-600">
-                    Loaded <span className="font-medium text-navy-950">{fileName}</span>
-                  </span>
-                ) : (
-                  <span className="text-sm text-slate-500">Any file (PDF, Word, text, and more), up to 8 MB.</span>
-                )}
-              </div>
-            </div>
-
-            <div className="relative mt-5">
-              <div className="flex items-center gap-3 py-1">
-                <span className="h-px flex-1 bg-slate-200" />
-                <span className="text-xs font-medium uppercase tracking-wide text-slate-400">or paste text</span>
-                <span className="h-px flex-1 bg-slate-200" />
-              </div>
-            </div>
-
-            <div className="mt-5">
-              <FieldLabel htmlFor="resume-text">Resume text</FieldLabel>
-              <TextArea
-                id="resume-text"
-                className="min-h-52"
-                value={resumeText}
-                disabled={extracting || analyzing}
-                onChange={(event) => setResumeText(event.target.value.slice(0, RESUME_TEXT_MAX))}
-                placeholder="Paste your full resume text here. Include your skills, projects (with the technologies used), work/internship experience, education, and certifications so the analysis has real evidence to work from."
-              />
-              <p className="mt-1 text-xs text-slate-500">
-                {resumeText.trim().length}/{RESUME_TEXT_MAX} · Minimum {RESUME_TEXT_MIN} characters · Sent only to your
-                secure analysis endpoint; not stored as a public document.
+      <div className="relative mx-auto max-w-3xl px-4 py-10 sm:px-6">
+        <header className="profile-enter overflow-hidden rounded-3xl border border-white/70 bg-white/80 p-5 shadow-[0_18px_40px_-28px_rgba(12,18,32,0.35)] backdrop-blur-sm sm:p-7">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-gradient-brand">Resume-based</p>
+              <h1 className="mt-2 text-2xl font-semibold tracking-tight text-navy-950 sm:text-[1.85rem]">
+                Resume Interview Skills
+              </h1>
+              <p className="mt-2 max-w-xl text-sm leading-6 text-slate-600 sm:text-base">
+                Upload your resume and we build an interview skill plan strictly from what it says. You review and
+                accept every skill before it is saved.
               </p>
             </div>
+            <div className="grid grid-cols-3 gap-2 sm:min-w-[15rem]">
+              {[
+                { n: '1', label: 'Upload', active: phase === 'input' },
+                { n: '2', label: 'Review', active: phase === 'review' },
+                { n: '3', label: 'Save', active: phase === 'review' && saved },
+              ].map((step, index) => (
+                <div
+                  key={step.n}
+                  className={`resume-step-pop rounded-xl px-2.5 py-2 text-center ${
+                    step.active
+                      ? 'bg-gradient-to-br from-coral-600 to-violet-600 text-white shadow-md shadow-violet-500/25'
+                      : 'bg-slate-50 text-slate-500 ring-1 ring-slate-200'
+                  }`}
+                  style={{ animationDelay: `${index * 80}ms` }}
+                >
+                  <p className="text-[11px] font-semibold uppercase tracking-wide opacity-80">{step.n}</p>
+                  <p className="mt-0.5 text-xs font-semibold">{step.label}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </header>
 
-            <div className="mt-5">
-              <DataUseConsent
-                id="resume-analysis-consent"
-                checked={analysisConsent}
-                onChange={setAnalysisConsent}
+        {phase === 'input' ? (
+          <div className="profile-stagger mt-6 space-y-5">
+            {busy ? (
+              <ResumeExtractingBanner
+                fileName={fileName || 'Pasted resume text'}
+                status={extracting ? 'Reading your resume file…' : 'Analyzing resume and extracting technical skills…'}
+              />
+            ) : null}
+
+            <div
+              className={`overflow-hidden rounded-2xl border border-black/[0.06] bg-white/95 p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition duration-300 sm:p-7 ${
+                busy ? 'pointer-events-none opacity-55' : 'hover:border-violet-200/80 hover:shadow-md hover:shadow-violet-100/70'
+              }`}
+            >
+              <input
+                ref={fileInputRef}
+                id="resume-file"
+                type="file"
+                accept={RESUME_ACCEPT}
+                className="hidden"
+                onChange={(event) => void onFileSelected(event.target.files?.[0] ?? null)}
+              />
+
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => !busy && fileInputRef.current?.click()}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault()
+                    if (!busy) fileInputRef.current?.click()
+                  }
+                }}
+                onDragEnter={(event) => {
+                  event.preventDefault()
+                  setDragOver(true)
+                }}
+                onDragOver={(event) => {
+                  event.preventDefault()
+                  setDragOver(true)
+                }}
+                onDragLeave={(event) => {
+                  event.preventDefault()
+                  setDragOver(false)
+                }}
+                onDrop={onDrop}
+                className={`resume-dropzone-idle relative cursor-pointer overflow-hidden rounded-2xl border-2 border-dashed px-4 py-8 text-center transition duration-300 sm:px-6 sm:py-10 ${
+                  dragOver
+                    ? 'border-coral-500 bg-coral-50/70 scale-[1.01]'
+                    : fileName
+                      ? 'border-emerald-300 bg-emerald-50/50'
+                      : 'border-violet-200 bg-gradient-to-br from-white via-violet-50/40 to-sky-50/50 hover:border-violet-400'
+                }`}
               >
-                I agree to send this resume text for optional AI analysis. It is not published. I can skip this step.{' '}
-                <Link to="/privacy" className="underline">
-                  Privacy Policy
-                </Link>
-              </DataUseConsent>
+                <span
+                  className={`mx-auto inline-flex h-14 w-14 items-center justify-center rounded-2xl text-white shadow-lg transition duration-300 ${
+                    fileName
+                      ? 'bg-gradient-to-br from-emerald-500 to-mint-600 shadow-emerald-500/25'
+                      : 'bg-gradient-to-br from-coral-600 via-violet-500 to-sky-500 shadow-violet-500/30'
+                  }`}
+                >
+                  {fileName ? <CheckCircle2 className="h-7 w-7" /> : <Upload className="h-7 w-7" />}
+                </span>
+                <p className="mt-4 text-base font-semibold text-navy-950">
+                  {fileName ? 'Resume loaded' : dragOver ? 'Drop to upload' : 'Drag & drop your resume'}
+                </p>
+                <p className="mt-1 text-sm text-slate-600">
+                  {fileName ? (
+                    <>
+                      <span className="font-medium text-navy-950">{fileName}</span>
+                      <span className="text-slate-500"> · click to replace</span>
+                    </>
+                  ) : (
+                    'PDF, Word, text, and more · up to 8 MB'
+                  )}
+                </p>
+                <div className="mt-4">
+                  <span className="inline-flex h-10 items-center justify-center rounded-xl border border-violet-200 bg-white px-4 text-sm font-semibold text-navy-950 shadow-sm">
+                    <FileUp className="mr-2 h-4 w-4 text-violet-600" />
+                    {extracting ? 'Reading file…' : 'Choose file'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="relative my-6">
+                <div className="flex items-center gap-3">
+                  <span className="h-px flex-1 bg-slate-200" />
+                  <span className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                    <ClipboardPaste className="h-3.5 w-3.5" />
+                    or paste text
+                  </span>
+                  <span className="h-px flex-1 bg-slate-200" />
+                </div>
+              </div>
+
+              <div>
+                <FieldLabel htmlFor="resume-text">Resume text</FieldLabel>
+                <TextArea
+                  id="resume-text"
+                  className="min-h-52 transition focus:border-violet-400"
+                  value={resumeText}
+                  disabled={busy}
+                  onChange={(event) => setResumeText(event.target.value.slice(0, RESUME_TEXT_MAX))}
+                  placeholder="Paste your full resume text here. Include skills, projects (with technologies), experience, education, and certifications."
+                />
+                <div className="mt-2">
+                  <div className="flex items-center justify-between gap-3 text-xs text-slate-500">
+                    <span>
+                      {textLen}/{RESUME_TEXT_MAX} · min {RESUME_TEXT_MIN}
+                    </span>
+                    <span className={canAnalyze ? 'font-medium text-emerald-700' : undefined}>
+                      {canAnalyze ? 'Ready to analyze' : textLen > 0 ? 'Add a bit more detail' : 'Waiting for resume'}
+                    </span>
+                  </div>
+                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100">
+                    <div
+                      className={`h-full rounded-full transition-[width] duration-500 ease-out ${
+                        canAnalyze
+                          ? 'bg-gradient-to-r from-emerald-500 to-mint-500'
+                          : 'bg-gradient-to-r from-coral-500 to-violet-500'
+                      }`}
+                      style={{ width: `${textProgress}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-5">
+                <DataUseConsent
+                  id="resume-analysis-consent"
+                  checked={analysisConsent}
+                  onChange={setAnalysisConsent}
+                >
+                  I agree to send this resume text for optional AI analysis. It is not published. I can skip this step.{' '}
+                  <Link to="/privacy" className="underline">
+                    Privacy Policy
+                  </Link>
+                </DataUseConsent>
+              </div>
+
+              {error ? (
+                <p className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                  {error}
+                </p>
+              ) : null}
+
+              <div className="mt-5 flex flex-col gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:justify-end">
+                <Button
+                  fullWidth
+                  className="sm:w-auto"
+                  onClick={() => void analyze()}
+                  disabled={!canAnalyze || !analysisConsent || busy}
+                >
+                  <Sparkles className="h-4 w-4" />
+                  {analyzing ? 'Analyzing resume…' : 'Analyze Resume'}
+                </Button>
+              </div>
             </div>
 
-            {error ? <p className="mt-4 text-sm text-red-700">{error}</p> : null}
-
-            <div className="mt-5 flex flex-col gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:justify-end">
-              <Button
-                fullWidth
-                className="sm:w-auto"
-                onClick={() => void analyze()}
-                disabled={!canAnalyze || !analysisConsent || analyzing || extracting}
-              >
-                {analyzing ? 'Analyzing resume…' : 'Analyze Resume'}
-              </Button>
-            </div>
-            {!canAnalyze && resumeText.trim().length > 0 ? (
-              <p className="mt-2 text-xs text-slate-500">Add a bit more detail to analyze.</p>
+            {!canAnalyze && textLen === 0 ? (
+              <EmptyState
+                title="No resume analyzed yet"
+                body="Upload or paste your resume, then analyze. We only extract skills, projects, experience and certifications that your resume actually states."
+              />
             ) : null}
           </div>
-        </div>
-      ) : (
-        <div className="mt-8 space-y-5">
-          {notice ? (
-            <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-              {notice}
-            </div>
-          ) : null}
-          {error ? (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
-          ) : null}
-
-          {profileSummary ? (
-            <Card className="p-5 sm:p-6">
-              <p className="text-xs font-semibold uppercase tracking-wide text-coral-700">From your resume</p>
-              <p className="mt-2 text-sm leading-6 text-slate-700">{profileSummary}</p>
-            </Card>
-          ) : null}
-
-          <Card className="p-5 sm:p-6">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="font-semibold text-navy-950">Review your interview skills</h2>
-              <span className="text-xs text-slate-500">
-                {acceptedItems.length} accepted of {items.length}
-              </span>
-            </div>
-            <p className="mt-1 text-sm text-slate-600">
-              Accept the skills you want, remove anything that does not fit, and add your own. Only accepted skills
-              become your resume-derived interview skill set.
-            </p>
-
-            {items.length === 0 ? (
-              <p className="mt-4 text-sm text-slate-600">No skills yet. Add one below or analyze a resume.</p>
-            ) : (
-              <div className="mt-4 space-y-6">
-                {SECTION_ORDER.map((section) => {
-                  const sectionItems = grouped[section]
-                  if (sectionItems.length === 0) return null
-                  const meta = CATEGORY_META[section]
-                  return (
-                    <div key={section}>
-                      <div className="flex items-center gap-2">
-                        <Badge tone={meta.tone}>{meta.title}</Badge>
-                      </div>
-                      <p className="mt-1 text-xs text-slate-500">{meta.description}</p>
-                      <ul className="mt-3 space-y-2">
-                        {sectionItems.map((item) => (
-                          <li
-                            key={item.key}
-                            className="flex items-start justify-between gap-3 rounded-lg border border-slate-100 p-3"
-                          >
-                            <div className="min-w-0">
-                              <p className="text-sm font-semibold text-navy-950">{item.skill}</p>
-                              {item.inferredFrom ? (
-                                <p className="mt-1 text-xs italic text-slate-500">
-                                  Inferred from: “{item.inferredFrom}”
-                                </p>
-                              ) : null}
-                              {item.derivedFrom && item.derivedFrom.length > 0 ? (
-                                <p className="mt-1 text-xs text-slate-500">
-                                  Derived from: {item.derivedFrom.join(', ')}
-                                </p>
-                              ) : null}
-                            </div>
-                            <div className="flex shrink-0 items-center gap-3">
-                              <Toggle
-                                checked={item.accepted}
-                                label={`Accept ${item.skill}`}
-                                onChange={(next) => toggleItem(item.key, next)}
-                              />
-                              <button
-                                type="button"
-                                onClick={() => removeItem(item.key)}
-                                className="text-xs font-medium text-slate-500 hover:text-red-700"
-                              >
-                                Remove
-                              </button>
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )
-                })}
+        ) : (
+          <div className="profile-stagger mt-6 space-y-5">
+            {notice ? (
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50/90 px-4 py-3 text-sm text-emerald-800 shadow-sm shadow-emerald-100">
+                {notice}
               </div>
-            )}
+            ) : null}
+            {error ? (
+              <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>
+            ) : null}
 
-            <div className="mt-6 border-t border-slate-100 pt-4">
-              <FieldLabel htmlFor="manual-skill">Add a skill manually</FieldLabel>
-              <div className="flex gap-2">
-                <TextInput
-                  id="manual-skill"
-                  value={manualDraft}
-                  placeholder="e.g. GraphQL"
-                  onChange={(event) => setManualDraft(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') {
-                      event.preventDefault()
-                      addManualSkill()
-                    }
-                  }}
-                />
-                <Button variant="outline" onClick={addManualSkill}>
-                  Add
+            {profileSummary ? (
+              <section className="overflow-hidden rounded-2xl border border-black/[0.06] bg-white/95 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+                <div className="border-b border-slate-100 bg-gradient-to-r from-slate-50/90 via-white to-violet-50/40 px-5 py-4 sm:px-6">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gradient-brand">From your resume</p>
+                </div>
+                <p className="px-5 py-4 text-sm leading-6 text-slate-700 sm:px-6">{profileSummary}</p>
+              </section>
+            ) : null}
+
+            <section className="overflow-hidden rounded-2xl border border-black/[0.06] bg-white/95 shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition hover:border-violet-200/80 hover:shadow-md hover:shadow-violet-100/70">
+              <div className="border-b border-slate-100 bg-gradient-to-r from-slate-50/90 via-white to-sky-50/40 px-5 py-4 sm:px-6">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-3">
+                    <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-coral-50 to-violet-100 text-violet-700">
+                      <Sparkles className="h-5 w-5" />
+                    </span>
+                    <div>
+                      <h2 className="font-semibold text-navy-950">Review your interview skills</h2>
+                      <p className="text-xs text-slate-500">
+                        {acceptedItems.length} accepted of {items.length}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="h-2 w-28 overflow-hidden rounded-full bg-slate-100">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-coral-500 to-violet-500 transition-[width] duration-500"
+                      style={{
+                        width: `${items.length === 0 ? 0 : Math.round((acceptedItems.length / items.length) * 100)}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+                <p className="mt-2 text-sm text-slate-600">
+                  Accept what fits, remove what does not. Only accepted skills become your resume-derived set.
+                </p>
+              </div>
+
+              <div className="p-5 sm:p-6">
+                {items.length === 0 ? (
+                  <p className="text-sm text-slate-600">No skills yet. Add one below or analyze a resume.</p>
+                ) : (
+                  <div className="space-y-6">
+                    {SECTION_ORDER.map((section) => {
+                      const sectionItems = grouped[section]
+                      if (sectionItems.length === 0) return null
+                      const meta = CATEGORY_META[section]
+                      return (
+                        <div key={section} className="resume-step-pop">
+                          <div className="flex items-center gap-2">
+                            <Badge tone={meta.tone}>{meta.title}</Badge>
+                          </div>
+                          <p className="mt-1 text-xs text-slate-500">{meta.description}</p>
+                          <ul className="mt-3 space-y-2">
+                            {sectionItems.map((item) => (
+                              <li
+                                key={item.key}
+                                className={`flex items-start justify-between gap-3 rounded-xl border p-3 transition duration-300 ${
+                                  item.accepted
+                                    ? 'border-violet-100 bg-violet-50/40 hover:border-violet-200'
+                                    : 'border-slate-100 bg-slate-50/50 opacity-70'
+                                }`}
+                              >
+                                <div className="min-w-0">
+                                  <p className="text-sm font-semibold text-navy-950">{item.skill}</p>
+                                  {item.inferredFrom ? (
+                                    <p className="mt-1 text-xs italic text-slate-500">
+                                      Inferred from: “{item.inferredFrom}”
+                                    </p>
+                                  ) : null}
+                                  {item.derivedFrom && item.derivedFrom.length > 0 ? (
+                                    <p className="mt-1 text-xs text-slate-500">
+                                      Derived from: {item.derivedFrom.join(', ')}
+                                    </p>
+                                  ) : null}
+                                </div>
+                                <div className="flex shrink-0 items-center gap-3">
+                                  <Toggle
+                                    checked={item.accepted}
+                                    label={`Accept ${item.skill}`}
+                                    onChange={(next) => toggleItem(item.key, next)}
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => removeItem(item.key)}
+                                    className="text-xs font-medium text-slate-500 hover:text-red-700"
+                                  >
+                                    Remove
+                                  </button>
+                                </div>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+
+                <div className="mt-6 border-t border-slate-100 pt-4">
+                  <FieldLabel htmlFor="manual-skill">Add a skill manually</FieldLabel>
+                  <div className="flex gap-2">
+                    <TextInput
+                      id="manual-skill"
+                      value={manualDraft}
+                      placeholder="e.g. GraphQL"
+                      onChange={(event) => setManualDraft(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          event.preventDefault()
+                          addManualSkill()
+                        }
+                      }}
+                    />
+                    <Button variant="outline" onClick={addManualSkill}>
+                      Add
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            {projects.length > 0 ? (
+              <section className="overflow-hidden rounded-2xl border border-black/[0.06] bg-white/95 shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition hover:border-violet-200/80 hover:shadow-md hover:shadow-violet-100/70">
+                <div className="border-b border-slate-100 bg-gradient-to-r from-slate-50/90 via-white to-mint-50/50 px-5 py-4 sm:px-6">
+                  <div className="flex items-center gap-3">
+                    <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-mint-50 to-sky-100 text-sky-700">
+                      <FolderKanban className="h-5 w-5" />
+                    </span>
+                    <div>
+                      <h2 className="font-semibold text-navy-950">Projects identified in your resume</h2>
+                      <p className="text-sm text-slate-600">
+                        AI Interview only asks about these — never invented projects.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <ul className="space-y-3 p-5 sm:p-6">
+                  {projects.map((project) => (
+                    <li
+                      key={project.key}
+                      className={`rounded-xl border p-3 transition ${
+                        project.accepted
+                          ? 'border-sky-100 bg-sky-50/40'
+                          : 'border-slate-100 bg-slate-50/50 opacity-70'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-navy-950">{project.name}</p>
+                          {project.description ? (
+                            <p className="mt-1 text-sm text-slate-600">{project.description}</p>
+                          ) : null}
+                          {project.technologies.length > 0 ? (
+                            <div className="mt-2 flex flex-wrap gap-1.5">
+                              {project.technologies.map((tech) => (
+                                <Badge key={tech} tone="slate">
+                                  {tech}
+                                </Badge>
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
+                        <div className="flex shrink-0 items-center gap-3">
+                          <Toggle
+                            checked={project.accepted}
+                            label={`Include ${project.name}`}
+                            onChange={(next) => toggleProject(project.key, next)}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeProject(project.key)}
+                            className="text-xs font-medium text-slate-500 hover:text-red-700"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+
+            {certifications.length > 0 ? (
+              <section className="overflow-hidden rounded-2xl border border-black/[0.06] bg-white/95 p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] sm:p-6">
+                <h2 className="font-semibold text-navy-950">Certifications</h2>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {certifications.map((cert) => (
+                    <Badge key={cert} tone="blue">
+                      {cert}
+                    </Badge>
+                  ))}
+                </div>
+              </section>
+            ) : null}
+
+            <div className="sticky bottom-3 z-10 flex flex-col gap-3 rounded-2xl border border-white/80 bg-white/90 p-3 shadow-[0_12px_40px_-18px_rgba(12,18,32,0.45)] backdrop-blur sm:flex-row sm:items-center sm:justify-between">
+              <Button variant="outline" onClick={startOver}>
+                {loadedExisting ? 'Analyze a new resume' : 'Start over'}
+              </Button>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                {saved ? (
+                  <Link to="/candidate/practice/mock?fresh=1">
+                    <Button variant="outline">Start AI Interview</Button>
+                  </Link>
+                ) : null}
+                <Button onClick={() => void save()} disabled={saving || acceptedItems.length === 0}>
+                  {saving ? 'Saving…' : saved ? 'Saved ✓ Update' : `Save ${acceptedItems.length} skills to profile`}
                 </Button>
               </div>
             </div>
-          </Card>
-
-          {projects.length > 0 ? (
-            <Card className="p-5 sm:p-6">
-              <h2 className="font-semibold text-navy-950">Projects identified in your resume</h2>
-              <p className="mt-1 text-sm text-slate-600">
-                Your AI Interview will only ask about these resume projects — never invented ones. Remove any you
-                don&apos;t want discussed.
-              </p>
-              <ul className="mt-4 space-y-3">
-                {projects.map((project) => (
-                  <li key={project.key} className="rounded-lg border border-slate-100 p-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-navy-950">{project.name}</p>
-                        {project.description ? (
-                          <p className="mt-1 text-sm text-slate-600">{project.description}</p>
-                        ) : null}
-                        {project.technologies.length > 0 ? (
-                          <div className="mt-2 flex flex-wrap gap-1.5">
-                            {project.technologies.map((tech) => (
-                              <Badge key={tech} tone="slate">
-                                {tech}
-                              </Badge>
-                            ))}
-                          </div>
-                        ) : null}
-                      </div>
-                      <div className="flex shrink-0 items-center gap-3">
-                        <Toggle
-                          checked={project.accepted}
-                          label={`Include ${project.name}`}
-                          onChange={(next) => toggleProject(project.key, next)}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => removeProject(project.key)}
-                          className="text-xs font-medium text-slate-500 hover:text-red-700"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </Card>
-          ) : null}
-
-          {certifications.length > 0 ? (
-            <Card className="p-5 sm:p-6">
-              <h2 className="font-semibold text-navy-950">Certifications</h2>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {certifications.map((cert) => (
-                  <Badge key={cert} tone="blue">
-                    {cert}
-                  </Badge>
-                ))}
-              </div>
-            </Card>
-          ) : null}
-
-          <div className="flex flex-col gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
-            <Button variant="outline" onClick={startOver}>
-              {loadedExisting ? 'Analyze a new resume' : 'Start over'}
-            </Button>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              {saved ? (
-                <Link to="/candidate/practice/mock?fresh=1">
-                  <Button variant="outline">Start AI Interview</Button>
-                </Link>
-              ) : null}
-              <Button onClick={() => void save()} disabled={saving || acceptedItems.length === 0}>
-                {saving ? 'Saving…' : saved ? 'Saved ✓ Update' : `Save ${acceptedItems.length} skills to profile`}
-              </Button>
-            </div>
           </div>
-        </div>
-      )}
-
-      {phase === 'input' && !canAnalyze && resumeText.trim().length === 0 ? (
-        <div className="mt-8">
-          <EmptyState
-            title="No resume analyzed yet"
-            body="Upload or paste your resume, then analyze. We only extract skills, projects, experience and certifications that your resume actually states."
-          />
-        </div>
-      ) : null}
+        )}
+      </div>
     </div>
   )
 }
