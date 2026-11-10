@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import {
   CheckCircle2,
   ClipboardPaste,
+  FileText,
   FileUp,
   FolderKanban,
   Sparkles,
@@ -354,6 +355,16 @@ export function ResumeSkillsPage() {
   const textLen = resumeText.trim().length
   const textProgress = Math.min(100, Math.round((textLen / RESUME_TEXT_MIN) * 100))
   const busy = extracting || analyzing
+  const hasResume = textLen > 0
+  const wordCount = useMemo(
+    () => (hasResume ? resumeText.trim().split(/\s+/).filter(Boolean).length : 0),
+    [hasResume, resumeText],
+  )
+  const previewSnippet = useMemo(() => {
+    const cleaned = resumeText.trim().replace(/\s+/g, ' ')
+    if (!cleaned) return ''
+    return cleaned.length > 220 ? `${cleaned.slice(0, 220)}…` : cleaned
+  }, [resumeText])
 
   function onDrop(event: DragEvent<HTMLDivElement>) {
     event.preventDefault()
@@ -379,22 +390,30 @@ export function ResumeSkillsPage() {
                 Resume Interview Skills
               </h1>
               <p className="mt-2 max-w-xl text-sm leading-6 text-slate-600 sm:text-base">
-                Upload your resume and we build an interview skill plan strictly from what it says. You review and
-                accept every skill before it is saved.
+                {hasResume && phase === 'input'
+                  ? 'Resume captured. Confirm the text, agree to analysis, then extract technical skills.'
+                  : 'Upload your resume and we build an interview skill plan strictly from what it says. You review and accept every skill before it is saved.'}
               </p>
             </div>
             <div className="grid grid-cols-3 gap-2 sm:min-w-[15rem]">
               {[
-                { n: '1', label: 'Upload', active: phase === 'input' },
-                { n: '2', label: 'Review', active: phase === 'review' },
-                { n: '3', label: 'Save', active: phase === 'review' && saved },
+                {
+                  n: '1',
+                  label: 'Upload',
+                  active: phase === 'input' && !canAnalyze,
+                  done: canAnalyze || phase === 'review',
+                },
+                { n: '2', label: 'Review', active: phase === 'review', done: false },
+                { n: '3', label: 'Save', active: phase === 'review' && saved, done: saved },
               ].map((step, index) => (
                 <div
                   key={step.n}
                   className={`resume-step-pop rounded-xl px-2.5 py-2 text-center ${
                     step.active
                       ? 'bg-gradient-to-br from-coral-600 to-violet-600 text-white shadow-md shadow-violet-500/25'
-                      : 'bg-slate-50 text-slate-500 ring-1 ring-slate-200'
+                      : step.done
+                        ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200'
+                        : 'bg-slate-50 text-slate-500 ring-1 ring-slate-200'
                   }`}
                   style={{ animationDelay: `${index * 80}ms` }}
                 >
@@ -429,111 +448,194 @@ export function ResumeSkillsPage() {
                 onChange={(event) => void onFileSelected(event.target.files?.[0] ?? null)}
               />
 
-              <div
-                role="button"
-                tabIndex={0}
-                onClick={() => !busy && fileInputRef.current?.click()}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter' || event.key === ' ') {
-                    event.preventDefault()
-                    if (!busy) fileInputRef.current?.click()
-                  }
-                }}
-                onDragEnter={(event) => {
-                  event.preventDefault()
-                  setDragOver(true)
-                }}
-                onDragOver={(event) => {
-                  event.preventDefault()
-                  setDragOver(true)
-                }}
-                onDragLeave={(event) => {
-                  event.preventDefault()
-                  setDragOver(false)
-                }}
-                onDrop={onDrop}
-                className={`resume-dropzone-idle relative cursor-pointer overflow-hidden rounded-2xl border-2 border-dashed px-4 py-8 text-center transition duration-300 sm:px-6 sm:py-10 ${
-                  dragOver
-                    ? 'border-coral-500 bg-coral-50/70 scale-[1.01]'
-                    : fileName
-                      ? 'border-emerald-300 bg-emerald-50/50'
-                      : 'border-violet-200 bg-gradient-to-br from-white via-violet-50/40 to-sky-50/50 hover:border-violet-400'
-                }`}
-              >
-                <span
-                  className={`mx-auto inline-flex h-14 w-14 items-center justify-center rounded-2xl text-white shadow-lg transition duration-300 ${
-                    fileName
-                      ? 'bg-gradient-to-br from-emerald-500 to-mint-600 shadow-emerald-500/25'
-                      : 'bg-gradient-to-br from-coral-600 via-violet-500 to-sky-500 shadow-violet-500/30'
-                  }`}
-                >
-                  {fileName ? <CheckCircle2 className="h-7 w-7" /> : <Upload className="h-7 w-7" />}
-                </span>
-                <p className="mt-4 text-base font-semibold text-navy-950">
-                  {fileName ? 'Resume loaded' : dragOver ? 'Drop to upload' : 'Drag & drop your resume'}
-                </p>
-                <p className="mt-1 text-sm text-slate-600">
-                  {fileName ? (
-                    <>
-                      <span className="font-medium text-navy-950">{fileName}</span>
-                      <span className="text-slate-500"> · click to replace</span>
-                    </>
-                  ) : (
-                    'PDF, Word, text, and more · up to 8 MB'
-                  )}
-                </p>
-                <div className="mt-4">
-                  <span className="inline-flex h-10 items-center justify-center rounded-xl border border-violet-200 bg-white px-4 text-sm font-semibold text-navy-950 shadow-sm">
-                    <FileUp className="mr-2 h-4 w-4 text-violet-600" />
-                    {extracting ? 'Reading file…' : 'Choose file'}
-                  </span>
-                </div>
-              </div>
-
-              <div className="relative my-6">
-                <div className="flex items-center gap-3">
-                  <span className="h-px flex-1 bg-slate-200" />
-                  <span className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">
-                    <ClipboardPaste className="h-3.5 w-3.5" />
-                    or paste text
-                  </span>
-                  <span className="h-px flex-1 bg-slate-200" />
-                </div>
-              </div>
-
-              <div>
-                <FieldLabel htmlFor="resume-text">Resume text</FieldLabel>
-                <TextArea
-                  id="resume-text"
-                  className="min-h-52 transition focus:border-violet-400"
-                  value={resumeText}
-                  disabled={busy}
-                  onChange={(event) => setResumeText(event.target.value.slice(0, RESUME_TEXT_MAX))}
-                  placeholder="Paste your full resume text here. Include skills, projects (with technologies), experience, education, and certifications."
-                />
-                <div className="mt-2">
-                  <div className="flex items-center justify-between gap-3 text-xs text-slate-500">
-                    <span>
-                      {textLen}/{RESUME_TEXT_MAX} · min {RESUME_TEXT_MIN}
-                    </span>
-                    <span className={canAnalyze ? 'font-medium text-emerald-700' : undefined}>
-                      {canAnalyze ? 'Ready to analyze' : textLen > 0 ? 'Add a bit more detail' : 'Waiting for resume'}
-                    </span>
-                  </div>
-                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100">
+              {hasResume ? (
+                <div className={`space-y-5 ${busy ? '' : 'resume-loaded-enter'}`}>
+                  <div
+                    className={`relative overflow-hidden rounded-2xl border border-emerald-200/80 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-4 sm:p-5 ${
+                      canAnalyze ? 'resume-ready-glow' : ''
+                    }`}
+                  >
                     <div
-                      className={`h-full rounded-full transition-[width] duration-500 ease-out ${
-                        canAnalyze
-                          ? 'bg-gradient-to-r from-emerald-500 to-mint-500'
-                          : 'bg-gradient-to-r from-coral-500 to-violet-500'
-                      }`}
-                      style={{ width: `${textProgress}%` }}
+                      aria-hidden
+                      className="pointer-events-none absolute -right-10 -top-12 h-32 w-32 rounded-full bg-emerald-300/30 blur-2xl"
+                    />
+                    <div className="relative flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="flex min-w-0 items-start gap-3">
+                        <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-mint-600 text-white shadow-lg shadow-emerald-500/25">
+                          <CheckCircle2 className="h-6 w-6" />
+                        </span>
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-base font-semibold text-navy-950">Resume ready</p>
+                            {canAnalyze ? (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-emerald-800">
+                                Ready to analyze
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-800">
+                                Needs more detail
+                              </span>
+                            )}
+                          </div>
+                          <p className="mt-1 inline-flex max-w-full items-center gap-1.5 text-sm text-slate-600">
+                            <FileText className="h-3.5 w-3.5 shrink-0 text-emerald-700" />
+                            <span className="truncate font-medium text-navy-950">
+                              {fileName || 'Pasted resume text'}
+                            </span>
+                          </p>
+                          {previewSnippet ? (
+                            <p className="mt-3 line-clamp-3 rounded-xl border border-white/80 bg-white/70 px-3 py-2 text-xs leading-5 text-slate-600 shadow-sm">
+                              {previewSnippet}
+                            </p>
+                          ) : null}
+                        </div>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="shrink-0"
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        <FileUp className="h-4 w-4" />
+                        Replace file
+                      </Button>
+                    </div>
+
+                    <div className="relative mt-4 grid grid-cols-3 gap-2">
+                      {[
+                        { label: 'Characters', value: textLen.toLocaleString('en-IN') },
+                        { label: 'Words', value: wordCount.toLocaleString('en-IN') },
+                        { label: 'Source', value: fileName ? 'File' : 'Paste' },
+                      ].map((stat, index) => (
+                        <div
+                          key={stat.label}
+                          className="resume-stat-rise rounded-xl border border-white/80 bg-white/80 px-3 py-2 text-center shadow-sm"
+                          style={{ animationDelay: `${index * 70}ms` }}
+                        >
+                          <p className="text-[11px] font-medium uppercase tracking-wide text-slate-500">{stat.label}</p>
+                          <p className="mt-0.5 text-sm font-semibold text-navy-950">{stat.value}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/60">
+                    <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white/80 px-4 py-2.5">
+                      <div className="flex items-center gap-2">
+                        <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-violet-50 text-violet-700">
+                          <ClipboardPaste className="h-3.5 w-3.5" />
+                        </span>
+                        <div>
+                          <p className="text-sm font-semibold text-navy-950">Document preview</p>
+                          <p className="text-[11px] text-slate-500">Edit if anything looks incomplete</p>
+                        </div>
+                      </div>
+                      <span className="text-xs font-medium text-slate-500">
+                        {textLen}/{RESUME_TEXT_MAX}
+                      </span>
+                    </div>
+                    <div className="p-3 sm:p-4">
+                      <TextArea
+                        id="resume-text"
+                        className="min-h-48 border-slate-200 bg-white shadow-inner"
+                        value={resumeText}
+                        disabled={busy}
+                        onChange={(event) => setResumeText(event.target.value.slice(0, RESUME_TEXT_MAX))}
+                        placeholder="Paste your full resume text here."
+                      />
+                      <div className="mt-3">
+                        <div className="h-1.5 overflow-hidden rounded-full bg-slate-200/80">
+                          <div
+                            className={`h-full rounded-full transition-[width] duration-500 ease-out ${
+                              canAnalyze
+                                ? 'bg-gradient-to-r from-emerald-500 to-mint-500'
+                                : 'bg-gradient-to-r from-coral-500 to-violet-500'
+                            }`}
+                            style={{ width: `${textProgress}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => !busy && fileInputRef.current?.click()}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault()
+                        if (!busy) fileInputRef.current?.click()
+                      }
+                    }}
+                    onDragEnter={(event) => {
+                      event.preventDefault()
+                      setDragOver(true)
+                    }}
+                    onDragOver={(event) => {
+                      event.preventDefault()
+                      setDragOver(true)
+                    }}
+                    onDragLeave={(event) => {
+                      event.preventDefault()
+                      setDragOver(false)
+                    }}
+                    onDrop={onDrop}
+                    className={`resume-dropzone-idle relative cursor-pointer overflow-hidden rounded-2xl border-2 border-dashed px-4 py-8 text-center transition duration-300 sm:px-6 sm:py-10 ${
+                      dragOver
+                        ? 'scale-[1.01] border-coral-500 bg-coral-50/70'
+                        : 'border-violet-200 bg-gradient-to-br from-white via-violet-50/40 to-sky-50/50 hover:border-violet-400'
+                    }`}
+                  >
+                    <span className="mx-auto inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-coral-600 via-violet-500 to-sky-500 text-white shadow-lg shadow-violet-500/30">
+                      <Upload className="h-7 w-7" />
+                    </span>
+                    <p className="mt-4 text-base font-semibold text-navy-950">
+                      {dragOver ? 'Drop to upload' : 'Drag & drop your resume'}
+                    </p>
+                    <p className="mt-1 text-sm text-slate-600">PDF, Word, text, and more · up to 8 MB</p>
+                    <div className="mt-4">
+                      <span className="inline-flex h-10 items-center justify-center rounded-xl border border-violet-200 bg-white px-4 text-sm font-semibold text-navy-950 shadow-sm">
+                        <FileUp className="mr-2 h-4 w-4 text-violet-600" />
+                        {extracting ? 'Reading file…' : 'Choose file'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="relative my-6">
+                    <div className="flex items-center gap-3">
+                      <span className="h-px flex-1 bg-slate-200" />
+                      <span className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                        <ClipboardPaste className="h-3.5 w-3.5" />
+                        or paste text
+                      </span>
+                      <span className="h-px flex-1 bg-slate-200" />
+                    </div>
+                  </div>
+
+                  <div>
+                    <FieldLabel htmlFor="resume-text-empty">Resume text</FieldLabel>
+                    <TextArea
+                      id="resume-text-empty"
+                      className="min-h-52 transition focus:border-violet-400"
+                      value={resumeText}
+                      disabled={busy}
+                      onChange={(event) => setResumeText(event.target.value.slice(0, RESUME_TEXT_MAX))}
+                      placeholder="Paste your full resume text here. Include skills, projects (with technologies), experience, education, and certifications."
                     />
                   </div>
-                </div>
-              </div>
+                </>
+              )}
 
-              <div className="mt-5">
+              <div
+                className={`mt-5 rounded-2xl border p-4 transition duration-300 sm:p-5 ${
+                  canAnalyze
+                    ? 'border-violet-200 bg-gradient-to-br from-violet-50/80 via-white to-sky-50/70 shadow-sm shadow-violet-100'
+                    : 'border-slate-200 bg-slate-50/70'
+                }`}
+              >
                 <DataUseConsent
                   id="resume-analysis-consent"
                   checked={analysisConsent}
@@ -544,24 +646,31 @@ export function ResumeSkillsPage() {
                     Privacy Policy
                   </Link>
                 </DataUseConsent>
-              </div>
 
-              {error ? (
-                <p className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                  {error}
-                </p>
-              ) : null}
+                {error ? (
+                  <p className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                    {error}
+                  </p>
+                ) : null}
 
-              <div className="mt-5 flex flex-col gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:justify-end">
-                <Button
-                  fullWidth
-                  className="sm:w-auto"
-                  onClick={() => void analyze()}
-                  disabled={!canAnalyze || !analysisConsent || busy}
-                >
-                  <Sparkles className="h-4 w-4" />
-                  {analyzing ? 'Analyzing resume…' : 'Analyze Resume'}
-                </Button>
+                <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-xs text-slate-500">
+                    {canAnalyze
+                      ? analysisConsent
+                        ? 'Next: extract technical skills for review.'
+                        : 'Tick the box above to enable analysis.'
+                      : 'Add enough resume text to continue.'}
+                  </p>
+                  <Button
+                    fullWidth
+                    className="sm:w-auto"
+                    onClick={() => void analyze()}
+                    disabled={!canAnalyze || !analysisConsent || busy}
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    {analyzing ? 'Analyzing resume…' : 'Analyze Resume'}
+                  </Button>
+                </div>
               </div>
             </div>
 

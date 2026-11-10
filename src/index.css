@@ -293,6 +293,50 @@
   animation: resume-step-pop 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+@keyframes resume-loaded-enter {
+  0% {
+    opacity: 0;
+    transform: translateY(16px) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.resume-loaded-enter {
+  animation: resume-loaded-enter 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes resume-ready-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.25);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgba(16, 185, 129, 0);
+  }
+}
+
+.resume-ready-glow {
+  animation: resume-ready-glow 2.4s ease-in-out infinite;
+}
+
+@keyframes resume-stat-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.resume-stat-rise {
+  animation: resume-stat-rise 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .testimonial-marquee {
     animation: none;
@@ -313,7 +357,10 @@
   .profile-stagger > *,
   .profile-ring-progress,
   .resume-dropzone-idle,
-  .resume-step-pop {
+  .resume-step-pop,
+  .resume-loaded-enter,
+  .resume-ready-glow,
+  .resume-stat-rise {
     animation: none;
   }
 }
