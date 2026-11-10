@@ -1,5 +1,40 @@
 project_id = "fhcrxjrqtojixgqemofp"
 
+[auth]
+site_url = "https://www.jobround.ai"
+additional_redirect_urls = [
+  "https://roundone-interviewer.vercel.app/",
+  "https://roundone-interviewer.vercel.app/interviewer/auth/callback",
+  "http://localhost:5174/**",
+  "http://localhost:5174/interviewer/auth/callback",
+  "https://roundone-candidate-plum.vercel.app/candidate/update-password",
+  "https://roundone-candidate-plum.vercel.app/candidate/auth/callback",
+  "https://roundone-candidate-plum.vercel.app/**",
+  "https://www.jobround.ai/candidate/auth/callback",
+  "https://jobround.ai/candidate/auth/callback",
+  "https://www.jobround.ai/",
+  "https://jobround.ai",
+  "https://experts.jobround.ai",
+  "http://localhost:5173",
+  "http://localhost:5173/candidate/auth/callback",
+]
+
+[auth.email]
+enable_confirmations = true
+
+[auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true
+
+# Auth mail uses Resend via Supabase SMTP (Dashboard → Auth → SMTP). Hook off so SMTP is used.
+[auth.hook.send_email]
+enabled = false
+uri = ""
+secrets = ""
+
+[functions.send-email]
+verify_jwt = false
+
 [functions.assist-matching]
 verify_jwt = true
 

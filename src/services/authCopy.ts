@@ -50,6 +50,16 @@ export function authErrorMessage(error: unknown): string {
   if (message.includes('failed to fetch') || message.includes('network')) {
     return 'Network error. Check your connection and try again.'
   }
+  if (
+    message.includes('error sending confirmation email') ||
+    message.includes('error sending magic link email') ||
+    message.includes('error sending email')
+  ) {
+    return 'We could not send a confirmation email right now. Use Continue with Google, or try again in a few minutes.'
+  }
+  if (message.includes('email address not authorized')) {
+    return 'This email cannot receive sign-up mail yet. Use Continue with Google, or contact support.'
+  }
   if (message.includes('provider is not enabled') || message.includes('unsupported provider')) {
     return 'Google sign-in is not enabled yet. Use email and password for now.'
   }

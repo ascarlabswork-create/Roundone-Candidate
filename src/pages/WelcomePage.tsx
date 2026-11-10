@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { Navigate, useNavigate } from 'react-router-dom'
+import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { Button } from '../components/ui/Button.tsx'
 import { Card, FieldLabel, TextInput } from '../components/ui/primitives.tsx'
 import { dedupeSkills } from '../matching/skills.ts'
@@ -25,6 +25,8 @@ function pillClass(selected: boolean) {
 
 export function WelcomePage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const emailConfirmed = searchParams.get('confirmed') === '1'
   const { setPreferences } = useMatching()
   const fileRef = useRef<HTMLInputElement>(null)
   const [loading, setLoading] = useState(true)
@@ -134,6 +136,14 @@ export function WelcomePage() {
 
   return (
     <div className="mx-auto w-full max-w-xl px-4 py-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-10">
+      {emailConfirmed ? (
+        <div className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+          <p className="font-semibold">Email confirmed</p>
+          <p className="mt-1 text-emerald-800">
+            You’re signed in. Add your role and skills below, then continue to your dashboard.
+          </p>
+        </div>
+      ) : null}
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-coral-700">Before your dashboard</p>
       <h1 className="mt-2 text-2xl font-semibold tracking-tight text-navy-950 sm:text-3xl">What are you preparing for?</h1>
       <p className="mt-2 text-sm leading-6 text-slate-600">
