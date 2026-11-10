@@ -7,8 +7,7 @@ export const CANDIDATE_WELCOME_PATH = '/candidate/welcome'
  */
 export function postAuthPath(value: string | null) {
   if (!value || !value.startsWith('/') || value.startsWith('//') || value.includes('\\')) {
-    return CANDIDATE_WELCOME_PATH
+    return '/'
   }
-  if (value === '/' || value === '/candidate') return CANDIDATE_WELCOME_PATH
   return value
 }
