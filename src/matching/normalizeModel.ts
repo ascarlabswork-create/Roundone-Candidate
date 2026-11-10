@@ -1,4 +1,5 @@
 import type { MatchingAiNormalized } from './aiModel.ts'
+import { normalizeSkill } from './skillCanonical.ts'
 
 export const NORMALIZATION_AI_MODE = 'normalize' as const
 
@@ -130,17 +131,172 @@ function toUsableField(field: NormalizedField | null, current: string): UsableNo
   return { ...field, band }
 }
 
+type RoleSkillSignal = {
+  role: string
+  interviewType: string
+  /** Canonical skill keys that support this role. */
+  skills: string[]
+  /** Extra weight for distinctive tools in this family. */
+  strongSkills?: string[]
+}
+
+/**
+ * Deterministic role hints from skills. Prevents bad AI jumps like SQL + Power BI → ML Engineer.
+ */
+const ROLE_SKILL_SIGNALS: RoleSkillSignal[] = [
+  {
+    role: 'Data Analyst',
+    interviewType: 'Data Science',
+    skills: ['sql', 'excel', 'power bi', 'tableau', 'looker', 'power query', 'dax'],
+    strongSkills: ['power bi', 'tableau', 'looker', 'excel', 'dax'],
+  },
+  {
+    role: 'Data Scientist',
+    interviewType: 'Data Science',
+    skills: ['pandas', 'numpy', 'scikit-learn', 'statistics', 'r', 'jupyter notebook', 'sql'],
+    strongSkills: ['pandas', 'numpy', 'scikit-learn', 'statistics', 'r'],
+  },
+  {
+    role: 'ML Engineer',
+    interviewType: 'Machine Learning',
+    skills: [
+      'machine learning',
+      'pytorch',
+      'tensorflow',
+      'deep learning',
+      'nlp',
+      'llm',
+      'scikit-learn',
+      'keras',
+      'huggingface',
+    ],
+    strongSkills: ['pytorch', 'tensorflow', 'deep learning', 'nlp', 'llm', 'machine learning', 'keras'],
+  },
+  {
+    role: 'Data Engineer',
+    interviewType: 'Data Science',
+    skills: ['sql', 'spark', 'airflow', 'kafka', 'dbt', 'snowflake', 'databricks', 'etl', 'hadoop'],
+    strongSkills: ['spark', 'airflow', 'kafka', 'dbt', 'snowflake', 'databricks', 'etl'],
+  },
+  {
+    role: 'Frontend Engineer',
+    interviewType: 'Coding',
+    skills: ['react', 'typescript', 'javascript', 'next.js', 'html', 'css', 'vue', 'angular'],
+    strongSkills: ['react', 'typescript', 'next.js', 'vue', 'angular'],
+  },
+  {
+    role: 'Backend Engineer',
+    interviewType: 'Coding',
+    skills: ['java', 'python', 'go', 'node.js', 'fastapi', 'spring', 'django', 'postgresql', 'mongodb'],
+    strongSkills: ['java', 'go', 'node.js', 'fastapi', 'spring', 'django'],
+  },
+  {
+    role: 'DevOps Engineer',
+    interviewType: 'Coding',
+    skills: ['docker', 'kubernetes', 'terraform', 'aws', 'ci/cd', 'jenkins', 'linux', 'ansible'],
+    strongSkills: ['docker', 'kubernetes', 'terraform', 'ci/cd', 'jenkins', 'ansible'],
+  },
+]
+
+function skillSignalKeys(skills: string[]) {
+  return [...new Set(skills.map((skill) => normalizeSkill(skill)).filter(Boolean))]
+}
+
+function scoreRoleSignal(signal: RoleSkillSignal, skillKeys: string[]) {
+  let score = 0
+  let hits = 0
+  const strong = new Set(signal.strongSkills ?? [])
+  for (const key of skillKeys) {
+    if (!signal.skills.includes(key)) continue
+    hits += 1
+    score += strong.has(key) ? 2 : 1
+  }
+  return { score, hits }
+}
+
+/** Infer the best role/interview-type pair from skills alone. */
+export function inferRoleFromSkills(skills: string[]): {
+  targetRole: NormalizedField
+  interviewType: NormalizedField
+} | null {
+  const keys = skillSignalKeys(skills)
+  if (keys.length === 0) return null
+
+  const ranked = ROLE_SKILL_SIGNALS.map((signal) => ({
+    signal,
+    ...scoreRoleSignal(signal, keys),
+  }))
+    .filter((row) => row.score > 0)
+    .sort((a, b) => b.score - a.score || b.hits - a.hits)
+
+  const best = ranked[0]
+  if (!best || best.score < 2) return null
+
+  const second = ranked[1]
+  // Require a clear winner so ambiguous skill sets (e.g. SQL alone) do not invent a role.
+  if (second && second.score >= best.score) return null
+
+  const confidence = best.score >= 4 || (best.hits >= 2 && best.score >= 3) ? 0.94 : 0.82
+  return {
+    targetRole: { value: best.signal.role, confidence },
+    interviewType: { value: best.signal.interviewType, confidence: Math.min(confidence, 0.88) },
+  }
+}
+
+function roleSupportedBySkills(role: string, skills: string[]) {
+  const keys = skillSignalKeys(skills)
+  if (keys.length === 0) return false
+  const signal = ROLE_SKILL_SIGNALS.find((row) => row.role.toLowerCase() === role.trim().toLowerCase())
+  if (!signal) return true
+  return scoreRoleSignal(signal, keys).score > 0
+}
+
+/**
+ * Prefer skill-grounded role/type when the model invents a mismatched role
+ * (example: SQL + Power BI → ML Engineer).
+ */
+export function reconcileNormalizationWithSkills(
+  parsed: NormalizationAiResponse,
+  input: NormalizationInput,
+): NormalizationAiResponse {
+  const inferred = inferRoleFromSkills(input.skills)
+  if (!inferred) {
+    // Drop AI roles that have zero overlap with the candidate's skills.
+    if (parsed.targetRole && input.skills.length > 0 && !roleSupportedBySkills(parsed.targetRole.value, input.skills)) {
+      return { ...parsed, targetRole: null }
+    }
+    return parsed
+  }
+
+  const aiRole = parsed.targetRole
+  const aiSupported = aiRole ? roleSupportedBySkills(aiRole.value, input.skills) : false
+  const shouldReplaceRole =
+    !aiRole ||
+    !aiSupported ||
+    aiRole.value.toLowerCase() !== inferred.targetRole.value.toLowerCase()
+
+  return {
+    ...parsed,
+    targetRole: shouldReplaceRole ? inferred.targetRole : aiRole,
+    interviewType:
+      !parsed.interviewType || shouldReplaceRole
+        ? inferred.interviewType
+        : parsed.interviewType,
+  }
+}
+
 export function toUsableNormalization(
   parsed: NormalizationAiResponse,
   input: NormalizationInput,
 ): UsableNormalization {
+  const reconciled = reconcileNormalizationWithSkills(parsed, input)
   const currentSkills = new Set(input.skills.map((skill) => skill.trim().toLowerCase()).filter(Boolean))
   return {
-    targetRole: toUsableField(parsed.targetRole, input.targetRole),
-    candidateLevel: toUsableField(parsed.candidateLevel, input.candidateLevel),
-    interviewType: toUsableField(parsed.interviewType, input.interviewType),
-    targetCompany: toUsableField(parsed.targetCompany, input.targetCompany),
-    skills: parsed.skills.flatMap((skill) => {
+    targetRole: toUsableField(reconciled.targetRole, input.targetRole),
+    candidateLevel: toUsableField(reconciled.candidateLevel, input.candidateLevel),
+    interviewType: toUsableField(reconciled.interviewType, input.interviewType),
+    targetCompany: toUsableField(reconciled.targetCompany, input.targetCompany),
+    skills: reconciled.skills.flatMap((skill) => {
       const band = confidenceBand(skill.confidence)
       if (!band) return []
       if (currentSkills.has(skill.value.toLowerCase())) return []

@@ -2,12 +2,15 @@ import { supabase } from '../lib/supabase.ts'
 import { MATCHING_AI_FUNCTION, MATCHING_AI_TIMEOUT_MS } from './aiModel.ts'
 import {
   NORMALIZATION_AI_MODE,
+  canonicalVocabularyValue,
   hasNormalizableInput,
   hasUsableNormalization,
+  inferRoleFromSkills,
   isAlreadyCanonical,
   parseNormalizationAiResponse,
   toUsableNormalization,
   type MatchingVocabulary,
+  type NormalizationAiResponse,
   type NormalizationInput,
   type UsableNormalization,
 } from './normalizeModel.ts'
@@ -55,6 +58,29 @@ function compactVocabulary(vocabulary: MatchingVocabulary): MatchingVocabulary {
   }
 }
 
+/** Skill-only fallback when the model is unavailable or invents a mismatched role. */
+function localSkillNormalization(
+  input: NormalizationInput,
+  vocabulary: MatchingVocabulary,
+): UsableNormalization | null {
+  const inferred = inferRoleFromSkills(input.skills)
+  if (!inferred) return null
+  const role = canonicalVocabularyValue(inferred.targetRole.value, vocabulary.roles)
+  const interviewType = canonicalVocabularyValue(inferred.interviewType.value, vocabulary.interviewTypes)
+  if (!role && !interviewType) return null
+  const parsed: NormalizationAiResponse = {
+    targetRole: role ? { value: role, confidence: inferred.targetRole.confidence } : null,
+    candidateLevel: null,
+    skills: [],
+    interviewType: interviewType
+      ? { value: interviewType, confidence: inferred.interviewType.confidence }
+      : null,
+    targetCompany: null,
+  }
+  const usable = toUsableNormalization(parsed, input)
+  return hasUsableNormalization(usable) ? usable : null
+}
+
 export async function requestNormalizationAssist(
   input: NormalizationInput,
 ): Promise<NormalizationAssistResult> {
@@ -83,22 +109,26 @@ export async function requestNormalizationAssist(
     const { data, error } = await withTimeout(invoke, MATCHING_AI_TIMEOUT_MS)
     if (error || data == null) {
       console.error('normalization assist failed')
-      return { ok: false }
+      const local = localSkillNormalization(input, vocabulary)
+      return local ? { ok: true, suggestions: local } : { ok: false }
     }
     if (typeof data === 'object' && data && 'error' in data && !('skills' in data)) {
-      return { ok: false }
+      const local = localSkillNormalization(input, vocabulary)
+      return local ? { ok: true, suggestions: local } : { ok: false }
     }
     const parsed = parseNormalizationAiResponse(data, vocabulary)
     if (!parsed) {
       console.error('normalization assist validation failed')
-      return { ok: false }
+      const local = localSkillNormalization(input, vocabulary)
+      return local ? { ok: true, suggestions: local } : { ok: false }
     }
     const usable = toUsableNormalization(parsed, input)
-    const suggestions = hasUsableNormalization(usable) ? usable : null
+    const suggestions = hasUsableNormalization(usable) ? usable : localSkillNormalization(input, vocabulary)
     memoryCache.set(key, suggestions)
     return { ok: true, suggestions }
   } catch (error) {
     console.error('normalization assist unavailable', error instanceof Error ? error.message : 'error')
-    return { ok: false }
+    const local = localSkillNormalization(input, vocabulary)
+    return local ? { ok: true, suggestions: local } : { ok: false }
   }
 }
