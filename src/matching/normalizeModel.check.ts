@@ -1,7 +1,9 @@
 import {
   buildNormalizationPatch,
   constrainNormalizedToVocabulary,
+  inferRoleFromSkills,
   parseNormalizationAiResponse,
+  reconcileNormalizationWithSkills,
   toUsableNormalization,
   type MatchingVocabulary,
 } from './normalizeModel.ts'
@@ -12,9 +14,16 @@ function expect(condition: boolean, message: string) {
 }
 
 const vocabulary: MatchingVocabulary = {
-  roles: ['Software Engineer', 'Backend Engineer', 'Frontend Engineer'],
-  skills: ['Python', 'FastAPI', 'React', 'Node.js', 'REST APIs'],
-  interviewTypes: ['Coding', 'System Design', 'Behavioral'],
+  roles: [
+    'Software Engineer',
+    'Backend Engineer',
+    'Frontend Engineer',
+    'Data Analyst',
+    'ML Engineer',
+    'Data Scientist',
+  ],
+  skills: ['Python', 'FastAPI', 'React', 'Node.js', 'REST APIs', 'SQL', 'Power BI', 'PyTorch'],
+  interviewTypes: ['Coding', 'System Design', 'Behavioral', 'Data Science', 'Machine Learning'],
   candidateLevels: ['SDE 2', 'Senior'],
   companies: ['Google', 'Amazon'],
 }
@@ -92,6 +101,55 @@ export function runNormalizationChecks() {
     vocabulary,
   )
   expect(overconfident?.interviewType == null, 'Out-of-range confidence is rejected')
+
+  const analyst = inferRoleFromSkills(['SQL', 'Powerbi'])
+  expect(analyst?.targetRole.value === 'Data Analyst', 'SQL + Power BI maps to Data Analyst')
+  expect(analyst?.interviewType.value === 'Data Science', 'Analyst interview type is Data Science')
+
+  const ml = inferRoleFromSkills(['PyTorch', 'Machine Learning'])
+  expect(ml?.targetRole.value === 'ML Engineer', 'PyTorch + ML maps to ML Engineer')
+
+  const sqlOnly = inferRoleFromSkills(['SQL'])
+  expect(sqlOnly == null, 'SQL alone does not invent a role')
+
+  const mismatched = reconcileNormalizationWithSkills(
+    {
+      targetRole: { value: 'ML Engineer', confidence: 0.99 },
+      candidateLevel: null,
+      skills: [],
+      interviewType: { value: 'Machine Learning', confidence: 0.9 },
+      targetCompany: null,
+    },
+    {
+      targetRole: '',
+      candidateLevel: '',
+      skills: ['SQL', 'Power BI'],
+      interviewType: '',
+      targetCompany: '',
+      intent: '',
+    },
+  )
+  expect(mismatched.targetRole?.value === 'Data Analyst', 'AI ML role is replaced for SQL + Power BI')
+  expect(mismatched.interviewType?.value === 'Data Science', 'Interview type follows the skill-grounded role')
+
+  const fixed = toUsableNormalization(
+    {
+      targetRole: { value: 'ML Engineer', confidence: 0.99 },
+      candidateLevel: null,
+      skills: [],
+      interviewType: null,
+      targetCompany: null,
+    },
+    {
+      targetRole: '',
+      candidateLevel: '',
+      skills: ['SQL', 'Powerbi'],
+      interviewType: '',
+      targetCompany: '',
+      intent: '',
+    },
+  )
+  expect(fixed.targetRole?.value === 'Data Analyst', 'Usable suggestions show Data Analyst for BI skills')
 
   return true
 }

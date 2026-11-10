@@ -1,5 +1,6 @@
 import { Search, SlidersHorizontal } from 'lucide-react'
 import { useMemo, useState } from 'react'
+import { useBodyScrollLock } from '../lib/bodyScrollLock.ts'
 import { Link, useSearchParams } from 'react-router-dom'
 import { COMPARE_MAX, ComparePanel } from '../components/interviewer/ComparePanel.tsx'
 import { FilterPanel } from '../components/interviewer/FilterPanel.tsx'
@@ -105,6 +106,8 @@ export function SearchPage() {
   const { pushToast } = useToast()
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [compared, setCompared] = useState<Interviewer[]>([])
+
+  useBodyScrollLock(drawerOpen)
 
   const sessionSkillsKey = JSON.stringify(preferences?.skills ?? [])
   const state = useAsync(async (): Promise<BrowseCatalog> => {

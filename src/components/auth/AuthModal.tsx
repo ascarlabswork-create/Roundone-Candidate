@@ -1,19 +1,30 @@
 import { useEffect, useId, useRef } from 'react'
-import { Navigate } from 'react-router-dom'
+import { Navigate, useLocation } from 'react-router-dom'
 import { X } from 'lucide-react'
 import { AuthForm } from './AuthForm.tsx'
 import { useAuthModal } from '../../state/authModal.tsx'
 import { useSession } from '../../state/session.tsx'
 import { cn } from '../../lib/cn.ts'
+import { useBodyScrollLock } from '../../lib/bodyScrollLock.ts'
 
 export function AuthModal() {
   const { open, tab, nextPath, closeAuth, setTab } = useAuthModal()
   const { status, user } = useSession()
+  const { pathname } = useLocation()
   const titleId = useId()
   const panelRef = useRef<HTMLDivElement>(null)
+  const showDialog = open && !(status === 'authenticated' && user)
+
+  useBodyScrollLock(showDialog)
 
   useEffect(() => {
-    if (!open) return
+    if (open && status === 'authenticated' && user) {
+      closeAuth()
+    }
+  }, [open, status, user, closeAuth])
+
+  useEffect(() => {
+    if (!showDialog) return
     const previous = document.activeElement as HTMLElement | null
     panelRef.current?.focus()
 
@@ -25,20 +36,20 @@ export function AuthModal() {
     }
 
     document.addEventListener('keydown', onKeyDown)
-    const prevOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
 
     return () => {
       document.removeEventListener('keydown', onKeyDown)
-      document.body.style.overflow = prevOverflow
       previous?.focus()
     }
-  }, [open, closeAuth])
+  }, [showDialog, closeAuth])
 
   if (!open) return null
 
   if (status === 'authenticated' && user) {
-    return <Navigate to={nextPath} replace />
+    if (pathname !== nextPath) {
+      return <Navigate to={nextPath} replace />
+    }
+    return null
   }
 
   return (

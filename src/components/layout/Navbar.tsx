@@ -2,6 +2,7 @@ import { Bell, LogOut, Menu, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
 import { cn } from '../../lib/cn.ts'
+import { useBodyScrollLock } from '../../lib/bodyScrollLock.ts'
 import { useAuthModal } from '../../state/authModal.tsx'
 import { useNotifications } from '../../state/notifications.tsx'
 import { useSession } from '../../state/session.tsx'
@@ -71,6 +72,8 @@ export function Navbar() {
   const { openAuth } = useAuthModal()
   const [open, setOpen] = useState(false)
   const signedIn = status === 'authenticated' && Boolean(account)
+
+  useBodyScrollLock(open)
 
   useEffect(() => {
     setOpen(false)

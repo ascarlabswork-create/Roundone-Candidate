@@ -110,8 +110,13 @@ export const SKILLS = [
   'System Design',
   'DSA',
   'SQL',
+  'Power BI',
+  'Tableau',
+  'Excel',
+  'Pandas',
   'Machine Learning',
   'PyTorch',
+  'TensorFlow',
   'Product Sense',
   'Communication',
 ] as const

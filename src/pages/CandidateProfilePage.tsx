@@ -316,6 +316,9 @@ export function CandidateProfilePage() {
   function applySuggestions(patch: NormalizationPatch) {
     setForm((prev) => ({
       ...prev,
+      targetRole: patch.targetRole ?? prev.targetRole,
+      candidateLevel: patch.candidateLevel ?? prev.candidateLevel,
+      interviewType: patch.interviewType ?? prev.interviewType,
       targetCompany: patch.targetCompany ?? prev.targetCompany,
       skills: patch.skills ?? prev.skills,
     }))

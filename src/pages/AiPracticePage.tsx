@@ -12,6 +12,7 @@ import {
   TextInput,
 } from '../components/ui/primitives.tsx'
 import { INTERVIEW_TYPES, SKILLS, TARGET_ROLES } from '../data/catalogs.ts'
+import { useBodyScrollLock } from '../lib/bodyScrollLock.ts'
 import { dedupeSkills } from '../matching/skills.ts'
 import { isUuid } from '../lib/uuid.ts'
 import { requestNextPracticeQuestion, requestPracticeFeedback } from '../practice/aiAssist.ts'
@@ -100,6 +101,7 @@ export function AiPracticePage() {
   const [prefilled, setPrefilled] = useState(false)
   const [voiceState, setVoiceState] = useState<VoiceState>('idle')
   const [confirmEndOpen, setConfirmEndOpen] = useState(false)
+  useBodyScrollLock(confirmEndOpen)
   const [resumePrompt, setResumePrompt] = useState(false)
   const [jobNotice, setJobNotice] = useState<string | null>(null)
 
