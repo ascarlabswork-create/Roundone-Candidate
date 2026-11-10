@@ -1,4 +1,6 @@
+import { useEffect } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
+import { syncBodyScrollLock } from '../../lib/bodyScrollLock.ts'
 import { useNotifications } from '../../state/notifications.tsx'
 import { useSession } from '../../state/session.tsx'
 import { useToast } from '../../state/toast.tsx'
@@ -15,7 +17,12 @@ export function CandidateLayout() {
   const { unreadCount } = useNotifications()
   const signedIn = status === 'authenticated' && Boolean(account)
   const unreadBadge = unreadCount != null && unreadCount > 0 ? (unreadCount > 99 ? '99+' : String(unreadCount)) : null
-  const onWelcome = useLocation().pathname === '/candidate/welcome'
+  const location = useLocation()
+  const onWelcome = location.pathname === '/candidate/welcome'
+
+  useEffect(() => {
+    syncBodyScrollLock()
+  }, [location.pathname])
 
   if (onWelcome) {
     return (
