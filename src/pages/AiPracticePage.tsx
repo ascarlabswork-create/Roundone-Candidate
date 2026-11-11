@@ -934,18 +934,32 @@ export function AiPracticePage() {
 
   // Phase: Setup (Initial screen)
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
+    <div className="practice-mock-setup relative isolate mx-auto max-w-3xl px-4 py-10 sm:px-6">
+      <div
+        className="pointer-events-none absolute inset-x-4 top-0 -z-10 h-44 rounded-3xl bg-gradient-to-r from-coral-100/80 via-violet-100/60 to-orange-100/50 blur-sm practice-mock-hero-glow"
+        aria-hidden
+      />
       <button
         type="button"
-        className="text-sm font-medium text-coral-700"
+        className="text-sm font-medium text-coral-700 practice-fade-up"
         onClick={() => navigate('/candidate/practice')}
       >
         ← All practice
       </button>
-      <PageHeader
-        title="AI Interview setup"
-        subtitle="Set the role and skills this one-to-one interview will cover. The AI interviewer asks about that role only."
-      />
+      <div className="practice-fade-up mt-6 rounded-2xl border border-coral-100/90 bg-white/90 px-5 py-4 shadow-sm backdrop-blur-sm">
+        <p className="text-xs font-semibold uppercase tracking-wide text-coral-800">Live mock</p>
+        <h1 className="mt-1 text-2xl font-semibold text-navy-950 sm:text-3xl">AI interview setup</h1>
+        <p className="mt-2 text-sm leading-6 text-slate-600">
+          Set the role and skills this one-to-one interview will cover. The AI interviewer asks about that role only.
+        </p>
+        <p className="mt-2 text-xs text-slate-500">
+          Want a study plan first?{' '}
+          <Link to="/candidate/preparation" className="font-medium text-emerald-800 underline decoration-emerald-200">
+            Open AI Prep
+          </Link>
+          .
+        </p>
+      </div>
       {waitingForJob ? <p className="mt-4 text-sm text-slate-600">Loading saved job...</p> : null}
       {jobNotice ? <p className="mt-4 text-sm text-slate-600">{jobNotice}</p> : null}
       {session.setup.jobContext ? (

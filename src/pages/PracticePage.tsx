@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { BookOpen, History, Mic, Sparkles, Target, Timer, TrendingUp } from 'lucide-react'
 import { Button } from '../components/ui/Button.tsx'
 import { Badge, Card, FieldLabel, PageHeader, TextArea } from '../components/ui/primitives.tsx'
+import { getPracticeProgress } from '../services/practiceProgress.ts'
 import {
   PRACTICE_DRILLS,
   coverageForAnswer,
@@ -91,83 +93,159 @@ export function PracticePage() {
 
 function PracticeHub() {
   const navigate = useNavigate()
+  const [progress, setProgress] = useState<Awaited<ReturnType<typeof getPracticeProgress>> | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    void getPracticeProgress()
+      .then((summary) => {
+        if (!cancelled) setProgress(summary)
+      })
+      .catch(() => {
+        /* hub still works without stats */
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const statLine =
+    progress && progress.sessionCount > 0
+      ? `${progress.sessionCount} session${progress.sessionCount === 1 ? '' : 's'} · ${
+          progress.averageScore != null ? `${Math.round(progress.averageScore)} avg score` : 'scores building'
+        }`
+      : 'No scored sessions yet — your first mock takes about 15 minutes.'
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
-      <PageHeader
-        eyebrow="Studio"
-        title="AI Practice"
-        subtitle="Practice with generated questions and written feedback, or use a timed drill. Live mocks still happen with a human interviewer."
+    <div className="practice-arena relative isolate overflow-hidden pb-16">
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[26rem] bg-gradient-to-b from-orange-50/90 via-rose-50/35 to-transparent"
+        aria-hidden
       />
-      <Card className="mt-8 p-5 sm:p-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-coral-700">Practice interview</p>
-            <h2 className="mt-1 font-semibold text-navy-950">Answer questions and get practice feedback</h2>
-            <p className="mt-2 max-w-xl text-sm text-slate-600">
-              Choose a role, interview type, and topics. This is AI practice only — it does not create a booking or
-              official interviewer feedback.
-            </p>
-          </div>
-          <div className="flex flex-col gap-2 sm:items-end">
-            <Button onClick={() => navigate('/candidate/practice/mock?fresh=1')}>Start AI Interview</Button>
+      <section className="practice-hero mx-auto max-w-5xl px-4 pt-10 sm:px-6">
+        <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-coral-800">
+          <Sparkles className="h-4 w-4" aria-hidden />
+          Performance studio
+        </p>
+        <h1 className="mt-2 text-3xl font-semibold tracking-tight text-navy-950 sm:text-4xl">Practice under pressure</h1>
+        <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 sm:text-base">
+          Timed drills, scored AI mocks, and session history live here. Need a study map first? Use{' '}
+          <Link
+            to="/candidate/preparation"
+            className="font-medium text-coral-800 underline decoration-coral-300 underline-offset-2"
+          >
+            AI Prep
+          </Link>{' '}
+          to prioritize topics, then come back to answer for real.
+        </p>
+        <p className="practice-stat-pill mt-4 inline-flex items-center gap-2 rounded-full border border-coral-100 bg-white/80 px-4 py-2 text-sm text-slate-700 shadow-sm backdrop-blur-sm">
+          <TrendingUp className="h-4 w-4 text-coral-700" aria-hidden />
+          {statLine}
+        </p>
+      </section>
+
+      <FadeIn className="mx-auto mt-10 grid max-w-5xl gap-5 px-4 sm:px-6 lg:grid-cols-3" stagger>
+        <Card className="practice-lane-card practice-lane-featured flex flex-col border-coral-100/80 bg-gradient-to-br from-white via-white to-orange-50/40 p-6 shadow-sm">
+          <span className="inline-flex w-fit items-center gap-2 rounded-full bg-coral-100/80 px-3 py-1 text-xs font-semibold text-coral-900">
+            <Mic className="h-3.5 w-3.5" aria-hidden />
+            Flagship
+          </span>
+          <h2 className="mt-4 text-xl font-semibold text-navy-950">AI mock interview</h2>
+          <p className="mt-2 flex-1 text-sm leading-6 text-slate-600">
+            One-to-one session with follow-ups, voice optional, and a scored report saved to your history.
+          </p>
+          <ul className="mt-4 space-y-2 text-sm text-slate-700">
+            <li className="flex gap-2">
+              <Target className="mt-0.5 h-4 w-4 shrink-0 text-coral-600" aria-hidden />
+              Role-specific questions only
+            </li>
+            <li className="flex gap-2">
+              <History className="mt-0.5 h-4 w-4 shrink-0 text-coral-600" aria-hidden />
+              Full transcript + rubric feedback
+            </li>
+          </ul>
+          <div className="mt-6 flex flex-col gap-2">
+            <Button onClick={() => navigate('/candidate/practice/mock?fresh=1')}>Start AI interview</Button>
             <Button variant="outline" onClick={() => navigate('/candidate/practice/history')}>
-              View Progress
-            </Button>
-            <Button variant="outline" onClick={() => navigate('/candidate/preparation')}>
-              AI Preparation
+              View progress & history
             </Button>
           </div>
-        </div>
-      </Card>
-      <Card className="mt-4 p-5 sm:p-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-coral-700">Interview preparation</p>
-            <h2 className="mt-1 font-semibold text-navy-950">Suggested topics from your profile</h2>
-            <p className="mt-2 max-w-xl text-sm text-slate-600">
-              Get practice recommendations based on your role and skills. Suggestions only — your profile is not changed
-              automatically.
-            </p>
+        </Card>
+
+        <Card className="practice-lane-card flex flex-col border-slate-200/80 p-6 lg:col-span-2">
+          <div className="flex items-center gap-2">
+            <Timer className="h-5 w-5 text-navy-900" aria-hidden />
+            <h2 className="text-lg font-semibold text-navy-950">Timed drills</h2>
+          </div>
+          <p className="mt-1 text-sm text-slate-600">Fast reps by interview type — notes, checklist, and recap included.</p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {INTERVIEW_TYPES.map((type) => {
+              const drill = PRACTICE_DRILLS[type]
+              const saved = readSessionJson<SavedPractice | null>(storageKey(type), null)
+              const inProgress = Boolean(saved?.started && !saved.done)
+              return (
+                <div
+                  key={type}
+                  className="practice-drill-tile flex flex-col rounded-xl border border-slate-100 bg-slate-50/50 p-4 transition hover:border-coral-200 hover:bg-white"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <h3 className="font-semibold text-navy-950">{type}</h3>
+                    <Badge tone={inProgress ? 'violet' : 'blue'}>{inProgress ? 'Resume' : `${drill.durationMin} min`}</Badge>
+                  </div>
+                  <p className="mt-2 flex-1 text-xs leading-5 text-slate-600 line-clamp-2">{drill.summary}</p>
+                  <Button
+                    className="mt-3"
+                    size="sm"
+                    fullWidth
+                    variant={inProgress ? 'primary' : 'outline'}
+                    onClick={() => navigate(`/candidate/practice/${practiceTypeSlug(type)}?start=1`)}
+                  >
+                    {inProgress ? 'Resume drill' : 'Start drill'}
+                  </Button>
+                </div>
+              )
+            })}
+          </div>
+        </Card>
+      </FadeIn>
+
+      <FadeIn className="mx-auto mt-8 max-w-5xl px-4 sm:px-6">
+        <div className="practice-prep-nudge flex flex-col gap-3 rounded-2xl border border-emerald-100 bg-emerald-50/50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-800">
+              <BookOpen className="h-5 w-5" aria-hidden />
+            </span>
+            <div>
+              <p className="text-sm font-medium text-navy-950">Not sure what to study?</p>
+              <p className="text-sm text-slate-600">AI Prep builds a 3-day plan and checklist from your profile.</p>
+            </div>
           </div>
           <Button variant="outline" onClick={() => navigate('/candidate/preparation')}>
-            Prepare for Interview
+            Open AI Prep
           </Button>
         </div>
-      </Card>
-      <h2 className="mt-10 text-lg font-semibold text-navy-950">Timed drills</h2>
-      <div className="mt-4 grid gap-4 md:grid-cols-2">
-        {INTERVIEW_TYPES.map((type) => {
-          const drill = PRACTICE_DRILLS[type]
-          const saved = readSessionJson<SavedPractice | null>(storageKey(type), null)
-          const inProgress = Boolean(saved?.started && !saved.done)
-          return (
-            <Card key={type} className="flex flex-col p-5">
-              <div className="flex items-start justify-between gap-3">
-                <h2 className="font-semibold text-navy-950">{type} drill</h2>
-                <Badge tone={inProgress ? 'violet' : 'blue'}>{inProgress ? 'In progress' : `${drill.durationMin} min`}</Badge>
-              </div>
-              <p className="mt-2 flex-1 text-sm text-slate-600">{drill.summary}</p>
-              <p className="mt-3 text-xs text-slate-500">{drill.questions.length} prompts · notes + recap</p>
-              <div className="mt-4">
-                <Button
-                  fullWidth
-                  onClick={() => navigate(`/candidate/practice/${practiceTypeSlug(type)}?start=1`)}
-                >
-                  {inProgress ? 'Resume session' : 'Start session'}
-                </Button>
-              </div>
-            </Card>
-          )
-        })}
-      </div>
-      <div className="mt-8">
-        <Button variant="outline" onClick={() => navigate('/candidate/find')}>
-          Find a human interviewer instead
+      </FadeIn>
+
+      <section className="mx-auto mt-10 max-w-5xl px-4 sm:px-6">
+        <Button variant="ghost" onClick={() => navigate('/candidate/find')}>
+          Prefer a human interviewer instead →
         </Button>
-      </div>
+      </section>
     </div>
   )
+}
+
+function FadeIn({
+  className,
+  children,
+  stagger,
+}: {
+  className?: string
+  children?: ReactNode
+  stagger?: boolean
+}) {
+  const cls = [className, stagger ? 'practice-stagger' : 'practice-fade-up'].filter(Boolean).join(' ')
+  return <div className={cls}>{children}</div>
 }
 
 function PracticeSession({ drill }: { drill: PracticeDrill }) {
