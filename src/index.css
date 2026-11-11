@@ -337,6 +337,168 @@
   animation: resume-stat-rise 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+@keyframes prep-enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes prep-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes prep-orb-float {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-8px) scale(1.03);
+  }
+}
+
+@keyframes prep-spin-slow {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes practice-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes practice-lane-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes practice-hero-glow {
+  0%,
+  100% {
+    opacity: 0.85;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.prep-enter {
+  animation: prep-enter 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.prep-fade-up {
+  animation: prep-fade-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.prep-stagger > * {
+  animation: prep-fade-up 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.prep-stagger > *:nth-child(1) {
+  animation-delay: 0.05s;
+}
+.prep-stagger > *:nth-child(2) {
+  animation-delay: 0.12s;
+}
+
+.prep-orb-a {
+  animation: prep-orb-float 8s ease-in-out infinite;
+}
+
+.prep-orb-b {
+  animation: prep-orb-float 11s ease-in-out infinite reverse;
+}
+
+.prep-ring-progress {
+  transition: stroke-dashoffset 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.prep-spin-slow {
+  animation: prep-spin-slow 2.4s linear infinite;
+}
+
+.prep-generate-glow:not(:disabled) {
+  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.35);
+  transition: box-shadow 0.35s ease;
+}
+
+.prep-generate-glow:not(:disabled):hover {
+  box-shadow: 0 0 24px 2px rgba(16, 185, 129, 0.25);
+}
+
+.prep-result-card {
+  animation: prep-fade-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.prep-results .prep-result-card:nth-child(2) {
+  animation-delay: 0.06s;
+}
+.prep-results .prep-result-card:nth-child(3) {
+  animation-delay: 0.1s;
+}
+.prep-results .prep-result-card:nth-child(4) {
+  animation-delay: 0.14s;
+}
+.prep-results .prep-result-card:nth-child(5) {
+  animation-delay: 0.18s;
+}
+
+.practice-fade-up {
+  animation: practice-fade-up 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.practice-stagger > * {
+  animation: practice-lane-rise 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.practice-stagger > *:nth-child(1) {
+  animation-delay: 0.04s;
+}
+.practice-stagger > *:nth-child(2) {
+  animation-delay: 0.12s;
+}
+
+.practice-lane-featured {
+  animation: practice-lane-rise 0.65s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.practice-stat-pill {
+  animation: practice-fade-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.15s both;
+}
+
+.practice-prep-nudge {
+  animation: practice-fade-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.2s both;
+}
+
+.practice-mock-hero-glow {
+  animation: practice-hero-glow 5s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .testimonial-marquee {
     animation: none;
@@ -360,7 +522,20 @@
   .resume-step-pop,
   .resume-loaded-enter,
   .resume-ready-glow,
-  .resume-stat-rise {
+  .resume-stat-rise,
+  .prep-enter,
+  .prep-fade-up,
+  .prep-stagger > *,
+  .prep-orb-a,
+  .prep-orb-b,
+  .prep-spin-slow,
+  .prep-result-card,
+  .practice-fade-up,
+  .practice-stagger > *,
+  .practice-lane-featured,
+  .practice-stat-pill,
+  .practice-prep-nudge,
+  .practice-mock-hero-glow {
     animation: none;
   }
 }
