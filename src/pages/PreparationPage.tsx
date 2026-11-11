@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { BookOpen, CalendarDays, Compass, Sparkles, Target } from 'lucide-react'
+import { BookMarked, BookOpen, CalendarDays, Compass, Library, Sparkles, Target } from 'lucide-react'
 import { DataUseConsent } from '../components/legal/DataUseConsent.tsx'
 import { Button } from '../components/ui/Button.tsx'
 import {
@@ -220,11 +220,15 @@ export function PreparationPage() {
   return (
     <div className="prep-studio relative isolate overflow-hidden pb-16">
       <div
-        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[28rem] bg-gradient-to-b from-emerald-50/90 via-teal-50/40 to-transparent"
+        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[32rem] bg-gradient-to-b from-emerald-50/95 via-teal-50/50 to-cyan-50/15"
         aria-hidden
       />
-      <div className="prep-orb prep-orb-a pointer-events-none absolute -left-24 top-8 h-56 w-56 rounded-full bg-emerald-200/40 blur-3xl" aria-hidden />
-      <div className="prep-orb prep-orb-b pointer-events-none absolute -right-16 top-24 h-48 w-48 rounded-full bg-teal-200/35 blur-3xl" aria-hidden />
+      <div className="prep-orb prep-orb-a pointer-events-none absolute -left-24 top-8 h-56 w-56 rounded-full bg-emerald-300/35 blur-3xl" aria-hidden />
+      <div className="prep-orb prep-orb-b pointer-events-none absolute -right-16 top-24 h-48 w-48 rounded-full bg-teal-200/40 blur-3xl" aria-hidden />
+      <div
+        className="prep-orb prep-orb-c pointer-events-none absolute right-1/4 top-4 h-36 w-36 rounded-full bg-cyan-200/30 blur-3xl"
+        aria-hidden
+      />
 
       <section className="mx-auto max-w-6xl px-4 pt-10 sm:px-6 prep-enter">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
@@ -243,7 +247,7 @@ export function PreparationPage() {
               .
             </p>
           </div>
-          <div className="prep-readiness-card flex items-center gap-4 rounded-2xl border border-emerald-100/80 bg-white/80 px-5 py-4 shadow-sm backdrop-blur-sm">
+          <div className="prep-readiness-card prep-readiness-shine flex items-center gap-4 rounded-2xl border border-emerald-200/70 bg-gradient-to-br from-white/95 to-emerald-50/40 px-5 py-4 shadow-sm backdrop-blur-sm">
             <ReadinessRing percent={readiness} />
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Brief completeness</p>
@@ -256,7 +260,7 @@ export function PreparationPage() {
 
       <FadeIn className="mx-auto mt-10 grid max-w-6xl gap-8 px-4 sm:px-6 lg:grid-cols-[minmax(0,1fr)_17.5rem]" stagger>
         <form
-          className="prep-panel space-y-6 rounded-2xl border border-emerald-100/80 bg-white/95 p-5 shadow-sm sm:p-8"
+          className="prep-panel prep-panel-glow space-y-6 rounded-2xl border border-emerald-200/60 bg-white/95 p-5 shadow-sm sm:p-8"
           onSubmit={(event) => void generate(event)}
         >
           <div className="flex items-center gap-2 text-sm font-semibold text-navy-950">
@@ -264,7 +268,7 @@ export function PreparationPage() {
             Your interview brief
           </div>
 
-          <div className="grid gap-5 sm:grid-cols-2">
+          <div className="prep-brief-fields grid gap-5 rounded-xl border border-emerald-100/60 bg-gradient-to-br from-emerald-50/40 to-teal-50/20 p-4 sm:grid-cols-2">
             <div className="sm:col-span-2">
               <FieldLabel htmlFor="prep-role">Target role</FieldLabel>
               <TextInput
@@ -398,7 +402,7 @@ export function PreparationPage() {
         </form>
 
         <aside className="prep-aside space-y-4">
-          <Card className="border-emerald-100/80 bg-white/90 p-4">
+          <Card className="prep-aside-card border-emerald-100/80 bg-gradient-to-br from-white to-emerald-50/30 p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">Prep vs practice</p>
             <ul className="mt-3 space-y-2 text-sm text-slate-600">
               <li className="flex gap-2">
@@ -414,14 +418,42 @@ export function PreparationPage() {
                 </span>
               </li>
             </ul>
-            <Link to="/candidate/practice" className="mt-4 block">
+            <div className="mt-4 space-y-2">
+              <Link to="/candidate/practice" className="block">
+                <Button variant="outline" fullWidth size="sm">
+                  Go to AI Practice
+                </Button>
+              </Link>
+              <Link to="/candidate/resources" className="block">
+                <Button variant="ghost" fullWidth size="sm" className="text-violet-800 hover:bg-violet-50">
+                  <span className="inline-flex items-center gap-2">
+                    <Library className="h-4 w-4" aria-hidden />
+                    Prep library →
+                  </span>
+                </Button>
+              </Link>
+            </div>
+          </Card>
+          <Card className="prep-aside-card border-violet-100/70 bg-gradient-to-br from-white to-violet-50/25 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-violet-800">Study playbooks</p>
+            <p className="mt-2 text-sm leading-5 text-slate-600">
+              Guides and checklists ranked for your role — open{' '}
+              <Link to="/candidate/resources" className="font-medium text-violet-900 underline decoration-violet-200">
+                Resources
+              </Link>{' '}
+              while you work through your plan.
+            </p>
+            <Link to="/candidate/resources" className="mt-3 block">
               <Button variant="outline" fullWidth size="sm">
-                Go to AI Practice
+                <span className="inline-flex items-center gap-2">
+                  <BookMarked className="h-4 w-4" aria-hidden />
+                  Browse resources
+                </span>
               </Button>
             </Link>
           </Card>
           {result ? (
-            <Card className="border-emerald-100/80 bg-white/90 p-4">
+            <Card className="prep-aside-card border-emerald-100/80 bg-white/90 p-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Checklist</p>
               <p className="mt-1 text-sm font-medium text-navy-950">{checklistDone}% done</p>
               <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100">
@@ -477,7 +509,10 @@ export function PreparationPage() {
               <p className="mt-1 text-sm text-slate-600">A lightweight schedule — adjust to your calendar.</p>
               <ol className="mt-4 space-y-4">
                 {studyPlan.map((day) => (
-                  <li key={day.label} className="rounded-xl border border-slate-100 bg-slate-50/50 p-4">
+                  <li
+                    key={day.label}
+                    className="prep-day-tile rounded-xl border border-emerald-100/80 bg-gradient-to-br from-emerald-50/30 to-white p-4"
+                  >
                     <p className="text-sm font-semibold text-navy-950">{day.label}</p>
                     <p className="mt-0.5 text-xs text-slate-500">{day.focus}</p>
                     <ul className="mt-2 flex flex-wrap gap-2">
