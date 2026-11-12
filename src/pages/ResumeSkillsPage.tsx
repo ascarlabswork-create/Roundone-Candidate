@@ -398,12 +398,7 @@ export function ResumeSkillsPage() {
               <p className="mt-2 max-w-xl text-sm leading-6 text-slate-600 sm:text-base">
                 {hasResume && phase === 'input'
                   ? 'Resume captured. Confirm the text, agree to analysis, then extract technical skills.'
-                  : 'Upload your resume and we build an interview skill plan strictly from what it says. You review and accept every skill before it is saved.'}{' '}
-                Prefer a readiness score only?{' '}
-                <Link to="/candidate/ats-check" className="font-medium text-sky-900 underline decoration-sky-200">
-                  Open ATS Check
-                </Link>
-                .
+                  : 'Upload your resume and we build an interview skill plan strictly from what it says. You review and accept every skill before it is saved.'}
               </p>
             </div>
             <div className="grid grid-cols-3 gap-2 sm:min-w-[15rem]">

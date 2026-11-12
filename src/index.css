@@ -907,6 +907,24 @@
     background-color 0.25s ease;
 }
 
+@keyframes resume-match-progress {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(220%);
+  }
+}
+
+.resume-match-progress {
+  position: relative;
+}
+
+.resume-match-progress-bar {
+  width: 42%;
+  animation: resume-match-progress 1.15s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .testimonial-marquee {
     animation: none;
@@ -975,7 +993,8 @@
   .ats-orb-b,
   .ats-ring-draw,
   .ats-check-stagger > *,
-  .ats-chip-pop {
+  .ats-chip-pop,
+  .resume-match-progress-bar {
     animation: none;
     transform: none;
   }
