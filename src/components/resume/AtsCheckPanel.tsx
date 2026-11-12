@@ -131,12 +131,23 @@ export function JdMatchPanel({
       </div>
       <div className="space-y-5 p-5 sm:p-6">
         <ScoreRing score={result.score} label="JD match coverage" animateKey={`${result.score}-${result.matchedSkills.length}`} />
+        <p className="text-sm text-slate-600">
+          Matched <span className="font-semibold text-navy-950">{result.matchedSkills.length}</span> of{' '}
+          <span className="font-semibold text-navy-950">{result.jobSkills.length}</span> required job skills
+          {result.resumeSkills.length > 0 ? (
+            <>
+              {' '}
+              · <span className="font-semibold text-navy-950">{result.resumeSkills.length}</span> technical skills found in resume
+            </>
+          ) : null}
+          .
+        </p>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">Matched</p>
             <div className="mt-2 flex flex-wrap gap-2">
               {result.matchedSkills.length === 0 ? (
-                <p className="text-sm text-slate-500">None yet</p>
+                <p className="text-sm text-slate-500">None of the job skills appear in this resume yet.</p>
               ) : (
                 result.matchedSkills.map((skill) => (
                   <span
@@ -167,6 +178,21 @@ export function JdMatchPanel({
             </div>
           </div>
         </div>
+        {result.resumeSkills.length > 0 ? (
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Detected in your resume</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {result.resumeSkills.slice(0, 12).map((skill) => (
+                <span
+                  key={skill}
+                  className="ats-chip-pop rounded-full bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700 ring-1 ring-slate-200"
+                >
+                  {skill}
+                </span>
+              ))}
+            </div>
+          </div>
+        ) : null}
         {result.improvements.length > 0 ? (
           <div className="rounded-xl border border-violet-100 bg-violet-50/40 p-4">
             <p className="text-sm font-semibold text-violet-950">Improve before applying</p>

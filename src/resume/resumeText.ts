@@ -106,6 +106,22 @@ async function extractDocxText(file: File): Promise<string> {
   }
 }
 
+const PDF_EXTRACT_TIMEOUT_MS = 25_000
+
+async function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(message)), ms)
+      }),
+    ])
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+}
+
 async function extractPdfText(file: File): Promise<string> {
   // Static import avoids a separate dynamic chunk that can 404 after redeploys
   // when a cached page still points at an old hashed asset URL.
@@ -114,10 +130,15 @@ async function extractPdfText(file: File): Promise<string> {
   try {
     const data = new Uint8Array(await file.arrayBuffer())
     const loadingTask = pdfjs.getDocument({ data })
-    const pdf = await loadingTask.promise
+    const pdf = await withTimeout(
+      loadingTask.promise,
+      PDF_EXTRACT_TIMEOUT_MS,
+      'Reading that PDF took too long. Paste the resume text or try a .docx file.',
+    )
     const parts: string[] = []
+    const maxPages = Math.min(pdf.numPages, 8)
 
-    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+    for (let pageNumber = 1; pageNumber <= maxPages; pageNumber += 1) {
       const page = await pdf.getPage(pageNumber)
       const content = await page.getTextContent()
       const pageText = content.items
@@ -135,7 +156,10 @@ async function extractPdfText(file: File): Promise<string> {
     }
     return text
   } catch (error) {
-    if (error instanceof Error && /scanned image|paste the resume|another file/i.test(error.message)) {
+    if (
+      error instanceof Error &&
+      /scanned image|paste the resume|another file|took too long|docx/i.test(error.message)
+    ) {
       throw error
     }
     throw new Error('Could not read that PDF. Please refresh and try again, or upload a Word or text resume.')
