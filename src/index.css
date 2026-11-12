@@ -795,6 +795,118 @@
   animation: ats-panel-enter 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+@keyframes ats-enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes ats-orb-float {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-8px) scale(1.03);
+  }
+}
+
+@keyframes ats-ring-draw {
+  from {
+    stroke-dashoffset: var(--ats-ring-full, 220);
+  }
+  to {
+    stroke-dashoffset: var(--ats-ring-offset, 0);
+  }
+}
+
+@keyframes ats-chip-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.ats-enter {
+  animation: ats-enter 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.ats-fade-up {
+  animation: ats-panel-enter 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.ats-orb-a {
+  animation: ats-orb-float 9s ease-in-out infinite;
+}
+
+.ats-orb-b {
+  animation: ats-orb-float 12s ease-in-out infinite reverse;
+}
+
+.ats-ring-draw {
+  animation: ats-ring-draw 0.85s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.ats-check-stagger > * {
+  animation: ats-panel-enter 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.ats-check-stagger > *:nth-child(1) {
+  animation-delay: 0.03s;
+}
+.ats-check-stagger > *:nth-child(2) {
+  animation-delay: 0.06s;
+}
+.ats-check-stagger > *:nth-child(3) {
+  animation-delay: 0.09s;
+}
+.ats-check-stagger > *:nth-child(4) {
+  animation-delay: 0.12s;
+}
+.ats-check-stagger > *:nth-child(5) {
+  animation-delay: 0.15s;
+}
+.ats-check-stagger > *:nth-child(6) {
+  animation-delay: 0.18s;
+}
+.ats-check-stagger > *:nth-child(7) {
+  animation-delay: 0.21s;
+}
+.ats-check-stagger > *:nth-child(8) {
+  animation-delay: 0.24s;
+}
+.ats-check-stagger > *:nth-child(9) {
+  animation-delay: 0.27s;
+}
+
+.ats-chip-pop {
+  animation: ats-chip-pop 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.ats-cta-glow:not(:disabled) {
+  transition: box-shadow 0.3s ease;
+}
+
+.ats-cta-glow:not(:disabled):hover {
+  box-shadow: 0 0 22px rgba(14, 165, 233, 0.28);
+}
+
+.ats-dropzone {
+  transition:
+    transform 0.25s ease,
+    border-color 0.25s ease,
+    background-color 0.25s ease;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .testimonial-marquee {
     animation: none;
@@ -856,7 +968,14 @@
   .job-match-expand,
   .job-match-review,
   .job-match-skill-stagger > *,
-  .ats-panel {
+  .ats-panel,
+  .ats-enter,
+  .ats-fade-up,
+  .ats-orb-a,
+  .ats-orb-b,
+  .ats-ring-draw,
+  .ats-check-stagger > *,
+  .ats-chip-pop {
     animation: none;
     transform: none;
   }

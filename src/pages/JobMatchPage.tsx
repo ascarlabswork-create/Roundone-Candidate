@@ -310,7 +310,11 @@ export function JobMatchPage() {
         <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 sm:text-base">
           Paste a public job URL or ID — we read the posting, pull{' '}
           <span className="font-medium text-indigo-900">required interview skills</span> from the description, then rank interviewers
-          who list those skills.
+          who list those skills. Need a resume-only check?{' '}
+          <Link to="/candidate/ats-check" className="font-medium text-sky-900 underline decoration-sky-200">
+            ATS Check without a JD
+          </Link>
+          .
         </p>
       </section>
 
@@ -507,9 +511,14 @@ export function JobMatchPage() {
                   Upload your resume to get ATS readiness plus skill coverage against this job. Improve gaps, then re-upload.
                 </p>
               </div>
-              <Link to="/candidate/resume-skills" className="text-sm font-medium text-indigo-800 underline decoration-indigo-200">
-                Full resume skills page →
-              </Link>
+              <div className="flex flex-col items-start gap-1 text-sm">
+                <Link to="/candidate/ats-check" className="font-medium text-sky-900 underline decoration-sky-200">
+                  Resume-only ATS check →
+                </Link>
+                <Link to="/candidate/resume-skills" className="font-medium text-indigo-800 underline decoration-indigo-200">
+                  Resume skills page →
+                </Link>
+              </div>
             </div>
             <input
               ref={resumeInputRef}

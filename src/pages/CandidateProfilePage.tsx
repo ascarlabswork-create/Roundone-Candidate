@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import {
   Bookmark,
   CalendarDays,
+  FileSearch,
   FileUp,
   Sparkles,
   Target,
@@ -509,6 +510,26 @@ export function CandidateProfilePage() {
             </div>
             <span className="inline-flex h-11 items-center justify-center rounded-xl border border-violet-200 bg-white px-4 text-sm font-semibold text-navy-950 transition group-hover:border-violet-300 group-hover:bg-violet-50">
               Upload / manage
+            </span>
+          </Link>
+
+          <Link
+            to="/candidate/ats-check"
+            className="group flex flex-col gap-4 rounded-2xl border border-sky-100 bg-gradient-to-br from-white via-sky-50/50 to-indigo-50/50 p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition duration-300 hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-lg hover:shadow-sky-100/80 sm:flex-row sm:items-center sm:justify-between sm:p-6"
+          >
+            <div className="flex items-start gap-3">
+              <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white text-sky-700 shadow-sm ring-1 ring-sky-100 transition group-hover:scale-105">
+                <FileSearch className="h-5 w-5" />
+              </span>
+              <div>
+                <h2 className="font-semibold text-navy-950">ATS readiness check</h2>
+                <p className="mt-1 text-sm leading-6 text-slate-600">
+                  Score your resume structure without a job description — or pair it with Job Match for JD coverage.
+                </p>
+              </div>
+            </div>
+            <span className="inline-flex h-11 items-center justify-center rounded-xl border border-sky-200 bg-white px-4 text-sm font-semibold text-navy-950 transition group-hover:border-sky-300 group-hover:bg-sky-50">
+              Check resume
             </span>
           </Link>
 
