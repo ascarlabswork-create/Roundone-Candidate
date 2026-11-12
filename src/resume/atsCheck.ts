@@ -15,6 +15,7 @@ export type AtsReadinessResult = {
   grade: 'strong' | 'fair' | 'needs_work'
   items: AtsCheckItem[]
   improvements: string[]
+  wordCount: number
 }
 
 export type JdMatchResult = {
@@ -27,17 +28,60 @@ export type JdMatchResult = {
   improvements: string[]
 }
 
+/** Normalize PDF/OCR quirks: soft hyphens, odd spaces, mailto links. */
+export function normalizeResumeText(raw: string) {
+  return raw
+    .replace(/\u00ad/g, '')
+    .replace(/\u00a0/g, ' ')
+    .replace(/mailto:/gi, ' ')
+    .replace(/\[\s*at\s*\]|\(\s*at\s*\)|\s+at\s+/gi, '@')
+    .replace(/\[\s*dot\s*\]|\(\s*dot\s*\)/gi, '.')
+    .replace(/([A-Za-z0-9._%+-])\s+@\s+([A-Za-z0-9.-])/g, '$1@$2')
+    .replace(/([A-Za-z0-9-])\s+\.\s+([A-Za-z]{2,})/g, '$1.$2')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim()
+}
+
 function hasEmail(text: string) {
-  return /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i.test(text)
+  return /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i.test(text)
 }
 
 function hasPhone(text: string) {
-  return /(\+?\d[\d\s().-]{7,}\d)/.test(text)
+  return /(\+?\d[\d\s().-]{8,}\d)|(\b\d{3}[-.\s]?\d{3}[-.\s]?\d{4}\b)/.test(text)
 }
 
-function hasSection(text: string, labels: string[]) {
-  const pattern = new RegExp(`(^|\\n)\\s*(${labels.join('|')})\\s*[:\\n]`, 'i')
-  return pattern.test(text)
+/** PDF extractors often drop newlines — match headings in-line too. */
+function hasHeading(text: string, labels: string[]) {
+  const alt = labels.map((label) => label.replace(/\s+/g, '\\s+')).join('|')
+  return new RegExp(`(^|[\\n•|]|\\s)(${alt})(\\s*[:|]|\\s*$|\\s+(?=[A-Z0-9]))`, 'im').test(text)
+}
+
+function hasExperienceSignal(text: string) {
+  if (hasHeading(text, ['experience', 'work experience', 'employment', 'professional experience', 'work history'])) {
+    return true
+  }
+  return /\b(software engineer|devops engineer|sde|developer|intern)\b/i.test(text) && /\b(20\d{2}|19\d{2})\b/.test(text)
+}
+
+function hasEducationSignal(text: string) {
+  if (hasHeading(text, ['education', 'academics', 'qualifications', 'academic'])) return true
+  return /\b(b\.?\s?tech|b\.?\s?e\.?|m\.?\s?tech|bachelor|master|university|college|cgpa|gpa)\b/i.test(text)
+}
+
+function hasSkillsSignal(text: string, techCount: number) {
+  if (hasHeading(text, ['skills', 'technical skills', 'technologies', 'tech stack', 'core competencies', 'tools'])) {
+    return true
+  }
+  return techCount >= 8
+}
+
+function bulletCount(text: string) {
+  const classic = (text.match(/(^|\n)\s*[-•*◦▪▸►]/gm) ?? []).length
+  const inline = (text.match(/\s[•▪▸►]\s/g) ?? []).length
+  const numbered = (text.match(/(^|\n)\s*\d+[.)]\s+\S/gm) ?? []).length
+  return classic + inline + numbered
 }
 
 function gradeFor(score: number): AtsReadinessResult['grade'] {
@@ -46,74 +90,94 @@ function gradeFor(score: number): AtsReadinessResult['grade'] {
   return 'needs_work'
 }
 
+/** Drop near-duplicate job skills (e.g. SAP UI5 + SAP UI5 Development). */
+export function collapseRelatedSkills(skills: string[]) {
+  const ordered = dedupeSkills(skills).sort((a, b) => b.length - a.length)
+  const kept: string[] = []
+  for (const skill of ordered) {
+    const key = skill.toLowerCase()
+    const covered = kept.some((existing) => {
+      const other = existing.toLowerCase()
+      return other.includes(key) || key.includes(other)
+    })
+    if (!covered) kept.push(skill)
+  }
+  return kept
+}
+
 /** Structural resume readiness for common ATS parsers — not a hiring prediction. */
 export function evaluateAtsReadiness(resumeText: string): AtsReadinessResult {
-  const text = resumeText.trim()
+  const text = normalizeResumeText(resumeText)
   const words = text ? text.split(/\s+/).filter(Boolean).length : 0
-  const technical = extractTechnicalSkillsFromText(text, 24)
-  const bullets = (text.match(/(^|\n)\s*[-•*◦]/gm) ?? []).length
+  const technical = extractTechnicalSkillsFromText(text, 30)
+  const bullets = bulletCount(text)
   const dates = (text.match(/\b(20\d{2}|19\d{2})\b/g) ?? []).length
-  const metrics = (text.match(/\b\d+(\.\d+)?\s?(%|x|k|m|million|users|requests)\b/gi) ?? []).length
+  const metrics = (text.match(/\b\d+(\.\d+)?\s?(%|x|k\+?|m\+?|million|users|requests|latency)\b/gi) ?? []).length
+  const emailOk = hasEmail(text)
+  const phoneOk = hasPhone(text)
+  const skillsOk = hasSkillsSignal(text, technical.length)
+  const experienceOk = hasExperienceSignal(text)
+  const educationOk = hasEducationSignal(text)
+  // PDF text is often denser than page count; allow a wider band.
+  const lengthOk = words >= 120 && words <= 2800
 
   const items: AtsCheckItem[] = [
     {
       id: 'contact-email',
       label: 'Email address',
-      passed: hasEmail(text),
-      detail: hasEmail(text) ? 'Email found for recruiter contact.' : 'Add a clear email near the top.',
+      passed: emailOk,
+      detail: emailOk ? 'Email found for recruiter contact.' : 'Add a clear email near the top of the resume.',
       weight: 12,
     },
     {
       id: 'contact-phone',
       label: 'Phone number',
-      passed: hasPhone(text),
-      detail: hasPhone(text) ? 'Phone number detected.' : 'Add a phone number if you want recruiters to call.',
+      passed: phoneOk,
+      detail: phoneOk ? 'Phone number detected.' : 'Add a phone number if you want recruiters to call.',
       weight: 8,
     },
     {
       id: 'skills-section',
       label: 'Skills section',
-      passed: hasSection(text, ['skills', 'technical skills', 'technologies', 'tech stack']),
-      detail: hasSection(text, ['skills', 'technical skills', 'technologies', 'tech stack'])
-        ? 'A dedicated skills section helps parsers.'
+      passed: skillsOk,
+      detail: skillsOk
+        ? technical.length >= 8 && !hasHeading(text, ['skills', 'technical skills', 'technologies', 'tech stack', 'tools'])
+          ? `${technical.length} technical keywords found (add a clear Skills heading if missing).`
+          : 'Skills / tools section detected.'
         : 'Add a Skills / Technologies heading with keyword lists.',
       weight: 16,
     },
     {
       id: 'experience-section',
       label: 'Experience section',
-      passed: hasSection(text, ['experience', 'work experience', 'employment', 'professional experience']),
-      detail: hasSection(text, ['experience', 'work experience', 'employment', 'professional experience'])
-        ? 'Work experience section found.'
-        : 'Include an Experience heading with roles and dates.',
+      passed: experienceOk,
+      detail: experienceOk ? 'Work experience signals found.' : 'Include Experience with roles and dates.',
       weight: 16,
     },
     {
       id: 'education-section',
       label: 'Education section',
-      passed: hasSection(text, ['education', 'academics', 'qualifications']),
-      detail: hasSection(text, ['education', 'academics', 'qualifications'])
-        ? 'Education section found.'
-        : 'Add Education with degree and school.',
+      passed: educationOk,
+      detail: educationOk ? 'Education signals found.' : 'Add Education with degree and school.',
       weight: 10,
     },
     {
       id: 'length',
       label: 'Readable length',
-      passed: words >= 180 && words <= 1200,
+      passed: lengthOk,
       detail:
-        words < 180
-          ? 'Resume text is short — paste the full document.'
-          : words > 1200
-            ? 'Very long resumes can confuse parsers — tighten to 1–2 pages of text.'
-            : 'Length looks parser-friendly.',
+        words < 120
+          ? 'Resume text is short — paste or upload the full document.'
+          : words > 2800
+            ? 'Extracted text is very long — trim to about 1–2 pages of core content.'
+            : `About ${words} words — parser-friendly length.`,
       weight: 10,
     },
     {
       id: 'bullets',
       label: 'Bullet points',
-      passed: bullets >= 4,
-      detail: bullets >= 4 ? 'Bullets help ATS and humans scan achievements.' : 'Use bullet points under each role/project.',
+      passed: bullets >= 3,
+      detail: bullets >= 3 ? 'Bullet / list markers help scanners.' : 'Use bullet points under each role or project.',
       weight: 10,
     },
     {
@@ -130,7 +194,7 @@ export function evaluateAtsReadiness(resumeText: string): AtsReadinessResult {
       detail:
         technical.length >= 5
           ? `${technical.length} technical skills detected in the text.`
-          : 'Name concrete tools (e.g. React, SQL, SAP UI5) — not only soft skills.',
+          : 'Name concrete tools (e.g. React, SQL, AWS) — not only soft skills.',
       weight: 10,
     },
   ]
@@ -148,19 +212,20 @@ export function evaluateAtsReadiness(resumeText: string): AtsReadinessResult {
     grade: gradeFor(score),
     items,
     improvements: improvements.slice(0, 8),
+    wordCount: words,
   }
 }
 
 /** Keyword coverage of job skills inside resume text — suggestions only. */
 export function evaluateJdMatch(resumeText: string, jobDescription: string, jobTitle = '', seedSkills: string[] = []): JdMatchResult {
-  const jobSkills = skillsFromJobDescription(jobDescription, jobTitle, seedSkills)
-  const resumeSkills = dedupeSkills([
-    ...extractTechnicalSkillsFromText(resumeText, 30),
-    ...skillsFromJobDescription(resumeText, '', []),
+  const text = normalizeResumeText(resumeText)
+  const jobSkills = collapseRelatedSkills(skillsFromJobDescription(jobDescription, jobTitle, seedSkills))
+  const resumeSkills = collapseRelatedSkills([
+    ...extractTechnicalSkillsFromText(text, 40),
+    ...skillsFromJobDescription(text, '', []),
   ])
-  const resumeKeys = new Set(resumeSkills.map((skill) => skill.toLowerCase()))
-  const matchedSkills = jobSkills.filter((skill) => resumeKeys.has(skill.toLowerCase()) || mentionsSkill(resumeText, skill))
-  const missingSkills = jobSkills.filter((skill) => !matchedSkills.some((item) => item.toLowerCase() === skill.toLowerCase()))
+  const matchedSkills = jobSkills.filter((skill) => mentionsSkill(text, skill) || resumeSkills.some((item) => skillsOverlap(item, skill)))
+  const missingSkills = jobSkills.filter((skill) => !matchedSkills.some((item) => skillsOverlap(item, skill)))
   const score = jobSkills.length === 0 ? 0 : Math.round((matchedSkills.length / jobSkills.length) * 100)
 
   const improvements: string[] = []
@@ -186,6 +251,12 @@ export function evaluateJdMatch(resumeText: string, jobDescription: string, jobT
     jobSkills,
     improvements: improvements.slice(0, 8),
   }
+}
+
+function skillsOverlap(a: string, b: string) {
+  const left = a.toLowerCase()
+  const right = b.toLowerCase()
+  return left === right || left.includes(right) || right.includes(left)
 }
 
 function mentionsSkill(text: string, skill: string) {

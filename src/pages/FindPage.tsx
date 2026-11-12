@@ -240,12 +240,20 @@ export function FindPage() {
         title="Tell us about your interview"
         subtitle="We’ll rank interviewers against this goal by skill overlap."
         actions={
-          <Link
-            to="/candidate/job-match"
-            className="inline-flex h-11 min-h-11 shrink-0 items-center justify-center whitespace-nowrap rounded-xl border border-black/10 bg-white px-4 text-sm font-medium text-navy-950 transition-colors hover:bg-black/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral-600 focus-visible:ring-offset-2"
-          >
-            Match interviewers to a job posting
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              to="/candidate/ats-check"
+              className="inline-flex h-11 min-h-11 shrink-0 items-center justify-center whitespace-nowrap rounded-xl border border-sky-200 bg-sky-50 px-4 text-sm font-medium text-sky-950 transition-colors hover:bg-sky-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-600 focus-visible:ring-offset-2"
+            >
+              ATS check (no JD)
+            </Link>
+            <Link
+              to="/candidate/job-match"
+              className="inline-flex h-11 min-h-11 shrink-0 items-center justify-center whitespace-nowrap rounded-xl border border-black/10 bg-white px-4 text-sm font-medium text-navy-950 transition-colors hover:bg-black/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral-600 focus-visible:ring-offset-2"
+            >
+              Match interviewers to a job posting
+            </Link>
+          </div>
         }
       />
 

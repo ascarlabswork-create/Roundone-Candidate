@@ -12,13 +12,13 @@ function scoreTone(score: number) {
   return 'text-rose-800 bg-rose-50 border-rose-200'
 }
 
-function ScoreRing({ score, label }: { score: number; label: string }) {
+function ScoreRing({ score, label, animateKey }: { score: number; label: string; animateKey?: string | number }) {
   const r = 34
   const c = 2 * Math.PI * r
   const offset = c - (Math.min(100, Math.max(0, score)) / 100) * c
   return (
     <div className="flex items-center gap-3">
-      <svg width="84" height="84" viewBox="0 0 84 84" className="ats-score-ring shrink-0" aria-hidden>
+      <svg key={animateKey ?? score} width="84" height="84" viewBox="0 0 84 84" className="ats-score-ring shrink-0" aria-hidden>
         <circle cx="42" cy="42" r={r} fill="none" stroke="rgb(226 232 240)" strokeWidth="8" />
         <circle
           cx="42"
@@ -31,7 +31,8 @@ function ScoreRing({ score, label }: { score: number; label: string }) {
           strokeDasharray={c}
           strokeDashoffset={offset}
           transform="rotate(-90 42 42)"
-          className="transition-[stroke-dashoffset] duration-700 ease-out"
+          className="ats-ring-draw"
+          style={{ ['--ats-ring-offset' as string]: String(offset), ['--ats-ring-full' as string]: String(c) }}
         />
         <text x="42" y="46" textAnchor="middle" className="fill-navy-950 text-[15px] font-semibold">
           {score}
@@ -51,12 +52,16 @@ function ScoreRing({ score, label }: { score: number; label: string }) {
 export function AtsReadinessPanel({
   result,
   className = '',
+  animate = true,
 }: {
   result: AtsReadinessResult
   className?: string
+  animate?: boolean
 }) {
   return (
-    <section className={`ats-panel overflow-hidden rounded-2xl border border-sky-100/90 bg-white/95 shadow-sm ${className}`}>
+    <section
+      className={`overflow-hidden rounded-2xl border border-sky-100/90 bg-white/95 shadow-sm ${animate ? 'ats-panel' : ''} ${className}`}
+    >
       <div className="border-b border-sky-100 bg-gradient-to-r from-sky-50/90 via-white to-indigo-50/50 px-5 py-4 sm:px-6">
         <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-sky-900">
           <FileSearch className="h-4 w-4" aria-hidden />
@@ -65,12 +70,12 @@ export function AtsReadinessPanel({
         <p className="mt-1 text-sm text-slate-600">Structural checks parsers usually need when you upload a resume.</p>
       </div>
       <div className="space-y-5 p-5 sm:p-6">
-        <ScoreRing score={result.score} label="Readiness score" />
-        <ul className="grid gap-2 sm:grid-cols-2">
+        <ScoreRing score={result.score} label="Readiness score" animateKey={result.score} />
+        <ul className="ats-check-stagger grid gap-2 sm:grid-cols-2">
           {result.items.map((item) => (
             <li
               key={item.id}
-              className={`rounded-xl border px-3 py-2.5 text-sm ${
+              className={`rounded-xl border px-3 py-2.5 text-sm transition ${
                 item.passed ? 'border-emerald-100 bg-emerald-50/40 text-slate-700' : 'border-amber-100 bg-amber-50/50 text-slate-700'
               }`}
             >
@@ -125,7 +130,7 @@ export function JdMatchPanel({
         <p className="mt-1 text-sm text-slate-600">How many required job skills appear in your resume text.</p>
       </div>
       <div className="space-y-5 p-5 sm:p-6">
-        <ScoreRing score={result.score} label="JD match coverage" />
+        <ScoreRing score={result.score} label="JD match coverage" animateKey={`${result.score}-${result.matchedSkills.length}`} />
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">Matched</p>
@@ -134,7 +139,10 @@ export function JdMatchPanel({
                 <p className="text-sm text-slate-500">None yet</p>
               ) : (
                 result.matchedSkills.map((skill) => (
-                  <span key={skill} className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-900 ring-1 ring-emerald-100">
+                  <span
+                    key={skill}
+                    className="ats-chip-pop rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-900 ring-1 ring-emerald-100"
+                  >
                     {skill}
                   </span>
                 ))
@@ -148,7 +156,10 @@ export function JdMatchPanel({
                 <p className="text-sm text-slate-500">No gaps detected</p>
               ) : (
                 result.missingSkills.map((skill) => (
-                  <span key={skill} className="rounded-full bg-rose-50 px-2.5 py-1 text-xs font-medium text-rose-900 ring-1 ring-rose-100">
+                  <span
+                    key={skill}
+                    className="ats-chip-pop rounded-full bg-rose-50 px-2.5 py-1 text-xs font-medium text-rose-900 ring-1 ring-rose-100"
+                  >
                     {skill}
                   </span>
                 ))
