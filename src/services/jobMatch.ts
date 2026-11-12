@@ -163,5 +163,13 @@ export async function matchInterviewersForJob(input: {
   if (error) throw new Error(error.message || 'Unable to find interviewers for this job.')
   const parsed = parseJobMatchPage(data)
   if (!parsed) throw new Error('Unable to find interviewers for this job.')
-  return parsed
+  // Safety net if an older RPC still returns zero-overlap rows.
+  const results = parsed.results.filter((row) => row.matchedJobSkills.length > 0)
+  if (results.length === parsed.results.length) return parsed
+  return {
+    ...parsed,
+    results,
+    total: results.length === 0 && parsed.page === 1 ? 0 : parsed.total,
+    reason: results.length === 0 && parsed.page === 1 ? (parsed.reason ?? 'no_skill_overlap') : parsed.reason,
+  }
 }

@@ -365,8 +365,7 @@ export function JobMatchPage() {
             <div>
               <h2 className="text-xl font-semibold text-navy-950">Interviewers for this Job</h2>
               <p className="mt-1 text-sm text-slate-600">
-                {matches.total} interviewer{matches.total === 1 ? '' : 's'} ranked by job skill coverage.
-                {matches.total === 0 ? ' No matching skills found does not mean no interviewers exist.' : ''}
+                {matches.total} interviewer{matches.total === 1 ? '' : 's'} with at least one matching job skill, ranked by coverage.
               </p>
             </div>
             <form
@@ -392,11 +391,19 @@ export function JobMatchPage() {
           {!finding && matches.results.length === 0 ? (
             <div className="mt-6">
               <EmptyState
-                title={matches.reason === 'no_job_skills' ? 'Add job skills to continue' : 'No interviewers for this search'}
+                title={
+                  matches.reason === 'no_job_skills'
+                    ? 'Add job skills to continue'
+                    : matches.reason === 'no_skill_overlap'
+                      ? 'No interviewers match these job skills'
+                      : 'No interviewers for this search'
+                }
                 body={
                   matches.reason === 'no_job_skills'
                     ? "We couldn't identify interview skills from this posting. Add the required skills manually to continue."
-                    : 'No interviewers matched this search. Coverage can be 0% and those interviewers still appear when the search is empty.'
+                    : matches.reason === 'no_skill_overlap'
+                      ? 'None of our interviewers list skills that overlap this job. Edit the job skills above (e.g. TypeScript, Machine Learning) or try Browse in Find Interviewer.'
+                      : 'No interviewers matched this search. Try a different name or skill keyword.'
                 }
               />
             </div>
