@@ -4,6 +4,10 @@
  * private.canonical_skill_label — this list does not rename skills.
  */
 export const SKILL_PHRASES = [
+  'sap ui5 development',
+  'sap ui5',
+  'sap fiori',
+  'ui5 development',
   'machine learning algorithms',
   'jupyter notebook',
   'machine learning',

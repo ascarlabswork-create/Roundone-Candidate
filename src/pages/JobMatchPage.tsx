@@ -1,8 +1,10 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Briefcase, FileText, Hash, Link2, RefreshCw, Sparkles, Users } from 'lucide-react'
 import { JobMatchCard } from '../components/interviewer/JobMatchCard.tsx'
 import { Button } from '../components/ui/Button.tsx'
-import { EmptyState, FieldLabel, PageHeader, Skeleton, TextArea, TextInput } from '../components/ui/primitives.tsx'
+import { Chip, EmptyState, FieldLabel, Skeleton, TextArea, TextInput } from '../components/ui/primitives.tsx'
+import { skillsFromJobDescription } from '../jobMatch/extractJobSkills.ts'
 import { dedupeSkills } from '../matching/skills.ts'
 import {
   analyzeJobText,
@@ -27,25 +29,29 @@ type ReviewDraft = {
 
 const PAGE_SIZE = 20
 
-function draftFromAnalysis(analysis: JobAnalysis, jobId: string): ReviewDraft {
+function draftFromAnalysis(analysis: JobAnalysis, jobIdHint: string): ReviewDraft {
+  const description = analysis.description ?? ''
+  const jobTitle = analysis.jobTitle ?? ''
   return {
     companyName: analysis.companyName ?? '',
-    jobTitle: analysis.jobTitle ?? '',
-    description: analysis.description ?? '',
-    skills: analysis.skills,
+    jobTitle,
+    description,
+    skills: skillsFromJobDescription(description, jobTitle, analysis.skills),
     skillDraft: '',
     sourceUrl: analysis.sourceUrl,
     sourceType: analysis.sourceType,
-    jobId: analysis.jobId ?? jobId,
+    jobId: analysis.jobId ?? jobIdHint,
   }
 }
 
 function draftFromTarget(target: JobTarget): ReviewDraft {
+  const description = target.description ?? ''
+  const jobTitle = target.jobTitle ?? ''
   return {
     companyName: target.companyName ?? '',
-    jobTitle: target.jobTitle ?? '',
-    description: target.description ?? '',
-    skills: target.skills,
+    jobTitle,
+    description,
+    skills: skillsFromJobDescription(description, jobTitle, target.skills),
     skillDraft: '',
     sourceUrl: target.sourceUrl,
     sourceType: target.sourceType,
@@ -82,7 +88,9 @@ export function JobMatchPage() {
         if (cancelled || !target) return
         setReview(draftFromTarget(target))
         setSavedId(target.id)
-        setSkillsEdited(true)
+        setSkillsEdited(false)
+        if (target.sourceUrl) setUrl(target.sourceUrl)
+        if (target.jobId) setJobId(target.jobId)
       })
       .catch(() => {
         if (!cancelled) setAnalyzeError('That saved job could not be opened.')
@@ -141,6 +149,8 @@ export function JobMatchPage() {
             }
           : next
       setReview(merged)
+      setSkillsEdited(false)
+      if (merged.jobId) setJobId(merged.jobId)
       setShowPaste(false)
       try {
         await saveReviewed(merged, 'analyzed')
@@ -166,6 +176,7 @@ export function JobMatchPage() {
       const next = draftFromAnalysis(analysis, jobId)
       setReview(next)
       setSkillsEdited(false)
+      if (next.jobId) setJobId(next.jobId)
       try {
         await saveReviewed(next, 'analyzed')
       } catch (error) {
@@ -178,31 +189,47 @@ export function JobMatchPage() {
     }
   }
 
+  function refreshSkillsFromDescription() {
+    if (!review) return
+    const skills = skillsFromJobDescription(review.description, review.jobTitle, [])
+    setReview({ ...review, skills })
+    setSkillsEdited(false)
+    setMatches(null)
+  }
+
   function addSkill() {
     if (!review) return
     const next = dedupeSkills([...review.skills, review.skillDraft])
     setReview({ ...review, skills: next, skillDraft: '' })
     setSkillsEdited(true)
+    setMatches(null)
   }
 
   function removeSkill(skill: string) {
     if (!review) return
     setReview({ ...review, skills: review.skills.filter((item) => item !== skill) })
     setSkillsEdited(true)
+    setMatches(null)
   }
 
   async function loadMatches(nextPage: number, nextSearch: string) {
     if (!review) return
-    if (review.skills.length === 0) {
+    const enriched = skillsFromJobDescription(review.description, review.jobTitle, review.skills)
+    const skills = skillsEdited ? review.skills : enriched
+    if (skills.length === 0) {
       setFindError("We couldn't identify interview skills from this posting. Add the required skills manually to continue.")
       return
+    }
+    if (!skillsEdited && enriched.length !== review.skills.length) {
+      setReview({ ...review, skills: enriched })
     }
     setFinding(true)
     setFindError('')
     try {
-      await saveReviewed(review, 'ready')
+      const working = { ...review, skills }
+      await saveReviewed(working, 'ready')
       const result = await matchInterviewersForJob({
-        skills: review.skills,
+        skills,
         page: nextPage,
         pageSize: PAGE_SIZE,
         search: nextSearch,
@@ -219,89 +246,159 @@ export function JobMatchPage() {
   const totalPages = matches ? Math.max(1, Math.ceil(matches.total / matches.pageSize)) : 1
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-      <PageHeader
-        eyebrow="Job-based discovery"
-        title="Find an Interviewer for a Job"
-        subtitle="Paste a public job URL. jobround.ai reads the posting, then ranks interviewers by how well their skills cover that job."
+    <div className="job-match-studio relative isolate overflow-hidden pb-16">
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[30rem] bg-gradient-to-b from-indigo-50/95 via-violet-50/50 to-transparent"
+        aria-hidden
+      />
+      <div
+        className="job-match-orb job-match-orb-a pointer-events-none absolute -left-24 top-10 h-56 w-56 rounded-full bg-indigo-200/40 blur-3xl"
+        aria-hidden
+      />
+      <div
+        className="job-match-orb job-match-orb-b pointer-events-none absolute -right-16 top-28 h-48 w-48 rounded-full bg-violet-200/35 blur-3xl"
+        aria-hidden
       />
 
-      <form onSubmit={onAnalyze} className="mt-8 space-y-4 rounded-2xl border border-navy-950/8 bg-white/90 p-5 sm:p-6">
-        <h2 className="text-lg font-semibold text-navy-950">Find an interviewer for a job</h2>
-        <div>
-          <FieldLabel htmlFor="job-url">Job URL</FieldLabel>
-          <TextInput
-            id="job-url"
-            type="url"
-            value={url}
-            onChange={(event) => setUrl(event.target.value)}
-            placeholder="https://example.com/jobs/123"
-            required={!showPaste}
-          />
-        </div>
-        <div>
-          <FieldLabel htmlFor="job-id">Job ID (optional)</FieldLabel>
-          <TextInput id="job-id" value={jobId} onChange={(event) => setJobId(event.target.value)} placeholder="Optional" />
+      <section className="job-match-enter mx-auto max-w-6xl px-4 pt-10 sm:px-6">
+        <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-indigo-800">
+          <Briefcase className="h-4 w-4" aria-hidden />
+          Job-based discovery
+        </p>
+        <h1 className="mt-2 text-3xl font-semibold tracking-tight text-navy-950 sm:text-4xl">Find an interviewer for this job</h1>
+        <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 sm:text-base">
+          Paste a public job URL or ID — we read the posting, pull{' '}
+          <span className="font-medium text-indigo-900">required interview skills</span> from the description, then rank interviewers
+          who list those skills.
+        </p>
+      </section>
+
+      <form
+        onSubmit={onAnalyze}
+        className="job-match-panel job-match-panel-glow mx-auto mt-8 max-w-6xl space-y-5 rounded-2xl border border-indigo-100/80 bg-white/95 p-5 shadow-sm sm:p-8"
+      >
+        <Motion className="flex items-center gap-2 text-sm font-semibold text-navy-950">
+          <Link2 className="h-4 w-4 text-indigo-700" aria-hidden />
+          Step 1 — Link this job posting
+        </Motion>
+        <div className="grid gap-5 md:grid-cols-[minmax(0,1.4fr)_minmax(0,0.6fr)]">
+          <div>
+            <FieldLabel htmlFor="job-url">Job URL</FieldLabel>
+            <div className="relative">
+              <Link2
+                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+                aria-hidden
+              />
+              <TextInput
+                id="job-url"
+                type="url"
+                className="job-match-input pl-10"
+                value={url}
+                onChange={(event) => setUrl(event.target.value)}
+                placeholder="https://careers.example.com/jobs/software-engineer"
+                required={!showPaste}
+              />
+            </div>
+            <p className="mt-1 text-xs text-slate-500">Public career pages work best — no login walls.</p>
+          </div>
+          <div>
+            <FieldLabel htmlFor="job-id">Job ID (optional)</FieldLabel>
+            <div className="relative">
+              <Hash className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden />
+              <TextInput
+                id="job-id"
+                className="job-match-input pl-10 font-mono text-sm"
+                value={jobId}
+                onChange={(event) => setJobId(event.target.value)}
+                placeholder="ATCI-5198132"
+              />
+            </div>
+            <p className="mt-1 text-xs text-slate-500">Helps ATS pages that hide the ID in the URL.</p>
+          </div>
         </div>
         {analyzeError ? <p className="text-sm text-red-700">{analyzeError}</p> : null}
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <Button type="submit" disabled={analyzing}>
-            {analyzing ? 'Analyzing job...' : 'Analyze Job'}
+        {analyzing ? (
+          <Motion className="job-match-analyze-bar flex items-center gap-3 rounded-xl border border-indigo-100 bg-indigo-50/60 px-4 py-3 text-sm text-indigo-900">
+            <Sparkles className="h-4 w-4 job-match-spin" aria-hidden />
+            Reading the job page and extracting skills from the description…
+          </Motion>
+        ) : null}
+        <Motion className="flex flex-col gap-2 sm:flex-row">
+          <Button type="submit" disabled={analyzing} className="job-match-cta-glow">
+            {analyzing ? 'Analyzing…' : 'Analyze job'}
           </Button>
           <Button type="button" variant="outline" onClick={() => setShowPaste((value) => !value)}>
-            Paste Job Description
+            <span className="inline-flex items-center gap-2">
+              <FileText className="h-4 w-4" aria-hidden />
+              {showPaste ? 'Hide paste' : 'Paste description instead'}
+            </span>
           </Button>
-        </div>
+        </Motion>
       </form>
 
       {showPaste ? (
-        <form onSubmit={onPaste} className="mt-4 space-y-3 rounded-2xl border border-navy-950/8 bg-white/90 p-5 sm:p-6">
-          <FieldLabel htmlFor="job-paste">Paste Job Description</FieldLabel>
+        <form
+          onSubmit={onPaste}
+          className="job-match-expand mx-auto mt-4 max-w-6xl space-y-3 rounded-2xl border border-violet-100/80 bg-gradient-to-br from-white to-violet-50/30 p-5 sm:p-6"
+        >
+          <FieldLabel htmlFor="job-paste">Paste job description</FieldLabel>
           <TextArea id="job-paste" value={paste} onChange={(event) => setPaste(event.target.value)} rows={8} />
-          <p className="text-xs text-slate-500">This description is entered by you. It is not claimed to come from a job URL.</p>
+          <p className="text-xs text-slate-500">We extract skills only from text you provide — nothing invented.</p>
           <Button type="submit" disabled={analyzing}>
-            Continue
+            Extract from pasted text
           </Button>
         </form>
       ) : null}
 
-      {analyzing ? <p className="mt-6 text-sm font-medium text-navy-950">Analyzing job...</p> : null}
-      {loadingTarget ? <Skeleton className="mt-6 h-40" /> : null}
+      {loadingTarget ? <Skeleton className="mx-auto mt-8 h-40 max-w-6xl" /> : null}
 
       {review ? (
-        <section className="mt-8 space-y-4 rounded-2xl border border-navy-950/8 bg-white/90 p-5 sm:p-6">
+        <Motion
+          tag="section"
+          className="job-match-review mx-auto mt-8 max-w-6xl space-y-5 rounded-2xl border border-indigo-100/80 bg-white/95 p-5 shadow-sm sm:p-8"
+        >
           <h2 className="text-lg font-semibold text-navy-950">Review extracted job</h2>
           <p className="text-sm text-slate-600">
             {review.sourceType === 'url'
-              ? 'These values were extracted from the job source. You can correct them before matching.'
-              : 'You supplied this description. Add the company, title, and skills you want matched.'}
+              ? 'Values came from the job source. Skills are pulled from the description — edit or refresh anytime.'
+              : 'You supplied this description. Confirm title, company, and required skills.'}
           </p>
           {review.sourceUrl ? (
             <p className="break-all text-sm text-slate-600">
-              Source URL: <a className="text-coral-700" href={review.sourceUrl}>{review.sourceUrl}</a>
+              Source:{' '}
+              <a className="text-indigo-800 underline decoration-indigo-200" href={review.sourceUrl}>
+                {review.sourceUrl}
+              </a>
             </p>
           ) : null}
-          <div>
-            <FieldLabel htmlFor="company">Company</FieldLabel>
-            <TextInput
-              id="company"
-              value={review.companyName}
-              onChange={(event) => {
-                setReview({ ...review, companyName: event.target.value })
-                setSkillsEdited(true)
-              }}
-            />
-          </div>
-          <div>
-            <FieldLabel htmlFor="title">Job title</FieldLabel>
-            <TextInput
-              id="title"
-              value={review.jobTitle}
-              onChange={(event) => {
-                setReview({ ...review, jobTitle: event.target.value })
-                setSkillsEdited(true)
-              }}
-            />
+          {review.jobId ? (
+            <p className="text-sm text-slate-600">
+              Job ID: <span className="font-mono text-navy-950">{review.jobId}</span>
+            </p>
+          ) : null}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <FieldLabel htmlFor="company">Company</FieldLabel>
+              <TextInput
+                id="company"
+                value={review.companyName}
+                onChange={(event) => {
+                  setReview({ ...review, companyName: event.target.value })
+                  setSkillsEdited(true)
+                }}
+              />
+            </div>
+            <div>
+              <FieldLabel htmlFor="title">Job title</FieldLabel>
+              <TextInput
+                id="title"
+                value={review.jobTitle}
+                onChange={(event) => {
+                  setReview({ ...review, jobTitle: event.target.value })
+                  setSkillsEdited(true)
+                }}
+              />
+            </div>
           </div>
           <div>
             <FieldLabel htmlFor="description">Job description</FieldLabel>
@@ -315,55 +412,72 @@ export function JobMatchPage() {
               }}
             />
           </div>
-          <div>
-            <p className="text-sm font-medium text-navy-950">Required interview skills</p>
+
+          <Motion className="rounded-xl border border-indigo-100/90 bg-gradient-to-br from-indigo-50/50 to-violet-50/30 p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-indigo-800">Required interview skills</p>
+                <p className="mt-1 text-sm text-slate-600">Matched against interviewer profiles — add or remove before finding people.</p>
+              </div>
+              <Button type="button" size="sm" variant="outline" onClick={refreshSkillsFromDescription}>
+                <span className="inline-flex items-center gap-2">
+                  <RefreshCw className="h-4 w-4" aria-hidden />
+                  Refresh from JD
+                </span>
+              </Button>
+            </div>
             {review.skills.length === 0 ? (
-              <p className="mt-2 text-sm text-red-700">
-                We couldn't identify interview skills from this posting. Add the required skills manually to continue.
+              <p className="mt-3 text-sm text-amber-900">
+                No skills detected yet. Edit the description, click <strong>Refresh from JD</strong>, or add skills below.
               </p>
             ) : (
-              <div className="mt-2 flex flex-wrap gap-2">
+              <div className="job-match-skill-stagger mt-3 flex flex-wrap gap-2">
                 {review.skills.map((skill) => (
-                  <button
-                    key={skill}
-                    type="button"
-                    className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-sm text-navy-950"
-                    onClick={() => removeSkill(skill)}
-                  >
-                    {skill} <span className="text-slate-500">Remove</span>
-                  </button>
+                  <Chip key={skill} active onClick={() => removeSkill(skill)}>
+                    {skill} ×
+                  </Chip>
                 ))}
               </div>
             )}
-            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+            <Motion className="mt-4 flex flex-col gap-2 sm:flex-row">
               <TextInput
                 value={review.skillDraft}
                 onChange={(event) => setReview({ ...review, skillDraft: event.target.value })}
-                placeholder="Add a skill"
+                placeholder="TypeScript, Machine Learning, System Design…"
                 aria-label="Add a required skill"
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault()
+                    addSkill()
+                  }
+                }}
               />
               <Button type="button" variant="outline" onClick={addSkill}>
                 Add skill
               </Button>
-            </div>
-          </div>
+            </Motion>
+          </Motion>
+
           {findError ? <p className="text-sm text-red-700">{findError}</p> : null}
           <div className="flex flex-col gap-2 sm:flex-row">
             <Button type="button" disabled={finding || review.skills.length === 0} onClick={() => void loadMatches(1, search)}>
-              {finding ? 'Finding interviewers...' : 'Find Interviewers'}
+              <span className="inline-flex items-center gap-2">
+                <Users className="h-4 w-4" aria-hidden />
+                {finding ? 'Finding interviewers…' : 'Find interviewers'}
+              </span>
             </Button>
             <Button type="button" variant="outline" disabled={finding} onClick={() => void practiceForJob()}>
-              Practice for this Job
+              Practice for this job
             </Button>
           </div>
-        </section>
+        </Motion>
       ) : null}
 
       {matches ? (
-        <section className="mt-10">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <section className="job-match-fade-up mx-auto mt-10 max-w-6xl px-4 sm:px-6">
+          <Motion className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <h2 className="text-xl font-semibold text-navy-950">Interviewers for this Job</h2>
+              <h2 className="text-xl font-semibold text-navy-950">Interviewers for this job</h2>
               <p className="mt-1 text-sm text-slate-600">
                 {matches.total} interviewer{matches.total === 1 ? '' : 's'} with at least one matching job skill, ranked by coverage.
               </p>
@@ -385,7 +499,7 @@ export function JobMatchPage() {
                 Search
               </Button>
             </form>
-          </div>
+          </Motion>
 
           {finding ? <Skeleton className="mt-6 h-40" /> : null}
           {!finding && matches.results.length === 0 ? (
@@ -409,7 +523,7 @@ export function JobMatchPage() {
             </div>
           ) : null}
           {!finding && matches.results.length > 0 ? (
-            <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <Motion stagger className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
               {matches.results.map((row) => (
                 <JobMatchCard
                   key={row.interviewerProfileId}
@@ -420,15 +534,15 @@ export function JobMatchPage() {
                   reviewCount={row.reviewCount}
                 />
               ))}
-            </div>
+            </Motion>
           ) : null}
 
           {matches.total > matches.pageSize ? (
-            <div className="mt-6 flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <Motion className="mt-6 flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-sm text-slate-600">
                 Page {page} of {totalPages}
               </p>
-              <div className="flex gap-2">
+              <Motion className="flex gap-2">
                 <Button
                   type="button"
                   variant="outline"
@@ -445,11 +559,26 @@ export function JobMatchPage() {
                 >
                   Next
                 </Button>
-              </div>
-            </div>
+              </Motion>
+            </Motion>
           ) : null}
         </section>
       ) : null}
     </div>
   )
+}
+
+function Motion({
+  className,
+  children,
+  stagger,
+  tag: Tag = 'div',
+}: {
+  className?: string
+  children?: ReactNode
+  stagger?: boolean
+  tag?: 'div' | 'section'
+}) {
+  const cls = [className, stagger ? 'job-match-stagger' : 'job-match-fade-up'].filter(Boolean).join(' ')
+  return <Tag className={cls}>{children}</Tag>
 }
