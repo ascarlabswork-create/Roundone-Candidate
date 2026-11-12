@@ -537,9 +537,14 @@ export function JobMatchPage() {
                   Upload your resume to get ATS readiness plus skill coverage against this job. Improve gaps, then re-upload.
                 </p>
               </div>
-              <Link to="/candidate/resume-skills" className="text-sm font-medium text-indigo-800 underline decoration-indigo-200">
-                Resume skills page →
-              </Link>
+              <div className="flex flex-col items-start gap-1 text-sm">
+                <Link to="/candidate/ats-check" className="font-medium text-sky-900 underline decoration-sky-200">
+                  Full ATS check & templates →
+                </Link>
+                <Link to="/candidate/resume-skills" className="font-medium text-indigo-800 underline decoration-indigo-200">
+                  Resume skills page →
+                </Link>
+              </div>
             </div>
             <input
               ref={resumeInputRef}
