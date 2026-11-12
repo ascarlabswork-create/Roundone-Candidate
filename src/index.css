@@ -925,6 +925,18 @@
   animation: resume-match-progress 1.15s ease-in-out infinite;
 }
 
+.ats-parse-fill {
+  transition: width 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.ats-analyze-modal {
+  animation: ats-panel-enter 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.ats-gauge {
+  animation: ats-panel-enter 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .testimonial-marquee {
     animation: none;
