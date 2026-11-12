@@ -1,4 +1,10 @@
-import { evaluateAtsReadiness, evaluateJdMatch, type AtsReadinessResult, type JdMatchResult } from './atsCheck.ts'
+import {
+  evaluateAtsReadiness,
+  evaluateJdMatch,
+  normalizeResumeText,
+  type AtsReadinessResult,
+  type JdMatchResult,
+} from './atsCheck.ts'
 import { extractTechnicalSkillsFromText } from './technicalSkills.ts'
 
 export type AtsIssue = {
@@ -33,12 +39,22 @@ function scoreFromFlags(flags: boolean[]) {
 
 /** Richer candidate-facing report inspired by ATS checkers — grounded in resume text only. */
 export function buildAtsFullReport(resumeText: string, jobDescription = '', jobTitle = ''): AtsFullReport {
-  const readiness = evaluateAtsReadiness(resumeText)
-  const text = resumeText.trim()
+  const text = normalizeResumeText(resumeText)
+  const readiness = evaluateAtsReadiness(text)
   const words = readiness.wordCount
   const tech = extractTechnicalSkillsFromText(text, 30)
-  const metrics = (text.match(/\b\d+(\.\d+)?\s?(%|x|k\+?|m\+?|million|users|requests|latency)\b/gi) ?? []).length
-  const longLines = text.split('\n').filter((line) => line.trim().length > 160).length
+  const metrics = (
+    text.match(
+      /\b\d+(\.\d+)?\s?(?:%|x|k\+?|m\+?|million|billion|users|requests|latency|ms|sec|hrs?|hours?|days?|weeks?|months?|servers?|pipelines?)(?!\w)|\b\d+\+?\s+years?\b/gi,
+    ) ?? []
+  ).length
+  // Prefer real newlines; for flattened PDFs, treat long sentences as “lines”.
+  const newlineLong = text.split('\n').filter((line) => line.trim().length > 160).length
+  const sentenceLong =
+    text.split('\n').length <= 3
+      ? (text.match(/[^.!?\n]{170,}[.!?]?/g) ?? []).length
+      : 0
+  const longLines = Math.max(newlineLong, sentenceLong)
   const repeatedWords = countHeavyRepetition(text)
 
   const issues: AtsIssue[] = []

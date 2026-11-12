@@ -1,5 +1,6 @@
 import { extractTechnicalSkillsFromText } from './technicalSkills.ts'
 import { normalizeResumeText } from './atsCheck.ts'
+import { dedupeSkills } from '../matching/skills.ts'
 
 export type AtsTemplateId = 'classic' | 'compact' | 'impact'
 
@@ -38,28 +39,46 @@ type ParsedResume = {
   skills: string[]
   experience: string[]
   education: string[]
-  other: string[]
 }
 
+const ROLE_TAIL =
+  /\s+(?:Senior\s+|Lead\s+|Principal\s+)?(?:DevOps|Software|Cloud|Platform|SRE|Full[\s-]?Stack|Backend|Frontend|Data|ML|AI)?\s*(?:Engineer|Developer|Architect|Analyst|Consultant|Manager|Intern).*$/i
+
+const SECTION_STOP =
+  'Professional Summary|Summary|Profile|About|Key Achievements|Achievements|Technical Skills|Skills|Technologies|Tech Stack|Tools|Work Experience|Professional Experience|Experience|Education|Projects|Certifications|Awards|SUMMARY|SKILLS|EXPERIENCE|EDUCATION'
+
 function firstLineName(text: string) {
-  const line = text.split('\n').map((item) => item.trim()).find(Boolean) ?? ''
-  if (line.length < 3 || line.length > 60) return 'Your Name'
-  if (/@|http|skills|experience|summary/i.test(line)) return 'Your Name'
-  return line
+  const lines = text.split('\n').map((item) => item.trim()).filter(Boolean)
+  for (const line of lines.slice(0, 5)) {
+    if (line.length < 3 || line.length > 90) continue
+    if (/@|https?:|linkedin\.com|\bphone\b/i.test(line)) continue
+    if (/^(summary|skills|experience|education|projects|professional)\b/i.test(line)) continue
+    const beforeRole = line.replace(ROLE_TAIL, '').trim()
+    const tokens = beforeRole.split(/\s+/).filter(Boolean)
+    while (
+      tokens.length > 2 &&
+      /^(Mumbai|Delhi|Bengaluru|Bangalore|Hyderabad|Pune|Chennai|Kolkata|India|USA|UK|Remote)$/i.test(tokens[tokens.length - 1] ?? '')
+    ) {
+      tokens.pop()
+    }
+    if (tokens.length >= 2 && tokens.length <= 5) return tokens.join(' ').slice(0, 60)
+  }
+  return lines[0]?.replace(ROLE_TAIL, '').trim().slice(0, 60) || 'Your Name'
 }
 
 function pullContact(text: string) {
   const email = text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0]
   const phone = text.match(/(\+?\d[\d\s().-]{8,}\d)/)?.[0]
-  const linkedin = text.match(/linkedin\.com\/[^\s)]+/i)?.[0]
-  return [email, phone, linkedin ? `https://${linkedin.replace(/^https?:\/\//i, '')}` : null].filter(
+  const linkedin = text.match(/(?:https?:\/\/)?(?:www\.)?linkedin\.com\/[^\s)|]+/i)?.[0]
+  return [email, phone, linkedin ? linkedin.replace(/^(?!https?:)/i, 'https://') : null].filter(
     (item): item is string => Boolean(item),
   )
 }
 
 function sectionBody(text: string, labels: string[]) {
+  const alt = labels.map((label) => label.replace(/\s+/g, '\\s+')).join('|')
   const pattern = new RegExp(
-    `(?:^|\\n)\\s*(?:${labels.map((label) => label.replace(/\s+/g, '\\s+')).join('|')})\\s*[:\\n]+([\\s\\S]*?)(?=(?:\\n\\s*(?:summary|skills|experience|education|projects|certifications)\\b)|$)`,
+    `(?:^|\\n)\\s*(?:${alt})\\s*(?:\\n|:)+([\\s\\S]*?)(?=(?:\\n\\s*(?:${SECTION_STOP})\\b)|$)`,
     'i',
   )
   const match = pattern.exec(text)
@@ -67,30 +86,80 @@ function sectionBody(text: string, labels: string[]) {
 }
 
 function bulletsFrom(block: string) {
-  const lines = block
-    .split(/\n|•|▪|▸/)
-    .map((line) => line.replace(/^[-*◦\d.)\s]+/, '').trim())
-    .filter((line) => line.length >= 12)
-  return lines.slice(0, 14)
+  if (!block.trim()) return []
+  const fromMarks = block
+    .split(/\n/)
+    .map((line) => line.replace(/^[-*•▪▸►◦\d.)\s]+/, '').trim())
+    .filter((line) => line.length >= 18 && line.length <= 280)
+  if (fromMarks.length >= 2) return fromMarks.slice(0, 14)
+
+  const sentences = block
+    .split(/(?<=[.!?])\s+|(?=\b(?:Built|Led|Managed|Developed|Implemented|Designed|Migrated|Automated|Created|Improved|Reduced|Increased)\b)/)
+    .map((line) => line.replace(/^[-*•▪▸►◦\d.)\s]+/, '').trim())
+    .filter((line) => line.length >= 24 && line.length <= 280)
+  return sentences.slice(0, 12)
+}
+
+function roleTitleHint(text: string) {
+  const match = text.match(
+    /\b((?:Senior\s+)?(?:DevOps|Software|Cloud|Platform|SRE|Full[\s-]?Stack|Backend|Frontend)\s+Engineer|Software Developer|SDE(?:\s*[123])?)\b/i,
+  )
+  return match?.[1]?.trim() ?? ''
+}
+
+function cleanSkillList(skills: string[]) {
+  const banned = new Set([
+    'experience',
+    'education',
+    'skills',
+    'summary',
+    'projects',
+    'professional',
+    'work experience',
+    'technical skills',
+  ])
+  return skills.filter((skill) => {
+    const key = skill.toLowerCase().trim()
+    if (banned.has(key)) return false
+    if (/^\d{4}$/.test(key)) return false
+    if (key.length > 48) return false
+    return true
+  })
 }
 
 export function parseResumeForTemplate(raw: string): ParsedResume {
   const text = normalizeResumeText(raw)
-  const skills = extractTechnicalSkillsFromText(text, 24)
-  const summary =
-    sectionBody(text, ['summary', 'professional summary', 'profile', 'about']) ||
-    text.split('\n').map((line) => line.trim()).filter((line) => line.length > 40).slice(0, 1)[0] ||
-    ''
-  const experienceBlock = sectionBody(text, ['experience', 'work experience', 'professional experience', 'employment'])
+  const skills = cleanSkillList(dedupeSkills(extractTechnicalSkillsFromText(text, 30))).slice(0, 28)
+
+  let summary = sectionBody(text, ['professional summary', 'summary', 'profile', 'about me', 'about'])
+  summary = summary.replace(/\s+/g, ' ').trim().slice(0, 520)
+  if (!summary) {
+    const role = roleTitleHint(text)
+    const years = text.match(/\b(\d+\+?\s+years?)\b/i)?.[1]
+    if (role || years) {
+      summary = [role, years ? `with ${years} of experience` : '', skills.slice(0, 6).join(', ')]
+        .filter(Boolean)
+        .join(' — ')
+        .slice(0, 280)
+    }
+  }
+
+  const experienceBlock =
+    sectionBody(text, ['work experience', 'professional experience', 'work history', 'experience', 'employment']) ||
+    text
   const educationBlock = sectionBody(text, ['education', 'academics', 'qualifications'])
+
+  const experience = bulletsFrom(experienceBlock)
+    .filter((line) => !/^(skills|education|summary|professional)\b/i.test(line))
+    .slice(0, 10)
+
   return {
     name: firstLineName(text),
     contact: pullContact(text),
-    summary: summary.slice(0, 500),
+    summary,
     skills,
-    experience: bulletsFrom(experienceBlock || text).slice(0, 10),
+    experience,
     education: bulletsFrom(educationBlock).slice(0, 4),
-    other: [],
   }
 }
 
@@ -102,15 +171,18 @@ export function formatResumeWithTemplate(
 ): string {
   const parsed = parseResumeForTemplate(raw)
   const missing = (options?.missingJobSkills ?? []).filter(
-    (skill) => !parsed.skills.some((item) => item.toLowerCase() === skill.toLowerCase()),
+    (skill) =>
+      !parsed.skills.some(
+        (item) => item.toLowerCase() === skill.toLowerCase() || item.toLowerCase().includes(skill.toLowerCase()),
+      ),
   )
-  const skills = [...parsed.skills, ...missing].slice(0, 28)
-  const contact = parsed.contact.join(' · ')
+  const skills = dedupeSkills([...parsed.skills, ...missing]).slice(0, 28)
+  const contact = parsed.contact.join(' · ') || 'Add email · phone · LinkedIn'
   const summary = parsed.summary || 'Add a 2–3 line summary focused on the role you want next.'
   const experience =
     parsed.experience.length > 0
       ? parsed.experience.map((line) => `• ${line}`).join('\n')
-      : '• Add 3–5 role bullets with tools and outcomes.'
+      : '• Add 3–5 role bullets with tools and outcomes (action + result).'
   const education =
     parsed.education.length > 0 ? parsed.education.map((line) => `• ${line}`).join('\n') : '• Degree, school, year'
 
@@ -134,7 +206,12 @@ export function formatResumeWithTemplate(
   }
 
   if (templateId === 'impact') {
-    const impact = parsed.experience.slice(0, 4).map((line) => `• ${line}`).join('\n') || experience
+    const impact =
+      parsed.experience
+        .filter((line) => /\d|%|users|latency|cost|saved|improved|reduced|increased/i.test(line))
+        .slice(0, 4)
+        .map((line) => `• ${line}`)
+        .join('\n') || experience
     return [
       parsed.name,
       contact,
