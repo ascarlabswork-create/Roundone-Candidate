@@ -163,11 +163,50 @@ export function parseResumeForTemplate(raw: string): ParsedResume {
   }
 }
 
-/** Rebuild resume text in an ATS-friendly template. Optional JD skills are appended if missing. */
+function inferTargetRole(jobDescription: string, missingSkills: string[]) {
+  const text = jobDescription.trim()
+  if (!text) return missingSkills[0] ? `${missingSkills[0]} roles` : 'this role'
+  const titled =
+    text.match(
+      /\b((?:Senior\s+|Lead\s+)?(?:SAP\s+)?(?:UI5|Fiori|ABAP|DevOps|Software|Full[\s-]?Stack|Frontend|Backend|Cloud|Platform)\s+(?:Developer|Engineer|Consultant|Architect))\b/i,
+    )?.[1] ?? text.match(/\b(SAP\s+UI5(?:\s+Development)?)\b/i)?.[1]
+  return titled?.trim() || (missingSkills[0] ? `${missingSkills[0]} roles` : 'this role')
+}
+
+function buildJdTailoredSummary(
+  baseSummary: string,
+  matched: string[],
+  missing: string[],
+  presentSkills: string[],
+  jobDescription: string,
+) {
+  const target = inferTargetRole(jobDescription, missing)
+  const strengths = (matched.length > 0 ? matched : presentSkills).slice(0, 6).join(', ')
+  if (missing.length === 0) {
+    return (
+      baseSummary ||
+      `Candidate for ${target}. Strengths: ${strengths || 'core technical skills from this resume'}.`
+    )
+  }
+  return [
+    `Targeting ${target}.`,
+    strengths ? `Transferable strengths already on this resume: ${strengths}.` : null,
+    `Gap vs this JD — add real evidence (skills + project bullets) for: ${missing.slice(0, 6).join(', ')}. Do not list tools you have not used.`,
+  ]
+    .filter(Boolean)
+    .join(' ')
+}
+
+/** Rebuild resume text in an ATS-friendly template. With a JD, rewrites toward that role honestly. */
 export function formatResumeWithTemplate(
   raw: string,
   templateId: AtsTemplateId,
-  options?: { missingJobSkills?: string[] },
+  options?: {
+    missingJobSkills?: string[]
+    matchedJobSkills?: string[]
+    jobDescription?: string
+    suggestions?: string[]
+  },
 ): string {
   const parsed = parseResumeForTemplate(raw)
   const missing = (options?.missingJobSkills ?? []).filter(
@@ -176,9 +215,19 @@ export function formatResumeWithTemplate(
         (item) => item.toLowerCase() === skill.toLowerCase() || item.toLowerCase().includes(skill.toLowerCase()),
       ),
   )
-  const skills = dedupeSkills([...parsed.skills, ...missing]).slice(0, 28)
+  const matched = (options?.matchedJobSkills ?? []).filter(Boolean)
+  const jobDescription = options?.jobDescription ?? ''
+  const hasJdTailor = Boolean(jobDescription.trim() || missing.length || matched.length)
+
+  const presentSkills = dedupeSkills([
+    ...matched,
+    ...parsed.skills.filter((skill) => !missing.some((gap) => gap.toLowerCase() === skill.toLowerCase())),
+  ]).slice(0, 22)
+
   const contact = parsed.contact.join(' · ') || 'Add email · phone · LinkedIn'
-  const summary = parsed.summary || 'Add a 2–3 line summary focused on the role you want next.'
+  const summary = hasJdTailor
+    ? buildJdTailoredSummary(parsed.summary, matched, missing, presentSkills, jobDescription)
+    : parsed.summary || 'Add a 2–3 line summary focused on the role you want next.'
   const experience =
     parsed.experience.length > 0
       ? parsed.experience.map((line) => `• ${line}`).join('\n')
@@ -186,13 +235,36 @@ export function formatResumeWithTemplate(
   const education =
     parsed.education.length > 0 ? parsed.education.map((line) => `• ${line}`).join('\n') : '• Degree, school, year'
 
+  const skillsBlock = hasJdTailor
+    ? [
+        missing.length > 0
+          ? `Target keywords for this JD (add only with real evidence): ${missing.slice(0, 8).join(', ')}`
+          : null,
+        `Skills on resume: ${presentSkills.join(', ') || 'Add technical skills'}`,
+      ]
+        .filter(Boolean)
+        .join('\n')
+    : presentSkills.join(', ') || 'Add technical skills'
+
+  const nextSteps =
+    hasJdTailor && (missing.length > 0 || (options?.suggestions?.length ?? 0) > 0)
+      ? [
+          'NEXT STEPS FOR THIS JD',
+          ...missing.slice(0, 4).map((skill) => `• Add a bullet proving ${skill} (project, module, or production use).`),
+          ...(options?.suggestions ?? [])
+            .filter((item) => !missing.some((skill) => item.includes(skill)))
+            .slice(0, 3)
+            .map((item) => `• ${item}`),
+        ].join('\n')
+      : ''
+
   if (templateId === 'compact') {
     return [
       parsed.name,
       contact,
       '',
       'SKILLS',
-      skills.join(' · ') || 'Add technical skills as a comma-separated list',
+      hasJdTailor ? skillsBlock.replace(/\n/g, '\n') : presentSkills.join(' · ') || 'Add technical skills as a comma-separated list',
       '',
       'SUMMARY',
       summary,
@@ -202,7 +274,10 @@ export function formatResumeWithTemplate(
       '',
       'EDUCATION',
       education,
-    ].join('\n')
+      nextSteps ? `\n${nextSteps}` : '',
+    ]
+      .filter((line) => line !== '')
+      .join('\n')
   }
 
   if (templateId === 'impact') {
@@ -223,14 +298,17 @@ export function formatResumeWithTemplate(
       summary,
       '',
       'SKILLS',
-      skills.join(', ') || 'Add technical skills',
+      skillsBlock,
       '',
       'EXPERIENCE',
       experience,
       '',
       'EDUCATION',
       education,
-    ].join('\n')
+      nextSteps ? `\n${nextSteps}` : '',
+    ]
+      .filter((line) => line !== '')
+      .join('\n')
   }
 
   return [
@@ -241,12 +319,15 @@ export function formatResumeWithTemplate(
     summary,
     '',
     'SKILLS',
-    skills.join(', ') || 'Add technical skills',
+    skillsBlock,
     '',
     'EXPERIENCE',
     experience,
     '',
     'EDUCATION',
     education,
-  ].join('\n')
+    nextSteps ? `\n${nextSteps}` : '',
+  ]
+    .filter((line) => line !== '')
+    .join('\n')
 }

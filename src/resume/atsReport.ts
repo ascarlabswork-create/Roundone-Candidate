@@ -1,6 +1,8 @@
 import {
+  computeJobFitScore,
   evaluateAtsReadiness,
   evaluateJdMatch,
+  gradeForScore,
   normalizeResumeText,
   type AtsReadinessResult,
   type JdMatchResult,
@@ -29,6 +31,11 @@ export type AtsFullReport = {
   issues: AtsIssue[]
   issueCount: number
   jdMatch: JdMatchResult | null
+  /** Present when a JD was scored — headline number for Resume + JD mode. */
+  fitScore: number | null
+  fitGrade: AtsReadinessResult['grade'] | null
+  /** Ordered action list for the candidate (JD gaps first when present). */
+  suggestions: string[]
 }
 
 function scoreFromFlags(flags: boolean[]) {
@@ -37,7 +44,7 @@ function scoreFromFlags(flags: boolean[]) {
   return Math.round((ok / flags.length) * 100)
 }
 
-/** Richer candidate-facing report inspired by ATS checkers — grounded in resume text only. */
+/** Richer candidate-facing report — readiness alone, or job-fit when a JD is supplied. */
 export function buildAtsFullReport(resumeText: string, jobDescription = '', jobTitle = ''): AtsFullReport {
   const text = normalizeResumeText(resumeText)
   const readiness = evaluateAtsReadiness(text)
@@ -48,7 +55,6 @@ export function buildAtsFullReport(resumeText: string, jobDescription = '', jobT
       /\b\d+(\.\d+)?\s?(?:%|x|k\+?|m\+?|million|billion|users|requests|latency|ms|sec|hrs?|hours?|days?|weeks?|months?|servers?|pipelines?)(?!\w)|\b\d+\+?\s+years?\b/gi,
     ) ?? []
   ).length
-  // Prefer real newlines; for flattened PDFs, treat long sentences as “lines”.
   const newlineLong = text.split('\n').filter((line) => line.trim().length > 160).length
   const sentenceLong =
     text.split('\n').length <= 3
@@ -111,11 +117,44 @@ export function buildAtsFullReport(resumeText: string, jobDescription = '', jobT
     })
   }
 
+  const jdMatch =
+    jobDescription.trim().length >= 40 ? evaluateJdMatch(resumeText, jobDescription, jobTitle, []) : null
+
+  if (jdMatch && jdMatch.jobSkills.length > 0) {
+    if (jdMatch.score < 50) {
+      issues.unshift({
+        id: 'jd-fit',
+        category: 'content',
+        title: 'Job description match',
+        detail:
+          jdMatch.score === 0
+            ? `None of the JD’s required skills appear on this resume (${jdMatch.missingSkills.slice(0, 4).join(', ') || 'required tools'}). Formatting can look strong while job fit is still weak — add real evidence for those skills before applying.`
+            : `Only ${jdMatch.matchedSkills.length}/${jdMatch.jobSkills.length} JD skills appear on the resume. Prioritize evidence for: ${jdMatch.missingSkills.slice(0, 5).join(', ')}.`,
+        severity: 'high',
+      })
+    }
+    for (const skill of jdMatch.missingSkills.slice(0, 4)) {
+      issues.push({
+        id: `jd-missing-${skill.toLowerCase().replace(/\s+/g, '-')}`,
+        category: 'content',
+        title: `Missing for this JD: ${skill}`,
+        detail: `Add “${skill}” to Skills and one concrete project/role bullet that proves you used it (do not invent experience).`,
+        severity: jdMatch.score < 35 ? 'high' : 'medium',
+      })
+    }
+  }
+
   const sectionFlags = readiness.items.filter((item) => item.id.includes('section')).map((item) => item.passed)
   const atsFlags = readiness.items
     .filter((item) => ['contact-email', 'contact-phone', 'length', 'bullets', 'dates', 'tech-keywords'].includes(item.id))
     .map((item) => item.passed)
-  const contentFlags = [metrics >= 2, longLines < 4, repeatedWords < 3, words >= 120]
+  const contentFlags = [
+    metrics >= 2,
+    longLines < 4,
+    repeatedWords < 3,
+    words >= 120,
+    ...(jdMatch ? [jdMatch.score >= 50] : []),
+  ]
 
   const categories: AtsCategoryScore[] = [
     {
@@ -141,8 +180,16 @@ export function buildAtsFullReport(resumeText: string, jobDescription = '', jobT
   const parseBase = readiness.score
   const parseRate = Math.max(35, Math.min(98, Math.round(parseBase * 0.9 + (tech.length >= 5 ? 8 : 0) + (metrics >= 2 ? 4 : 0))))
 
-  const jdMatch =
-    jobDescription.trim().length >= 40 ? evaluateJdMatch(resumeText, jobDescription, jobTitle, []) : null
+  const fitScore = jdMatch ? computeJobFitScore(readiness.score, jdMatch.score) : null
+  const fitGrade = fitScore == null ? null : gradeForScore(fitScore)
+
+  const suggestions = [
+    ...(jdMatch?.improvements ?? []),
+    ...readiness.improvements,
+    ...issues.filter((issue) => issue.id === 'impact' || issue.id === 'wordiness').map((issue) => issue.detail),
+  ]
+    .filter((item, index, all) => all.indexOf(item) === index)
+    .slice(0, 10)
 
   return {
     readiness,
@@ -151,6 +198,9 @@ export function buildAtsFullReport(resumeText: string, jobDescription = '', jobT
     issues,
     issueCount: issues.length,
     jdMatch,
+    fitScore,
+    fitGrade,
+    suggestions,
   }
 }
 
