@@ -1,11 +1,14 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Briefcase, FileText, Hash, Link2, RefreshCw, Sparkles, Users } from 'lucide-react'
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Briefcase, FileText, Hash, Link2, RefreshCw, Sparkles, Upload, Users } from 'lucide-react'
 import { JobMatchCard } from '../components/interviewer/JobMatchCard.tsx'
+import { AtsReadinessPanel, JdMatchPanel } from '../components/resume/AtsCheckPanel.tsx'
 import { Button } from '../components/ui/Button.tsx'
 import { Chip, EmptyState, FieldLabel, Skeleton, TextArea, TextInput } from '../components/ui/primitives.tsx'
 import { skillsFromJobDescription } from '../jobMatch/extractJobSkills.ts'
 import { dedupeSkills } from '../matching/skills.ts'
+import { evaluateAtsReadiness, evaluateJdMatch, type AtsReadinessResult, type JdMatchResult } from '../resume/atsCheck.ts'
+import { extractResumeText, RESUME_ACCEPT } from '../resume/resumeText.ts'
 import {
   analyzeJobText,
   analyzeJobUrl,
@@ -78,6 +81,13 @@ export function JobMatchPage() {
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [loadingTarget, setLoadingTarget] = useState(Boolean(targetId))
+  const [resumeText, setResumeText] = useState('')
+  const [resumeFileName, setResumeFileName] = useState<string | null>(null)
+  const [resumeBusy, setResumeBusy] = useState(false)
+  const [resumeError, setResumeError] = useState('')
+  const [atsResult, setAtsResult] = useState<AtsReadinessResult | null>(null)
+  const [jdMatch, setJdMatch] = useState<JdMatchResult | null>(null)
+  const resumeInputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
     if (!targetId) return
@@ -195,6 +205,37 @@ export function JobMatchPage() {
     setReview({ ...review, skills })
     setSkillsEdited(false)
     setMatches(null)
+    if (resumeText.trim()) {
+      setJdMatch(evaluateJdMatch(resumeText, review.description, review.jobTitle, skills))
+    }
+  }
+
+  async function onResumeSelected(file: File | null) {
+    if (!file || !review) return
+    setResumeBusy(true)
+    setResumeError('')
+    try {
+      const text = await extractResumeText(file)
+      setResumeText(text)
+      setResumeFileName(file.name)
+      setAtsResult(evaluateAtsReadiness(text))
+      setJdMatch(evaluateJdMatch(text, review.description, review.jobTitle, review.skills))
+    } catch (error) {
+      setResumeError(error instanceof Error ? error.message : 'Could not read that resume. Try PDF, DOCX, or paste text.')
+    } finally {
+      setResumeBusy(false)
+      if (resumeInputRef.current) resumeInputRef.current.value = ''
+    }
+  }
+
+  function runResumeChecksFromPaste() {
+    if (!review || !resumeText.trim()) {
+      setResumeError('Paste or upload your resume first.')
+      return
+    }
+    setResumeError('')
+    setAtsResult(evaluateAtsReadiness(resumeText))
+    setJdMatch(evaluateJdMatch(resumeText, review.description, review.jobTitle, review.skills))
   }
 
   function addSkill() {
@@ -456,6 +497,54 @@ export function JobMatchPage() {
                 Add skill
               </Button>
             </Motion>
+          </Motion>
+
+          <Motion className="rounded-xl border border-sky-100 bg-gradient-to-br from-sky-50/50 to-indigo-50/30 p-4 sm:p-5">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-sky-900">Step 2 — Match your resume to this JD</p>
+                <p className="mt-1 text-sm text-slate-600">
+                  Upload your resume to get ATS readiness plus skill coverage against this job. Improve gaps, then re-upload.
+                </p>
+              </div>
+              <Link to="/candidate/resume-skills" className="text-sm font-medium text-indigo-800 underline decoration-indigo-200">
+                Full resume skills page →
+              </Link>
+            </div>
+            <input
+              ref={resumeInputRef}
+              type="file"
+              accept={RESUME_ACCEPT}
+              className="hidden"
+              onChange={(event) => void onResumeSelected(event.target.files?.[0] ?? null)}
+            />
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+              <Button type="button" variant="outline" disabled={resumeBusy} onClick={() => resumeInputRef.current?.click()}>
+                <span className="inline-flex items-center gap-2">
+                  <Upload className="h-4 w-4" aria-hidden />
+                  {resumeBusy ? 'Reading resume…' : resumeFileName ? 'Replace resume' : 'Upload resume'}
+                </span>
+              </Button>
+              <Button type="button" variant="ghost" disabled={resumeBusy || !resumeText.trim()} onClick={runResumeChecksFromPaste}>
+                Re-check pasted resume
+              </Button>
+            </div>
+            {resumeFileName ? <p className="mt-2 text-xs text-slate-500">Loaded: {resumeFileName}</p> : null}
+            <TextArea
+              className="mt-3 min-h-28"
+              value={resumeText}
+              onChange={(event) => setResumeText(event.target.value.slice(0, 14_000))}
+              placeholder="Or paste resume text here, then click Re-check pasted resume."
+            />
+            {resumeError ? <p className="mt-2 text-sm text-red-700">{resumeError}</p> : null}
+            {atsResult ? <AtsReadinessPanel result={atsResult} className="mt-4" /> : null}
+            {jdMatch ? (
+              <JdMatchPanel
+                result={jdMatch}
+                className="mt-4"
+                onReupload={() => resumeInputRef.current?.click()}
+              />
+            ) : null}
           </Motion>
 
           {findError ? <p className="text-sm text-red-700">{findError}</p> : null}

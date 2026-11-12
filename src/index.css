@@ -780,6 +780,21 @@
   box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.22);
 }
 
+@keyframes ats-panel-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ats-panel {
+  animation: ats-panel-enter 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .testimonial-marquee {
     animation: none;
@@ -840,7 +855,8 @@
   .job-match-spin,
   .job-match-expand,
   .job-match-review,
-  .job-match-skill-stagger > * {
+  .job-match-skill-stagger > *,
+  .ats-panel {
     animation: none;
     transform: none;
   }

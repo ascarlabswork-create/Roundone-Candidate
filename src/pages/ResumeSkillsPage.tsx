@@ -11,7 +11,9 @@ import {
 } from 'lucide-react'
 import { DataUseConsent } from '../components/legal/DataUseConsent.tsx'
 import { ResumeExtractingBanner } from '../components/matching/ResumeExtractingBanner.tsx'
+import { AtsReadinessPanel } from '../components/resume/AtsCheckPanel.tsx'
 import { Button } from '../components/ui/Button.tsx'
+import { evaluateAtsReadiness } from '../resume/atsCheck.ts'
 import {
   Badge,
   EmptyState,
@@ -353,6 +355,10 @@ export function ResumeSkillsPage() {
 
   const canAnalyze = canAnalyzeResume(resumeText)
   const textLen = resumeText.trim().length
+  const atsReadiness = useMemo(
+    () => (textLen >= RESUME_TEXT_MIN ? evaluateAtsReadiness(resumeText) : null),
+    [resumeText, textLen],
+  )
   const textProgress = Math.min(100, Math.round((textLen / RESUME_TEXT_MIN) * 100))
   const busy = extracting || analyzing
   const hasResume = textLen > 0
@@ -501,11 +507,15 @@ export function ResumeSkillsPage() {
                       </Button>
                     </div>
 
-                    <div className="relative mt-4 grid grid-cols-3 gap-2">
+                    <div className="relative mt-4 grid grid-cols-3 gap-2 sm:grid-cols-4">
                       {[
                         { label: 'Characters', value: textLen.toLocaleString('en-IN') },
                         { label: 'Words', value: wordCount.toLocaleString('en-IN') },
                         { label: 'Source', value: fileName ? 'File' : 'Paste' },
+                        {
+                          label: 'ATS readiness',
+                          value: atsReadiness ? `${atsReadiness.score}` : '—',
+                        },
                       ].map((stat, index) => (
                         <div
                           key={stat.label}
@@ -518,6 +528,8 @@ export function ResumeSkillsPage() {
                       ))}
                     </div>
                   </div>
+
+                  {atsReadiness ? <AtsReadinessPanel result={atsReadiness} className="mt-5" /> : null}
 
                   <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/60">
                     <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white/80 px-4 py-2.5">
@@ -691,6 +703,8 @@ export function ResumeSkillsPage() {
             {error ? (
               <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>
             ) : null}
+
+            {atsReadiness ? <AtsReadinessPanel result={atsReadiness} /> : null}
 
             {profileSummary ? (
               <section className="overflow-hidden rounded-2xl border border-black/[0.06] bg-white/95 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
