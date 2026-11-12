@@ -64,7 +64,10 @@ export function AtsCheckPage() {
   const [copied, setCopied] = useState(false)
   const [dragOver, setDragOver] = useState(false)
   const inputRef = useRef<HTMLInputElement | null>(null)
+  const resultsRef = useRef<HTMLDivElement | null>(null)
   const progressTimer = useRef<ReturnType<typeof setInterval> | null>(null)
+  const jdDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const analysisToken = useRef(0)
 
   const improvedText = useMemo(() => {
     if (!resumeText.trim()) return ''
@@ -81,6 +84,7 @@ export function AtsCheckPage() {
   useEffect(() => {
     return () => {
       if (progressTimer.current) clearInterval(progressTimer.current)
+      if (jdDebounce.current) clearTimeout(jdDebounce.current)
     }
   }, [])
 
@@ -91,7 +95,14 @@ export function AtsCheckPage() {
     }
   }
 
-  function runAnalysis(text: string, jd: string) {
+  function runAnalysis(text: string, jd: string, analysisMode: Mode = mode) {
+    const useJd = analysisMode === 'jd'
+    if (useJd && jd.trim().length < 40) {
+      setError('Paste a job description (or switch to Resume only).')
+      return
+    }
+
+    const token = ++analysisToken.current
     clearProgressTimer()
     setAnalyzing(true)
     setProgress(8)
@@ -101,23 +112,28 @@ export function AtsCheckPage() {
     }, 160)
 
     window.setTimeout(() => {
+      if (token !== analysisToken.current) return
       try {
-        const next = buildAtsFullReport(text, mode === 'jd' ? jd : '', '')
+        const next = buildAtsFullReport(text, useJd ? jd : '', '')
         setReport(next)
         setActiveCategory(next.categories.sort((a, b) => b.issueCount - a.issueCount)[0]?.id ?? 'content')
         setPreviewMode('improved')
         setProgress(100)
+        window.setTimeout(() => {
+          resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }, 80)
       } catch {
         setError('Could not score that resume. Try pasting the text and run again.')
         setReport(null)
       } finally {
         clearProgressTimer()
         window.setTimeout(() => {
+          if (token !== analysisToken.current) return
           setAnalyzing(false)
           setProgress(0)
         }, 350)
       }
-    }, 1100)
+    }, 900)
   }
 
   async function onFile(file: File | null) {
@@ -129,8 +145,16 @@ export function AtsCheckPage() {
       const clipped = text.slice(0, RESUME_TEXT_MAX)
       setResumeText(clipped)
       setFileName(file.name)
-      if (clipped.trim().length >= RESUME_TEXT_MIN) runAnalysis(clipped, jobText)
-      else setError(`We need at least ${RESUME_TEXT_MIN} characters of resume text.`)
+      if (clipped.trim().length < RESUME_TEXT_MIN) {
+        setError(`We need at least ${RESUME_TEXT_MIN} characters of resume text.`)
+        return
+      }
+      if (mode === 'jd' && jobText.trim().length < 40) {
+        setReport(null)
+        setError('Resume loaded. Paste the job description, then click Check score.')
+        return
+      }
+      runAnalysis(clipped, jobText, mode)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not read that file.')
       setReport(null)
@@ -145,11 +169,28 @@ export function AtsCheckPage() {
       setError(`Paste at least ${RESUME_TEXT_MIN} characters, or upload a resume.`)
       return
     }
-    if (mode === 'jd' && jobText.trim().length < 40) {
-      setError('Paste a job description (or switch to Resume only).')
+    runAnalysis(resumeText, jobText, mode)
+  }
+
+  function switchMode(next: Mode) {
+    setMode(next)
+    setError('')
+    if (resumeText.trim().length < RESUME_TEXT_MIN) return
+    if (next === 'jd' && jobText.trim().length < 40) {
+      setReport(null)
       return
     }
-    runAnalysis(resumeText, jobText)
+    runAnalysis(resumeText, jobText, next)
+  }
+
+  function onJobTextChange(value: string) {
+    setJobText(value)
+    if (mode !== 'jd' || resumeText.trim().length < RESUME_TEXT_MIN) return
+    if (jdDebounce.current) clearTimeout(jdDebounce.current)
+    if (value.trim().length < 40) return
+    jdDebounce.current = setTimeout(() => {
+      runAnalysis(resumeText, value, 'jd')
+    }, 700)
   }
 
   async function copyImproved() {
@@ -191,7 +232,7 @@ export function AtsCheckPage() {
             className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
               mode === 'resume' ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'
             }`}
-            onClick={() => setMode('resume')}
+            onClick={() => switchMode('resume')}
           >
             Resume only
           </button>
@@ -200,7 +241,7 @@ export function AtsCheckPage() {
             className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
               mode === 'jd' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'
             }`}
-            onClick={() => setMode('jd')}
+            onClick={() => switchMode('jd')}
           >
             Resume + JD tailor
           </button>
@@ -279,7 +320,7 @@ export function AtsCheckPage() {
                   className="min-h-28"
                   value={jobText}
                   disabled={busy || analyzing}
-                  onChange={(event) => setJobText(event.target.value.slice(0, 12_000))}
+                  onChange={(event) => onJobTextChange(event.target.value.slice(0, 12_000))}
                   placeholder="Paste the JD to tailor missing skills into the improved template."
                 />
               </div>
@@ -298,9 +339,11 @@ export function AtsCheckPage() {
           </div>
 
           {report ? (
-            <div className="ats-panel grid gap-5 lg:grid-cols-[17rem_minmax(0,1fr)]">
+            <div ref={resultsRef} className="ats-panel grid gap-5 lg:grid-cols-[17rem_minmax(0,1fr)]">
               <aside className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Your score</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  {report.jdMatch ? 'Readiness score' : 'Your score'}
+                </p>
                 <Gauge score={report.readiness.score} />
                 <p className={`mx-auto mt-2 w-fit rounded-full border px-2.5 py-0.5 text-xs font-semibold ${scoreTone(report.readiness.score)}`}>
                   {atsGradeLabel(report.readiness.grade)}
@@ -334,10 +377,20 @@ export function AtsCheckPage() {
                       <Target className="h-3.5 w-3.5" />
                       JD coverage
                     </p>
-                    <p className="mt-1 text-2xl font-semibold text-navy-950">{report.jdMatch.score}%</p>
+                    <p className={`mt-1 text-2xl font-semibold ${scoreTone(report.jdMatch.score).split(' ')[0]}`}>
+                      {report.jdMatch.score}%
+                    </p>
                     <p className="text-xs text-slate-600">
                       {report.jdMatch.matchedSkills.length}/{report.jdMatch.jobSkills.length} required skills found
                     </p>
+                    {report.jdMatch.missingSkills.length > 0 ? (
+                      <p className="mt-2 text-xs leading-5 text-indigo-950">
+                        Missing: {report.jdMatch.missingSkills.slice(0, 6).join(', ')}
+                        {report.jdMatch.missingSkills.length > 6 ? '…' : ''}
+                      </p>
+                    ) : (
+                      <p className="mt-2 text-xs text-emerald-800">All extracted JD skills appear in the resume.</p>
+                    )}
                   </div>
                 ) : null}
               </aside>

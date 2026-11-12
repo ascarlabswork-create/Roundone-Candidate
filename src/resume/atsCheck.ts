@@ -28,9 +28,15 @@ export type JdMatchResult = {
   improvements: string[]
 }
 
-/** Normalize PDF/OCR quirks: soft hyphens, odd spaces, mailto links. */
+/** Title-case / ALL-CAPS headings only — avoids splitting on “years of experience”. */
+const SECTION_HEADERS =
+  'Professional Summary|Key Achievements|Technical Skills|Core Competencies|Work Experience|Professional Experience|Work History|Tech Stack|About Me|' +
+  'SUMMARY|SKILLS|EXPERIENCE|EDUCATION|PROJECTS|CERTIFICATIONS|AWARDS|PROFILE|ACHIEVEMENTS|TECHNOLOGIES|TOOLS|EMPLOYMENT|QUALIFICATIONS|ACADEMICS|LANGUAGES|' +
+  'Summary|Profile|Achievements|Skills|Technologies|Tools|Experience|Employment|Education|Projects|Certifications|Certification|Awards|Languages|Qualifications|Academics'
+
+/** Normalize PDF/OCR quirks and re-insert section breaks for flattened extracts. */
 export function normalizeResumeText(raw: string) {
-  return raw
+  let text = raw
     .replace(/\u00ad/g, '')
     .replace(/\u00a0/g, ' ')
     .replace(/mailto:/gi, ' ')
@@ -39,9 +45,25 @@ export function normalizeResumeText(raw: string) {
     .replace(/([A-Za-z0-9._%+-])\s+@\s+([A-Za-z0-9.-])/g, '$1@$2')
     .replace(/([A-Za-z0-9-])\s+\.\s+([A-Za-z]{2,})/g, '$1.$2')
     .replace(/[ \t]+\n/g, '\n')
-    .replace(/\n{3,}/g, '\n\n')
     .replace(/[ \t]{2,}/g, ' ')
-    .trim()
+
+  // PDF extractors often drop newlines before headings — restore them (case-sensitive).
+  text = text.replace(
+    new RegExp(`(?<=\\S)\\s+(${SECTION_HEADERS})(?=\\s*[:|]|\\s+(?:[A-Z•▪\\d]|https?))`, 'g'),
+    (_match, heading: string) => `\n\n${heading.trim()}\n`,
+  )
+  // Break before common role/date patterns that start experience blocks.
+  text = text.replace(
+    /\s+(\d{1,2}[\/\-]\d{4}|\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{4})\b/gi,
+    '\n$1',
+  )
+  text = text.replace(/\s+[•▪▸►]\s+/g, '\n• ')
+  text = text.replace(
+    /(?<=[.!?])\s+(?=(?:Built|Led|Managed|Developed|Implemented|Designed|Migrated|Automated|Created|Improved|Reduced|Increased)\b)/g,
+    '\n• ',
+  )
+
+  return text.replace(/\n{3,}/g, '\n\n').trim()
 }
 
 function hasEmail(text: string) {
@@ -81,7 +103,13 @@ function bulletCount(text: string) {
   const classic = (text.match(/(^|\n)\s*[-•*◦▪▸►]/gm) ?? []).length
   const inline = (text.match(/\s[•▪▸►]\s/g) ?? []).length
   const numbered = (text.match(/(^|\n)\s*\d+[.)]\s+\S/gm) ?? []).length
-  return classic + inline + numbered
+  // Flattened PDFs often lose markers — count achievement-style sentences as soft bullets.
+  const actionSentences =
+    classic + inline + numbered >= 3
+      ? 0
+      : (text.match(/\b(?:Built|Led|Managed|Developed|Implemented|Designed|Migrated|Automated|Created|Improved|Reduced|Increased)\b[^.!\n]{12,}[.!]/gi) ?? [])
+          .length
+  return classic + inline + numbered + actionSentences
 }
 
 function gradeFor(score: number): AtsReadinessResult['grade'] {
@@ -112,7 +140,11 @@ export function evaluateAtsReadiness(resumeText: string): AtsReadinessResult {
   const technical = extractTechnicalSkillsFromText(text, 30)
   const bullets = bulletCount(text)
   const dates = (text.match(/\b(20\d{2}|19\d{2})\b/g) ?? []).length
-  const metrics = (text.match(/\b\d+(\.\d+)?\s?(%|x|k\+?|m\+?|million|users|requests|latency)\b/gi) ?? []).length
+  const metrics = (
+    text.match(
+      /\b\d+(\.\d+)?\s?(?:%|x|k\+?|m\+?|million|billion|users|requests|latency|ms|sec|hrs?|hours?|days?|weeks?|months?|servers?|pipelines?)(?!\w)|\b\d+\+?\s+years?\b/gi,
+    ) ?? []
+  ).length
   const emailOk = hasEmail(text)
   const phoneOk = hasPhone(text)
   const skillsOk = hasSkillsSignal(text, technical.length)
@@ -183,8 +215,11 @@ export function evaluateAtsReadiness(resumeText: string): AtsReadinessResult {
     {
       id: 'dates',
       label: 'Dates / years',
-      passed: dates >= 2,
-      detail: dates >= 2 ? 'Years/dates help timeline parsing.' : 'Add start–end years for roles and education.',
+      passed: dates >= 2 || (dates >= 1 && /\b\d+\+?\s+years?\b/i.test(text)),
+      detail:
+        dates >= 2 || (dates >= 1 && /\b\d+\+?\s+years?\b/i.test(text))
+          ? 'Years/dates help timeline parsing.'
+          : 'Add start–end years for roles and education.',
       weight: 8,
     },
     {
