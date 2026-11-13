@@ -13,7 +13,7 @@ export type AtsAiImproveInput = {
 }
 
 export type AtsAiImproveOutcome =
-  | { ok: true; text: string; source: 'ai' | 'local' }
+  | { ok: true; text: string; source: 'ai' | 'local'; coachingNotes: string[] }
   | { ok: false; reason: 'unavailable' | 'empty' }
 
 function withTimeout<T>(promise: Promise<T>, ms: number) {
@@ -71,8 +71,90 @@ function inferTargetRole(jobDescription: string, missingSkills: string[]) {
   return titled?.trim() || (missingSkills[0] ? `${missingSkills[0]} roles` : 'target roles')
 }
 
-/** Stronger local rewrite used as the AI improve result (and as remote fallback). */
-export function improveResumeLocally(input: AtsAiImproveInput): string {
+function buildCleanResume(parts: {
+  name: string
+  contact: string
+  summary: string
+  skillsLine: string
+  experience: string[]
+  education: string[]
+  templateId: AtsTemplateId
+  impactFirst?: boolean
+}) {
+  const experienceBlock =
+    parts.experience.length > 0
+      ? parts.experience.map((line) => `• ${line}`).join('\n')
+      : '• Add 3–5 role bullets with tools and outcomes.'
+  const educationBlock =
+    parts.education.length > 0 ? parts.education.map((line) => `• ${line}`).join('\n') : '• Degree, school, year'
+
+  if (parts.templateId === 'compact') {
+    return [
+      parts.name,
+      parts.contact,
+      '',
+      'SKILLS',
+      parts.skillsLine,
+      '',
+      'SUMMARY',
+      parts.summary,
+      '',
+      'EXPERIENCE',
+      experienceBlock,
+      '',
+      'EDUCATION',
+      educationBlock,
+    ].join('\n')
+  }
+
+  if (parts.templateId === 'impact' || parts.impactFirst) {
+    const impact =
+      parts.experience
+        .filter((line) => /\d|%|users|latency|cost|saved|improved|reduced|increased/i.test(line))
+        .slice(0, 4)
+        .map((line) => `• ${line}`)
+        .join('\n') || experienceBlock
+    return [
+      parts.name,
+      parts.contact,
+      '',
+      'KEY IMPACT',
+      impact,
+      '',
+      'SUMMARY',
+      parts.summary,
+      '',
+      'SKILLS',
+      parts.skillsLine,
+      '',
+      'EXPERIENCE',
+      experienceBlock,
+      '',
+      'EDUCATION',
+      educationBlock,
+    ].join('\n')
+  }
+
+  return [
+    parts.name,
+    parts.contact,
+    '',
+    'SUMMARY',
+    parts.summary,
+    '',
+    'SKILLS',
+    parts.skillsLine,
+    '',
+    'EXPERIENCE',
+    experienceBlock,
+    '',
+    'EDUCATION',
+    educationBlock,
+  ].join('\n')
+}
+
+/** Stronger local rewrite — clean resume body + separate coaching notes. */
+export function improveResumeLocally(input: AtsAiImproveInput): { text: string; coachingNotes: string[] } {
   const parsed = parseResumeForTemplate(input.resumeText)
   const matched = (input.matchedSkills ?? []).filter(Boolean)
   const missing = (input.missingSkills ?? []).filter(Boolean)
@@ -88,111 +170,75 @@ export function improveResumeLocally(input: AtsAiImproveInput): string {
   const target = hasJd ? inferTargetRole(jd, missing) : ''
   const strengths = (matched.length ? matched : parsed.skills).slice(0, 7).join(', ')
   const years = input.resumeText.match(/\b(\d+\+?\s+years?)\b/i)?.[1]
+  const contact = parsed.contact.join(' · ') || 'Add email · phone · LinkedIn'
 
+  // Real resume summary — no “gap vs JD” meta language inside the document.
   const summary = hasJd
     ? [
-        `Applying for ${target}${years ? ` with ${years} of relevant experience` : ''}.`,
-        strengths ? `Closest strengths on this resume: ${strengths}.` : null,
-        missing.length
-          ? `To compete for this JD, add proven evidence for: ${missing.slice(0, 5).join(', ')}.`
-          : 'Keyword coverage looks solid — keep bullets concrete and ATS-friendly.',
-      ]
-        .filter(Boolean)
-        .join(' ')
+        `${target.replace(/ roles$/i, '')} candidate${years ? ` with ${years} of experience` : ''}.`,
+        strengths
+          ? `Skilled in ${strengths}, with hands-on delivery across production systems.`
+          : 'Focused on shipping reliable software and collaborating across teams.',
+        'Open to applying transferable engineering strengths to this role’s stack.',
+      ].join(' ')
     : [
         polishBullet(parsed.summary) ||
           `Results-focused ${parsed.skills.slice(0, 1)[0] || 'engineer'} profile${years ? ` with ${years} of experience` : ''}.`,
-        parsed.skills.length ? `Core tools: ${parsed.skills.slice(0, 8).join(', ')}.` : null,
+        parsed.skills.length ? `Core tools include ${parsed.skills.slice(0, 8).join(', ')}.` : null,
       ]
         .filter(Boolean)
         .join(' ')
 
-  const rebuilt = [
-    parsed.name,
-    parsed.contact.join(' · ') || 'Add email · phone · LinkedIn',
-    '',
-    'SUMMARY',
+  // Skills list looks like a real resume — matched tools first when JD mode.
+  const skillsLine = hasJd
+    ? [...matched, ...parsed.skills.filter((skill) => !matched.some((item) => item.toLowerCase() === skill.toLowerCase()))]
+        .slice(0, 22)
+        .join(', ') || 'Add technical skills'
+    : parsed.skills.join(', ') || 'Add technical skills'
+
+  const text = buildCleanResume({
+    name: parsed.name,
+    contact,
     summary,
-    '',
-    'SKILLS',
-    hasJd
-      ? [
-          matched.length ? `Matched to JD: ${matched.slice(0, 10).join(', ')}` : null,
-          `Other skills: ${parsed.skills.filter((s) => !matched.some((m) => m.toLowerCase() === s.toLowerCase())).slice(0, 14).join(', ') || '—'}`,
-          missing.length ? `Target keywords (add only with proof): ${missing.slice(0, 8).join(', ')}` : null,
-        ]
-          .filter(Boolean)
-          .join('\n')
-      : parsed.skills.join(', ') || 'Add technical skills',
-    '',
-    hasJd ? 'EXPERIENCE (prioritized for this JD)' : 'EXPERIENCE',
-    polishedExperience.length
-      ? polishedExperience.map((line) => `• ${line}`).join('\n')
-      : '• Add 3–5 role bullets with tools and outcomes.',
-    '',
-    'EDUCATION',
-    parsed.education.length
-      ? parsed.education.map((line) => `• ${polishBullet(line)}`).join('\n')
-      : '• Degree, school, year',
-  ]
+    skillsLine,
+    experience: polishedExperience,
+    education: parsed.education.map(polishBullet).filter(Boolean),
+    templateId: input.templateId,
+  })
 
+  const coachingNotes: string[] = []
   if (hasJd) {
-    rebuilt.push(
-      '',
-      'AI NEXT STEPS FOR THIS JD',
-      ...missing.slice(0, 4).map((skill) => `• Write one project/role bullet that proves ${skill}.`),
-      ...(input.suggestions ?? [])
-        .filter((item) => !missing.some((skill) => item.includes(skill)))
-        .slice(0, 3)
-        .map((item) => `• ${item}`),
-    )
+    for (const skill of missing.slice(0, 5)) {
+      coachingNotes.push(`Add a project/role bullet that proves ${skill} before listing it as a skill.`)
+    }
+    if (matched.length) {
+      coachingNotes.push(`Lead with these overlapping tools in interviews: ${matched.slice(0, 6).join(', ')}.`)
+    }
   } else {
-    rebuilt.push(
-      '',
-      'AI POLISH NOTES',
-      '• Keep bullets under ~2 lines with a tool + outcome.',
-      '• Add 1–2 metrics (%, users, latency, cost) under recent roles.',
-      ...(input.suggestions ?? []).slice(0, 3).map((item) => `• ${item}`),
-    )
+    coachingNotes.push('Keep bullets under ~2 lines with a tool + outcome.')
+    coachingNotes.push('Add 1–2 metrics (%, users, latency, cost) under recent roles.')
+  }
+  for (const item of input.suggestions ?? []) {
+    if (!coachingNotes.some((note) => note.includes(item.slice(0, 24)))) coachingNotes.push(item)
+    if (coachingNotes.length >= 8) break
   }
 
-  // Re-run through template formatter for layout consistency when no JD next-steps needed.
-  if (!hasJd) {
-    return formatResumeWithTemplate(rebuilt.join('\n'), input.templateId, {
-      suggestions: input.suggestions,
-    })
+  // Keep a copyable plain-text package with coaching separated for optional export.
+  const withNotes =
+    coachingNotes.length > 0 ? `${text}\n\nCOACHING NOTES\n${coachingNotes.map((note) => `• ${note}`).join('\n')}` : text
+
+  if (!hasJd && input.templateId) {
+    // Ensure template layout still applies for resume-only polish.
+    const formatted = formatResumeWithTemplate(text, input.templateId, { suggestions: [] })
+    return {
+      text: coachingNotes.length
+        ? `${formatted}\n\nCOACHING NOTES\n${coachingNotes.map((note) => `• ${note}`).join('\n')}`
+        : formatted,
+      coachingNotes,
+    }
   }
 
-  if (input.templateId === 'compact') {
-    return [
-      parsed.name,
-      parsed.contact.join(' · ') || 'Add email · phone · LinkedIn',
-      '',
-      'SKILLS',
-      hasJd
-        ? [
-            matched.length ? `Matched to JD: ${matched.slice(0, 10).join(', ')}` : null,
-            `Other skills: ${parsed.skills.slice(0, 14).join(', ')}`,
-            missing.length ? `Target keywords (add only with proof): ${missing.slice(0, 8).join(', ')}` : null,
-          ]
-            .filter(Boolean)
-            .join('\n')
-        : parsed.skills.join(' · '),
-      '',
-      'SUMMARY',
-      summary,
-      '',
-      'EXPERIENCE',
-      polishedExperience.map((line) => `• ${line}`).join('\n'),
-      '',
-      'EDUCATION',
-      parsed.education.map((line) => `• ${polishBullet(line)}`).join('\n') || '• Degree, school, year',
-      '',
-      ...rebuilt.slice(rebuilt.indexOf('AI NEXT STEPS FOR THIS JD')),
-    ].join('\n')
-  }
-
-  return rebuilt.join('\n')
+  return { text: withNotes, coachingNotes }
 }
 
 async function requestRemoteAtsImprove(input: AtsAiImproveInput): Promise<string | null> {
@@ -229,8 +275,10 @@ async function requestRemoteAtsImprove(input: AtsAiImproveInput): Promise<string
 export async function requestAtsAiImprove(input: AtsAiImproveInput): Promise<AtsAiImproveOutcome> {
   if (input.resumeText.trim().length < 60) return { ok: false, reason: 'empty' }
   const remote = await requestRemoteAtsImprove(input)
-  if (remote) return { ok: true, text: remote, source: 'ai' }
-  const local = improveResumeLocally(input).trim()
-  if (local.length < 80) return { ok: false, reason: 'unavailable' }
-  return { ok: true, text: local, source: 'local' }
+  if (remote) {
+    return { ok: true, text: remote, source: 'ai', coachingNotes: [] }
+  }
+  const local = improveResumeLocally(input)
+  if (local.text.trim().length < 80) return { ok: false, reason: 'unavailable' }
+  return { ok: true, text: local.text, source: 'local', coachingNotes: local.coachingNotes }
 }

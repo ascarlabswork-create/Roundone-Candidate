@@ -1216,12 +1216,14 @@ async function handleAtsImprove(
     return json(400, { error: "insufficient_resume_evidence" });
   }
 
-  const system = `You rewrite resumes for ATS readability and optional job-description fit.
+  const system = `You rewrite resumes so they look like a real single-column resume ready to paste into Word/Google Docs.
 Rules:
 - Return JSON only: { "improved_text": "..." }
 - Keep the candidate honest: never invent employers, degrees, or tools they did not use.
-- If a job description is provided, rewrite summary toward that role, prioritize overlapping skills, list missing JD skills as target gaps (not as claimed skills), and reorder bullets by relevance.
-- Use plain single-column ATS text with headings SUMMARY, SKILLS, EXPERIENCE, EDUCATION.
+- Output MUST look like a real resume: Name, contact line, then SUMMARY, SKILLS, EXPERIENCE, EDUCATION.
+- If a job description is provided, rewrite the summary for that role, put overlapping skills first, and reorder bullets by relevance.
+- Do NOT put coaching meta inside the resume body (no "Matched to JD", "Target keywords", "Gap vs JD", "AI NEXT STEPS").
+- Optionally append a final section titled COACHING NOTES with bullet advice for missing skills.
 - Prefer short bullets with tools + outcomes. No markdown tables.
 - Never use banned marketing claims about hiring probability or ATS score.`;
 

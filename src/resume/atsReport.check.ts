@@ -89,8 +89,9 @@ const aiLocal = improveResumeLocally({
   missingSkills: flatReport.jdMatch?.missingSkills ?? [],
   suggestions: flatReport.suggestions.slice(0, 3),
 })
-expect(/SUMMARY/i.test(aiLocal), 'AI local improve has summary')
-expect(/AI NEXT STEPS FOR THIS JD/i.test(aiLocal), 'AI local improve has JD next steps')
-expect(/SAP/i.test(aiLocal), 'AI local improve keeps SAP gaps visible')
+expect(/SUMMARY/i.test(aiLocal.text), 'AI local improve has summary')
+expect(/EXPERIENCE/i.test(aiLocal.text), 'AI local improve has experience')
+expect(!/Gap vs this JD/i.test(aiLocal.text.split('COACHING NOTES')[0] ?? ''), 'resume body stays clean')
+expect(aiLocal.coachingNotes.some((note) => /SAP/i.test(note)), 'coaching notes keep SAP gaps')
 
 console.log('atsReport.check.ts passed')
