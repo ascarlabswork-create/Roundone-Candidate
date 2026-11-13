@@ -14,8 +14,23 @@ export type ResumePreviewModel = {
 const SECTION_TITLES =
   /^(SUMMARY|PROFESSIONAL SUMMARY|SKILLS|TECHNICAL SKILLS|EXPERIENCE|WORK EXPERIENCE|PROFESSIONAL EXPERIENCE|EXPERIENCE \(PRIORITIZED FOR THIS JD\)|KEY IMPACT|EDUCATION|PROJECTS|CERTIFICATIONS|NEXT STEPS FOR THIS JD|AI NEXT STEPS FOR THIS JD|AI POLISH NOTES|COACHING NOTES)$/i
 
-function isMetaSection(title: string) {
+export function isMetaSection(title: string) {
   return /next steps|polish notes|coaching notes/i.test(title)
+}
+
+/** Rebuild plain ATS text from an editable preview model. */
+export function serializeResumePreview(model: ResumePreviewModel) {
+  const blocks = [model.name.trim() || 'Your Name']
+  if (model.contact.trim()) blocks.push(model.contact.trim())
+  for (const section of model.sections) {
+    if (!section.title.trim()) continue
+    blocks.push('')
+    blocks.push(section.title.trim().toUpperCase())
+    for (const line of section.lines) {
+      if (line.trim()) blocks.push(line.trim())
+    }
+  }
+  return blocks.join('\n').trim()
 }
 
 function cleanSectionTitle(title: string) {

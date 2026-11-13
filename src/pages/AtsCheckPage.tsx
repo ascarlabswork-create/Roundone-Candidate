@@ -1,23 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   AlertTriangle,
   CheckCircle2,
-  ClipboardCopy,
   Coins,
-  Download,
   FileSearch,
   FileUp,
+  LayoutTemplate,
   Loader2,
-  PencilLine,
-  Printer,
-  RefreshCw,
   Sparkles,
   Target,
   Upload,
   Wand2,
 } from 'lucide-react'
-import { AtsResumePreview } from '../components/resume/AtsResumePreview.tsx'
 import { Button } from '../components/ui/Button.tsx'
 import { FieldLabel, TextArea } from '../components/ui/primitives.tsx'
 import { RESUME_TEXT_MAX, RESUME_TEXT_MIN } from '../resume/aiModel.ts'
@@ -25,13 +20,12 @@ import { ATS_AI_IMPROVE_COST, canSpendAiCredits, getAiCredits, refundAiCredits, 
 import { requestAtsAiImprove } from '../resume/atsAiImprove.ts'
 import { atsGradeLabel } from '../resume/atsCheck.ts'
 import { buildAtsFullReport, type AtsFullReport, type AtsIssue } from '../resume/atsReport.ts'
-import { ATS_TEMPLATES, formatResumeWithTemplate, type AtsTemplateId } from '../resume/atsTemplates.ts'
+import { formatResumeWithTemplate, type AtsTemplateId } from '../resume/atsTemplates.ts'
 import { extractResumeText, RESUME_ACCEPT } from '../resume/resumeText.ts'
+import { loadAtsStudioPayload, saveAtsStudioPayload } from '../resume/atsStudioStore.ts'
 
 type Mode = 'resume' | 'jd'
 type CategoryId = 'content' | 'sections' | 'ats'
-type PreviewMode = 'original' | 'improved' | 'ai'
-type DraftView = 'visual' | 'plain' | 'edit'
 
 function scoreTone(score: number) {
   if (score >= 75) return 'text-emerald-800 bg-emerald-50 border-emerald-200'
@@ -60,6 +54,7 @@ function Gauge({ score }: { score: number }) {
 }
 
 export function AtsCheckPage() {
+  const navigate = useNavigate()
   const [mode, setMode] = useState<Mode>('resume')
   const [resumeText, setResumeText] = useState('')
   const [jobText, setJobText] = useState('')
@@ -73,12 +68,8 @@ export function AtsCheckPage() {
   const [report, setReport] = useState<AtsFullReport | null>(null)
   const [activeCategory, setActiveCategory] = useState<CategoryId>('content')
   const [templateId, setTemplateId] = useState<AtsTemplateId>('classic')
-  const [previewMode, setPreviewMode] = useState<PreviewMode>('improved')
-  const [draftView, setDraftView] = useState<DraftView>('visual')
   const [aiDraft, setAiDraft] = useState('')
   const [credits, setCredits] = useState(() => getAiCredits())
-  const [copied, setCopied] = useState(false)
-  const [applied, setApplied] = useState(false)
   const [dragOver, setDragOver] = useState(false)
   const inputRef = useRef<HTMLInputElement | null>(null)
   const resultsRef = useRef<HTMLDivElement | null>(null)
@@ -104,12 +95,19 @@ export function AtsCheckPage() {
     report?.suggestions,
   ])
 
-  const displayText =
-    previewMode === 'original' ? resumeText : previewMode === 'ai' && aiDraft ? aiDraft : templateText
-  const resumeOnlyText = useMemo(() => displayText.split(/\nCOACHING NOTES\n/i)[0]?.trim() ?? displayText, [displayText])
-
   const headlineScore = report?.fitScore ?? report?.readiness.score ?? 0
   const headlineGrade = report?.fitGrade ?? report?.readiness.grade ?? 'needs_work'
+
+  useEffect(() => {
+    const saved = loadAtsStudioPayload()
+    if (!saved?.draftText) return
+    if (saved.resumeText) setResumeText(saved.resumeText)
+    if (saved.jobText) setJobText(saved.jobText)
+    if (saved.mode) setMode(saved.mode)
+    if (saved.templateId) setTemplateId(saved.templateId)
+    if (saved.draftText) setAiDraft(saved.draftText)
+    setInfo('Loaded edits from Resume Studio.')
+  }, [])
 
   const categoryIssues = useMemo(() => {
     if (!report) return [] as AtsIssue[]
@@ -162,7 +160,6 @@ export function AtsCheckPage() {
             ? 'content'
             : (next.categories.sort((a, b) => b.issueCount - a.issueCount)[0]?.id ?? 'content'),
         )
-        setPreviewMode('improved')
         setProgress(100)
         window.setTimeout(() => {
           resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -240,6 +237,26 @@ export function AtsCheckPage() {
     }, 700)
   }
 
+  function openStudio(draftOverride?: string) {
+    if (resumeText.trim().length < RESUME_TEXT_MIN) {
+      setError('Run a score check first, then open Resume Studio.')
+      return
+    }
+    const draft = (draftOverride || aiDraft || templateText || resumeText).slice(0, RESUME_TEXT_MAX)
+    saveAtsStudioPayload({
+      resumeText,
+      jobText,
+      mode,
+      templateId,
+      draftText: draft,
+      aiDraft: aiDraft || undefined,
+      matchedSkills: report?.jdMatch?.matchedSkills ?? [],
+      missingSkills: report?.jdMatch?.missingSkills ?? [],
+      suggestions: report?.suggestions ?? [],
+    })
+    navigate('/candidate/ats-check/studio')
+  }
+
   async function onImproveWithAi() {
     if (!report || resumeText.trim().length < RESUME_TEXT_MIN) {
       setError('Run a score check first, then improve with AI.')
@@ -275,17 +292,8 @@ export function AtsCheckPage() {
         return
       }
       setAiDraft(outcome.text)
-      setPreviewMode('ai')
-      setDraftView('visual')
-      setApplied(false)
-      setInfo(
-        outcome.source === 'ai'
-          ? `AI rewrite ready (−${ATS_AI_IMPROVE_COST} credits). Review the resume layout, then copy, download, or apply it.`
-          : `Resume rewrite ready (−${ATS_AI_IMPROVE_COST} credits). Remote AI was unavailable, so we used the on-device improver.`,
-      )
-      window.setTimeout(() => {
-        resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      }, 60)
+      setInfo(`AI rewrite ready (−${ATS_AI_IMPROVE_COST} credits). Opening Resume Studio…`)
+      openStudio(outcome.text)
     } catch {
       refundAiCredits(ATS_AI_IMPROVE_COST)
       refreshCredits()
@@ -293,43 +301,6 @@ export function AtsCheckPage() {
     } finally {
       setImproving(false)
     }
-  }
-
-  async function copyImproved() {
-    const text = resumeOnlyText
-    if (!text) return
-    try {
-      await navigator.clipboard.writeText(text)
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 1600)
-    } catch {
-      setError('Could not copy. Select the improved text manually.')
-    }
-  }
-
-  function downloadResume() {
-    const text = resumeOnlyText
-    if (!text) return
-    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = previewMode === 'ai' ? 'ai-improved-resume.txt' : 'improved-resume.txt'
-    link.click()
-    URL.revokeObjectURL(url)
-  }
-
-  function printResume() {
-    if (!resumeOnlyText) return
-    window.print()
-  }
-
-  function applyToEditor() {
-    if (!resumeOnlyText) return
-    setResumeText(resumeOnlyText.slice(0, RESUME_TEXT_MAX))
-    setApplied(true)
-    setInfo('Applied rewrite into the resume editor above. Re-check score anytime.')
-    window.setTimeout(() => setApplied(false), 2000)
   }
 
   return (
@@ -622,196 +593,52 @@ export function AtsCheckPage() {
                   </ul>
                 </section>
 
-                <section className="ats-ai-panel relative rounded-2xl border border-indigo-100 bg-white p-5 shadow-sm sm:p-6">
+                <section className="ats-ai-panel relative rounded-2xl border border-indigo-100 bg-gradient-to-br from-white via-indigo-50/40 to-sky-50/50 p-5 shadow-sm sm:p-6">
                   <div className="pointer-events-none absolute -right-10 -top-10 -z-10 h-36 w-36 rounded-full bg-indigo-200/30 blur-2xl" aria-hidden />
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <h2 className="text-lg font-semibold text-navy-950">
-                        {report.jdMatch ? 'Tailor resume to this JD' : 'Improve with a template'}
-                      </h2>
-                      <p className="mt-1 text-sm text-slate-600">
-                        {report.jdMatch
-                          ? 'Free template rebuild prioritizes JD skills. Then spend credits for a deeper AI rewrite.'
-                          : 'Free ATS template rebuild, plus optional AI polish with credits.'}
-                      </p>
-                    </div>
+                  <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-indigo-900">
+                    <LayoutTemplate className="h-3.5 w-3.5" />
+                    Resume Studio
+                  </p>
+                  <h2 className="mt-2 text-lg font-semibold text-navy-950">
+                    {report.jdMatch ? 'Browse templates & edit for this JD' : 'Browse templates & edit by section'}
+                  </h2>
+                  <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-600">
+                    Open a full page to pick Classic / Compact / Impact layouts, edit Name · Summary · Skills · Experience · Education
+                    one section at a time, preview a real resume, then copy, download, or print.
+                  </p>
+                  <div className="mt-5 flex flex-col gap-2.5 sm:flex-row sm:flex-wrap">
+                    <Button type="button" onClick={() => openStudio()} className="ats-cta-glow">
+                      <LayoutTemplate className="h-4 w-4" />
+                      Browse templates & edit sections
+                    </Button>
                     <Button
                       type="button"
+                      variant="secondary"
                       disabled={busy || analyzing || improving}
                       onClick={() => void onImproveWithAi()}
                       className="ats-ai-glow"
                     >
-                      <span className="inline-flex items-center gap-2">
-                        {improving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
-                        {improving ? 'Improving…' : `Improve with AI (−${ATS_AI_IMPROVE_COST})`}
-                      </span>
+                      {improving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
+                      {improving ? 'Improving…' : `Improve with AI (−${ATS_AI_IMPROVE_COST})`}
                     </Button>
-                  </div>
-
-                  <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                    {ATS_TEMPLATES.map((template) => (
-                      <button
-                        key={template.id}
-                        type="button"
-                        onClick={() => {
-                          setTemplateId(template.id)
-                          if (previewMode !== 'ai') setPreviewMode('improved')
-                        }}
-                        className={`ats-template-card rounded-xl border p-3 text-left transition ${
-                          templateId === template.id
-                            ? 'border-indigo-400 bg-indigo-50 shadow-sm'
-                            : 'border-slate-200 hover:border-indigo-200'
-                        }`}
-                      >
-                        <p className="text-sm font-semibold text-navy-950">{template.name}</p>
-                        <p className="mt-1 text-xs leading-5 text-slate-600">{template.blurb}</p>
-                      </button>
-                    ))}
-                  </div>
-
-                  <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
-                    <div className="inline-flex flex-wrap rounded-lg border border-slate-200 bg-slate-50 p-1">
-                      {(
-                        [
-                          ['original', 'Original'],
-                          ['improved', report.jdMatch ? 'JD-tailored' : 'Template'],
-                          ...(aiDraft ? ([['ai', 'AI rewrite']] as const) : []),
-                        ] as Array<[PreviewMode, string]>
-                      ).map(([id, label]) => (
-                        <button
-                          key={id}
-                          type="button"
-                          className={`rounded-md px-3 py-1.5 text-xs font-semibold ${
-                            previewMode === id ? 'bg-white text-navy-950 shadow-sm' : 'text-slate-600'
-                          }`}
-                          onClick={() => {
-                            setPreviewMode(id)
-                            if (id !== 'original') setDraftView('visual')
-                          }}
-                        >
-                          {label}
-                        </button>
-                      ))}
-                    </div>
-                    {previewMode !== 'original' ? (
-                      <div className="inline-flex rounded-lg border border-slate-200 bg-white p-1">
-                        {(
-                          [
-                            ['visual', 'Resume view'],
-                            ['plain', 'Plain text'],
-                            ['edit', 'Edit'],
-                          ] as Array<[DraftView, string]>
-                        ).map(([id, label]) => (
-                          <button
-                            key={id}
-                            type="button"
-                            className={`rounded-md px-2.5 py-1 text-xs font-semibold ${
-                              draftView === id ? 'bg-slate-900 text-white' : 'text-slate-600'
-                            }`}
-                            onClick={() => setDraftView(id)}
-                          >
-                            {label}
-                          </button>
-                        ))}
-                      </div>
+                    <Link to="/candidate/resume-skills">
+                      <Button type="button" variant="outline">
+                        Resume skills →
+                      </Button>
+                    </Link>
+                    {mode === 'jd' ? (
+                      <Link to="/candidate/job-match">
+                        <Button type="button" variant="outline">
+                          Find interviewers →
+                        </Button>
+                      </Link>
                     ) : null}
                   </div>
-
-                  <div className="ats-draft-pane mt-4 overflow-hidden rounded-xl border border-slate-200 bg-slate-100/80">
-                    {previewMode === 'original' || draftView === 'plain' ? (
-                      <pre className="max-h-[32rem] overflow-auto whitespace-pre-wrap bg-slate-50/90 p-4 text-xs leading-5 text-slate-800">
-                        {displayText}
-                      </pre>
-                    ) : draftView === 'edit' ? (
-                      <TextArea
-                        className="min-h-[28rem] rounded-none border-0 bg-white text-sm"
-                        value={previewMode === 'ai' ? aiDraft : templateText}
-                        onChange={(event) => {
-                          const next = event.target.value.slice(0, RESUME_TEXT_MAX)
-                          if (previewMode === 'ai') setAiDraft(next)
-                          else setResumeText(next)
-                        }}
-                      />
-                    ) : (
-                      <div className="ats-resume-stage max-h-[36rem] overflow-auto p-3 sm:p-5">
-                        <AtsResumePreview text={displayText} showMeta={previewMode === 'ai'} />
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="ats-action-row mt-4 flex flex-col gap-2.5">
-                    <div className="flex flex-col gap-2.5 sm:flex-row sm:flex-wrap">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => void copyImproved()}
-                        className="ats-action-btn sm:min-w-[10.5rem] sm:flex-1"
-                      >
-                        <ClipboardCopy className="h-4 w-4 shrink-0" />
-                        <span className="truncate">{copied ? 'Copied resume' : 'Copy resume'}</span>
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={downloadResume}
-                        className="ats-action-btn sm:min-w-[10.5rem] sm:flex-1"
-                      >
-                        <Download className="h-4 w-4 shrink-0" />
-                        <span className="truncate">Download .txt</span>
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={printResume}
-                        className="ats-action-btn sm:min-w-[10.5rem] sm:flex-1"
-                      >
-                        <Printer className="h-4 w-4 shrink-0" />
-                        <span className="truncate">Print / Save PDF</span>
-                      </Button>
-                    </div>
-                    <div className="flex flex-col gap-2.5 sm:flex-row sm:flex-wrap">
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="sm"
-                        onClick={applyToEditor}
-                        className="ats-action-btn sm:min-w-[10.5rem] sm:flex-1"
-                      >
-                        <PencilLine className="h-4 w-4 shrink-0" />
-                        <span className="truncate">{applied ? 'Applied to editor' : 'Apply to editor'}</span>
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        disabled={busy || analyzing || improving}
-                        onClick={() => void onImproveWithAi()}
-                        className="ats-action-btn sm:min-w-[10.5rem] sm:flex-1"
-                      >
-                        <RefreshCw className={`h-4 w-4 shrink-0 ${improving ? 'animate-spin' : ''}`} />
-                        <span className="truncate">Re-run AI (−{ATS_AI_IMPROVE_COST})</span>
-                      </Button>
-                      <Link
-                        to="/candidate/resume-skills"
-                        className="ats-action-link inline-flex h-9 min-h-9 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 text-sm font-semibold text-navy-950 sm:min-w-[10.5rem] sm:flex-1"
-                      >
-                        <span className="truncate">Resume skills</span>
-                        <span aria-hidden>→</span>
-                      </Link>
-                      {mode === 'jd' ? (
-                        <Link
-                          to="/candidate/job-match"
-                          className="ats-action-link inline-flex h-9 min-h-9 items-center justify-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50/70 px-3.5 text-sm font-semibold text-indigo-950 sm:min-w-[10.5rem] sm:flex-1"
-                        >
-                          <span className="truncate">Find interviewers</span>
-                          <span aria-hidden>→</span>
-                        </Link>
-                      ) : null}
-                    </div>
-                  </div>
+                  {aiDraft ? (
+                    <p className="mt-3 text-xs text-emerald-800">
+                      An AI draft is ready in Resume Studio. Open it to refine section by section.
+                    </p>
+                  ) : null}
                 </section>
               </div>
             </div>
@@ -824,9 +651,9 @@ export function AtsCheckPage() {
             <ol className="mt-3 list-decimal space-y-2 pl-4 text-sm leading-6 text-slate-600">
               <li>Upload or paste your resume.</li>
               <li>Optional: paste a JD — headline score becomes job fit.</li>
-              <li>Review gaps, pick a free template rebuild.</li>
+              <li>Open Resume Studio to browse templates and edit section by section.</li>
               <li>
-                Spend {ATS_AI_IMPROVE_COST} AI credits for Improve with AI (resume-only or Resume + JD).
+                Optional: spend {ATS_AI_IMPROVE_COST} AI credits, then refine the rewrite in Studio.
               </li>
             </ol>
             <p className="mt-4 text-xs text-slate-500">
