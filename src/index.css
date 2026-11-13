@@ -981,13 +981,20 @@
 }
 
 .ats-action-row {
+  position: relative;
+  z-index: 1;
+  isolation: isolate;
   animation: ats-panel-enter 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .ats-action-btn,
 .ats-action-link {
+  position: relative;
+  z-index: 1;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
   transition:
-    transform 0.2s cubic-bezier(0.22, 1, 0.36, 1),
     box-shadow 0.25s ease,
     border-color 0.2s ease,
     background-color 0.2s ease,
@@ -996,14 +1003,7 @@
 
 .ats-action-btn:hover:not(:disabled),
 .ats-action-link:hover {
-  transform: translateY(-2px);
   box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
-}
-
-.ats-action-btn:active:not(:disabled),
-.ats-action-link:active {
-  transform: translateY(0);
-  box-shadow: none;
 }
 
 .ats-action-link:hover {
@@ -1019,10 +1019,7 @@
   }
 
   .ats-action-btn:hover:not(:disabled),
-  .ats-action-link:hover,
-  .ats-action-btn:active:not(:disabled),
-  .ats-action-link:active {
-    transform: none;
+  .ats-action-link:hover {
     box-shadow: none;
   }
 }
