@@ -228,9 +228,26 @@ export function formatResumeWithTemplate(
   const summary = hasJdTailor
     ? buildJdTailoredSummary(parsed.summary, matched, missing, presentSkills, jobDescription)
     : parsed.summary || 'Add a 2–3 line summary focused on the role you want next.'
+  const rankedExperience =
+    hasJdTailor && jobDescription.trim().length >= 40
+      ? [...parsed.experience].sort((a, b) => {
+          const score = (line: string) => {
+            const lower = line.toLowerCase()
+            let points = 0
+            for (const skill of matched) {
+              if (skill && lower.includes(skill.toLowerCase())) points += 3
+            }
+            for (const token of jobDescription.toLowerCase().split(/[^a-z0-9+#./]+/).slice(0, 30)) {
+              if (token.length >= 3 && lower.includes(token)) points += 1
+            }
+            return points
+          }
+          return score(b) - score(a)
+        })
+      : parsed.experience
   const experience =
-    parsed.experience.length > 0
-      ? parsed.experience.map((line) => `• ${line}`).join('\n')
+    rankedExperience.length > 0
+      ? rankedExperience.map((line) => `• ${line}`).join('\n')
       : '• Add 3–5 role bullets with tools and outcomes (action + result).'
   const education =
     parsed.education.length > 0 ? parsed.education.map((line) => `• ${line}`).join('\n') : '• Degree, school, year'
