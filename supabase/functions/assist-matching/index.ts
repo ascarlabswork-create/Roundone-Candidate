@@ -1196,6 +1196,62 @@ async function handlePrepare(
   });
 }
 
+const ATS_IMPROVE_BANNED =
+  /\b(guaranteed|job-ready|hiring probability|employability|will get (you )?hired|recruiter score|ats score)\b/i;
+
+async function handleAtsImprove(
+  body: Record<string, unknown>,
+  apiKey: string,
+  model: string,
+  baseUrl: string,
+) {
+  const resumeText = readString(body.resume_text ?? body.resumeText, 14000);
+  const jobDescription = readString(body.job_description ?? body.jobDescription, 12000);
+  const templateId = readString(body.template_id ?? body.templateId, 24) || "classic";
+  const matchedSkills = readStringList(body.matched_skills ?? body.matchedSkills, 12, 48);
+  const missingSkills = readStringList(body.missing_skills ?? body.missingSkills, 12, 48);
+  const suggestions = readStringList(body.suggestions, 8, 180);
+
+  if (resumeText.length < 60) {
+    return json(400, { error: "insufficient_resume_evidence" });
+  }
+
+  const system = `You rewrite resumes for ATS readability and optional job-description fit.
+Rules:
+- Return JSON only: { "improved_text": "..." }
+- Keep the candidate honest: never invent employers, degrees, or tools they did not use.
+- If a job description is provided, rewrite summary toward that role, prioritize overlapping skills, list missing JD skills as target gaps (not as claimed skills), and reorder bullets by relevance.
+- Use plain single-column ATS text with headings SUMMARY, SKILLS, EXPERIENCE, EDUCATION.
+- Prefer short bullets with tools + outcomes. No markdown tables.
+- Never use banned marketing claims about hiring probability or ATS score.`;
+
+  const completed = await completeJson(
+    apiKey,
+    model,
+    baseUrl,
+    system,
+    {
+      resume_text: resumeText,
+      job_description: jobDescription || null,
+      template_id: templateId,
+      matched_skills: matchedSkills,
+      missing_skills: missingSkills,
+      suggestions,
+    },
+    20000,
+    0.3,
+  );
+
+  if (completed instanceof Response) return completed;
+  const improved = readString(completed.improved_text ?? completed.improvedText, 14000);
+  if (improved.length < 80 || ATS_IMPROVE_BANNED.test(improved)) {
+    console.log(JSON.stringify({ event: "ats_improve_empty" }));
+    return json(502, { error: "insufficient_resume_evidence" });
+  }
+  console.log(JSON.stringify({ event: "ats_improve_ok", chars: improved.length, has_jd: Boolean(jobDescription) }));
+  return json(200, { improved_text: improved });
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return json(405, { error: "method_not_allowed" });
@@ -1241,6 +1297,9 @@ Deno.serve(async (req) => {
   }
   if (readString(body.mode, 32) === "resume_skill_plan") {
     return await handleResumeSkillPlan(body, apiKey, model, baseUrl);
+  }
+  if (readString(body.mode, 32) === "ats_improve") {
+    return await handleAtsImprove(body, apiKey, model, baseUrl);
   }
 
   const prefsRow = asRecord(body.preferences) ?? {};

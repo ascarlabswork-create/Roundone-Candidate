@@ -4,16 +4,20 @@ import {
   AlertTriangle,
   CheckCircle2,
   ClipboardCopy,
+  Coins,
   FileSearch,
   FileUp,
   Loader2,
   Sparkles,
   Target,
   Upload,
+  Wand2,
 } from 'lucide-react'
 import { Button } from '../components/ui/Button.tsx'
 import { FieldLabel, TextArea } from '../components/ui/primitives.tsx'
 import { RESUME_TEXT_MAX, RESUME_TEXT_MIN } from '../resume/aiModel.ts'
+import { ATS_AI_IMPROVE_COST, canSpendAiCredits, getAiCredits, refundAiCredits, spendAiCredits } from '../resume/aiCredits.ts'
+import { requestAtsAiImprove } from '../resume/atsAiImprove.ts'
 import { atsGradeLabel } from '../resume/atsCheck.ts'
 import { buildAtsFullReport, type AtsFullReport, type AtsIssue } from '../resume/atsReport.ts'
 import { ATS_TEMPLATES, formatResumeWithTemplate, type AtsTemplateId } from '../resume/atsTemplates.ts'
@@ -21,6 +25,7 @@ import { extractResumeText, RESUME_ACCEPT } from '../resume/resumeText.ts'
 
 type Mode = 'resume' | 'jd'
 type CategoryId = 'content' | 'sections' | 'ats'
+type PreviewMode = 'original' | 'improved' | 'ai'
 
 function scoreTone(score: number) {
   if (score >= 75) return 'text-emerald-800 bg-emerald-50 border-emerald-200'
@@ -55,12 +60,16 @@ export function AtsCheckPage() {
   const [fileName, setFileName] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [analyzing, setAnalyzing] = useState(false)
+  const [improving, setImproving] = useState(false)
   const [progress, setProgress] = useState(0)
   const [error, setError] = useState('')
+  const [info, setInfo] = useState('')
   const [report, setReport] = useState<AtsFullReport | null>(null)
   const [activeCategory, setActiveCategory] = useState<CategoryId>('content')
   const [templateId, setTemplateId] = useState<AtsTemplateId>('classic')
-  const [previewMode, setPreviewMode] = useState<'original' | 'improved'>('improved')
+  const [previewMode, setPreviewMode] = useState<PreviewMode>('improved')
+  const [aiDraft, setAiDraft] = useState('')
+  const [credits, setCredits] = useState(() => getAiCredits())
   const [copied, setCopied] = useState(false)
   const [dragOver, setDragOver] = useState(false)
   const inputRef = useRef<HTMLInputElement | null>(null)
@@ -69,7 +78,7 @@ export function AtsCheckPage() {
   const jdDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
   const analysisToken = useRef(0)
 
-  const improvedText = useMemo(() => {
+  const templateText = useMemo(() => {
     if (!resumeText.trim()) return ''
     return formatResumeWithTemplate(resumeText, templateId, {
       missingJobSkills: report?.jdMatch?.missingSkills?.slice(0, 8) ?? [],
@@ -87,6 +96,9 @@ export function AtsCheckPage() {
     report?.suggestions,
   ])
 
+  const displayText =
+    previewMode === 'original' ? resumeText : previewMode === 'ai' && aiDraft ? aiDraft : templateText
+
   const headlineScore = report?.fitScore ?? report?.readiness.score ?? 0
   const headlineGrade = report?.fitGrade ?? report?.readiness.grade ?? 'needs_work'
 
@@ -101,6 +113,10 @@ export function AtsCheckPage() {
       if (jdDebounce.current) clearTimeout(jdDebounce.current)
     }
   }, [])
+
+  function refreshCredits() {
+    setCredits(getAiCredits())
+  }
 
   function clearProgressTimer() {
     if (progressTimer.current) {
@@ -121,6 +137,8 @@ export function AtsCheckPage() {
     setAnalyzing(true)
     setProgress(8)
     setError('')
+    setInfo('')
+    setAiDraft('')
     progressTimer.current = setInterval(() => {
       setProgress((value) => (value >= 92 ? value : value + 7 + Math.floor(Math.random() * 6)))
     }, 160)
@@ -193,6 +211,8 @@ export function AtsCheckPage() {
   function switchMode(next: Mode) {
     setMode(next)
     setError('')
+    setInfo('')
+    setAiDraft('')
     if (resumeText.trim().length < RESUME_TEXT_MIN) return
     if (next === 'jd' && jobText.trim().length < 40) {
       setReport(null)
@@ -211,10 +231,64 @@ export function AtsCheckPage() {
     }, 700)
   }
 
-  async function copyImproved() {
-    if (!improvedText) return
+  async function onImproveWithAi() {
+    if (!report || resumeText.trim().length < RESUME_TEXT_MIN) {
+      setError('Run a score check first, then improve with AI.')
+      return
+    }
+    if (!canSpendAiCredits(ATS_AI_IMPROVE_COST)) {
+      setError(`You need ${ATS_AI_IMPROVE_COST} AI credits. You have ${getAiCredits()} left.`)
+      refreshCredits()
+      return
+    }
+    if (!spendAiCredits(ATS_AI_IMPROVE_COST)) {
+      setError(`You need ${ATS_AI_IMPROVE_COST} AI credits.`)
+      refreshCredits()
+      return
+    }
+    refreshCredits()
+    setImproving(true)
+    setError('')
+    setInfo('')
     try {
-      await navigator.clipboard.writeText(improvedText)
+      const outcome = await requestAtsAiImprove({
+        resumeText,
+        jobDescription: mode === 'jd' ? jobText : '',
+        templateId,
+        matchedSkills: report.jdMatch?.matchedSkills ?? [],
+        missingSkills: report.jdMatch?.missingSkills ?? [],
+        suggestions: report.suggestions,
+      })
+      if (!outcome.ok) {
+        refundAiCredits(ATS_AI_IMPROVE_COST)
+        refreshCredits()
+        setError('AI improve could not finish. Your credits were refunded — try again.')
+        return
+      }
+      setAiDraft(outcome.text)
+      setPreviewMode('ai')
+      setInfo(
+        outcome.source === 'ai'
+          ? `AI rewrite ready (−${ATS_AI_IMPROVE_COST} credits). Review gaps before you claim new tools.`
+          : `Smart local rewrite ready (−${ATS_AI_IMPROVE_COST} credits). Remote AI was unavailable, so we used the on-device improver.`,
+      )
+      window.setTimeout(() => {
+        resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 60)
+    } catch {
+      refundAiCredits(ATS_AI_IMPROVE_COST)
+      refreshCredits()
+      setError('AI improve failed. Credits refunded.')
+    } finally {
+      setImproving(false)
+    }
+  }
+
+  async function copyImproved() {
+    const text = displayText
+    if (!text) return
+    try {
+      await navigator.clipboard.writeText(text)
       setCopied(true)
       window.setTimeout(() => setCopied(false), 1600)
     } catch {
@@ -230,17 +304,28 @@ export function AtsCheckPage() {
       />
       <div className="ats-orb ats-orb-a pointer-events-none absolute -left-20 top-10 h-52 w-52 rounded-full bg-sky-200/40 blur-3xl" aria-hidden />
       <div className="ats-orb ats-orb-b pointer-events-none absolute -right-16 top-28 h-44 w-44 rounded-full bg-indigo-200/35 blur-3xl" aria-hidden />
+      <div className="ats-orb ats-orb-c pointer-events-none absolute bottom-24 left-1/3 h-40 w-40 rounded-full bg-emerald-200/25 blur-3xl" aria-hidden />
 
       <section className="ats-enter mx-auto max-w-6xl px-4 pt-10 sm:px-6">
-        <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-sky-900">
-          <FileSearch className="h-4 w-4" aria-hidden />
-          Resume checker
-        </p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight text-navy-950 sm:text-4xl">Check score, then fix the format</h1>
-        <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 sm:text-base">
-          Upload a resume for readiness scoring and issue breakdown. Pick an ATS-friendly template to rebuild a cleaner version — optionally
-          tailored to a job description.
-        </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-sky-900">
+              <FileSearch className="h-4 w-4" aria-hidden />
+              Resume checker
+            </p>
+            <h1 className="mt-2 text-3xl font-semibold tracking-tight text-navy-950 sm:text-4xl">
+              Score, tailor, then improve with AI
+            </h1>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 sm:text-base">
+              Upload a resume for readiness scoring. In Resume + JD mode we rebuild toward the job. Spend AI credits for a deeper rewrite
+              after analysis.
+            </p>
+          </div>
+          <div className="ats-credit-chip inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50/90 px-3 py-1.5 text-sm font-semibold text-amber-950 shadow-sm">
+            <Coins className="h-4 w-4 text-amber-700" />
+            {credits} AI credit{credits === 1 ? '' : 's'}
+          </div>
+        </div>
       </section>
 
       <div className="ats-fade-up mx-auto mt-6 max-w-6xl px-4 sm:px-6">
@@ -268,7 +353,7 @@ export function AtsCheckPage() {
 
       <div className="mx-auto mt-6 grid max-w-6xl gap-6 px-4 sm:px-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="space-y-5">
-          <div className={`rounded-2xl border border-sky-100/90 bg-white/95 p-5 shadow-sm sm:p-6 ${busy ? 'opacity-70' : ''}`}>
+          <div className={`ats-card-lift rounded-2xl border border-sky-100/90 bg-white/95 p-5 shadow-sm sm:p-6 ${busy ? 'opacity-70' : ''}`}>
             <input
               ref={inputRef}
               type="file"
@@ -324,7 +409,7 @@ export function AtsCheckPage() {
                 id="ats-resume"
                 className="min-h-36"
                 value={resumeText}
-                disabled={busy || analyzing}
+                disabled={busy || analyzing || improving}
                 onChange={(event) => setResumeText(event.target.value.slice(0, RESUME_TEXT_MAX))}
                 placeholder="Or paste resume text here."
               />
@@ -337,7 +422,7 @@ export function AtsCheckPage() {
                   id="ats-jd"
                   className="min-h-28"
                   value={jobText}
-                  disabled={busy || analyzing}
+                  disabled={busy || analyzing || improving}
                   onChange={(event) => onJobTextChange(event.target.value.slice(0, 12_000))}
                   placeholder="Paste the JD to tailor missing skills into the improved template."
                 />
@@ -345,9 +430,10 @@ export function AtsCheckPage() {
             ) : null}
 
             {error ? <p className="mt-3 text-sm text-red-700">{error}</p> : null}
+            {info ? <p className="mt-3 text-sm text-emerald-800">{info}</p> : null}
 
             <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
-              <Button type="button" disabled={busy || analyzing} onClick={onCheck} className="ats-cta-glow">
+              <Button type="button" disabled={busy || analyzing || improving} onClick={onCheck} className="ats-cta-glow">
                 <span className="inline-flex items-center gap-2">
                   <Sparkles className="h-4 w-4" />
                   {report ? 'Re-check resume' : 'Check score'}
@@ -358,7 +444,7 @@ export function AtsCheckPage() {
 
           {report ? (
             <div ref={resultsRef} className="ats-panel grid gap-5 lg:grid-cols-[17rem_minmax(0,1fr)]">
-              <aside className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+              <aside className="ats-card-lift rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                   {report.fitScore != null ? 'Job fit score' : 'Your score'}
                 </p>
@@ -373,11 +459,11 @@ export function AtsCheckPage() {
                 </p>
                 {report.jdMatch ? (
                   <div className="mt-3 grid grid-cols-2 gap-2 text-center">
-                    <div className="rounded-lg border border-slate-100 bg-slate-50 px-2 py-2">
+                    <div className="ats-chip-pop rounded-lg border border-slate-100 bg-slate-50 px-2 py-2">
                       <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">ATS readiness</p>
                       <p className="text-sm font-semibold text-navy-950">{report.readiness.score}</p>
                     </div>
-                    <div className="rounded-lg border border-indigo-100 bg-indigo-50/60 px-2 py-2">
+                    <div className="ats-chip-pop rounded-lg border border-indigo-100 bg-indigo-50/60 px-2 py-2">
                       <p className="text-[10px] font-semibold uppercase tracking-wide text-indigo-800">JD coverage</p>
                       <p className="text-sm font-semibold text-navy-950">{report.jdMatch.score}%</p>
                     </div>
@@ -428,15 +514,14 @@ export function AtsCheckPage() {
 
               <div className="space-y-5">
                 {report.jdMatch && report.fitScore != null && report.fitScore < 50 ? (
-                  <div className="rounded-2xl border border-rose-200 bg-rose-50/70 p-4 sm:p-5">
+                  <div className="ats-alert-pulse rounded-2xl border border-rose-200 bg-rose-50/70 p-4 sm:p-5">
                     <p className="inline-flex items-center gap-2 text-sm font-semibold text-rose-950">
                       <AlertTriangle className="h-4 w-4" />
                       Weak match for this job description
                     </p>
                     <p className="mt-1 text-sm leading-6 text-rose-900/90">
-                      ATS readiness can still look high when the resume is well formatted. Job fit is driven by JD skills —
-                      this resume covers {report.jdMatch.matchedSkills.length}/{report.jdMatch.jobSkills.length} required
-                      tools.
+                      ATS readiness can still look high when the resume is well formatted. Job fit is driven by JD skills — this resume
+                      covers {report.jdMatch.matchedSkills.length}/{report.jdMatch.jobSkills.length} required tools.
                     </p>
                     {report.suggestions.length > 0 ? (
                       <ul className="mt-3 space-y-1.5 text-sm text-rose-950">
@@ -450,9 +535,11 @@ export function AtsCheckPage() {
                   </div>
                 ) : null}
 
-                <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                <section className="ats-card-lift rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h2 className="text-lg font-semibold text-navy-950 capitalize">{activeCategory === 'ats' ? 'ATS essentials' : activeCategory}</h2>
+                    <h2 className="text-lg font-semibold text-navy-950 capitalize">
+                      {activeCategory === 'ats' ? 'ATS essentials' : activeCategory}
+                    </h2>
                     <span className="rounded-full bg-violet-50 px-2.5 py-1 text-xs font-semibold text-violet-800 ring-1 ring-violet-100">
                       {report.issueCount} issue{report.issueCount === 1 ? '' : 's'} found
                     </span>
@@ -485,9 +572,7 @@ export function AtsCheckPage() {
                         <li
                           key={issue.id}
                           className={`rounded-xl border px-3 py-3 text-sm ${
-                            issue.severity === 'high'
-                              ? 'border-rose-100 bg-rose-50/50'
-                              : 'border-amber-100 bg-amber-50/40'
+                            issue.severity === 'high' ? 'border-rose-100 bg-rose-50/50' : 'border-amber-100 bg-amber-50/40'
                           }`}
                         >
                           <p className="inline-flex items-center gap-2 font-semibold text-navy-950">
@@ -501,15 +586,32 @@ export function AtsCheckPage() {
                   </ul>
                 </section>
 
-                <section className="rounded-2xl border border-indigo-100 bg-white p-5 shadow-sm sm:p-6">
-                  <h2 className="text-lg font-semibold text-navy-950">
-                    {report.jdMatch ? 'Tailor resume to this JD' : 'Improve with a template'}
-                  </h2>
-                  <p className="mt-1 text-sm text-slate-600">
-                    {report.jdMatch
-                      ? 'We rebuild the resume toward this job: target summary, prioritized skills, and concrete next steps. Missing tools are listed as gaps — only keep them if you can prove them.'
-                      : 'Choose a layout. We rebuild a cleaner text version for parsers and recruiters.'}
-                  </p>
+                <section className="ats-ai-panel relative overflow-hidden rounded-2xl border border-indigo-100 bg-white p-5 shadow-sm sm:p-6">
+                  <div className="pointer-events-none absolute -right-10 -top-10 h-36 w-36 rounded-full bg-indigo-200/30 blur-2xl" aria-hidden />
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <h2 className="text-lg font-semibold text-navy-950">
+                        {report.jdMatch ? 'Tailor resume to this JD' : 'Improve with a template'}
+                      </h2>
+                      <p className="mt-1 text-sm text-slate-600">
+                        {report.jdMatch
+                          ? 'Free template rebuild prioritizes JD skills. Then spend credits for a deeper AI rewrite.'
+                          : 'Free ATS template rebuild, plus optional AI polish with credits.'}
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      disabled={busy || analyzing || improving}
+                      onClick={() => void onImproveWithAi()}
+                      className="ats-ai-glow"
+                    >
+                      <span className="inline-flex items-center gap-2">
+                        {improving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
+                        {improving ? 'Improving…' : `Improve with AI (−${ATS_AI_IMPROVE_COST})`}
+                      </span>
+                    </Button>
+                  </div>
+
                   <div className="mt-4 grid gap-3 sm:grid-cols-3">
                     {ATS_TEMPLATES.map((template) => (
                       <button
@@ -517,9 +619,9 @@ export function AtsCheckPage() {
                         type="button"
                         onClick={() => {
                           setTemplateId(template.id)
-                          setPreviewMode('improved')
+                          if (previewMode !== 'ai') setPreviewMode('improved')
                         }}
-                        className={`rounded-xl border p-3 text-left transition ${
+                        className={`ats-template-card rounded-xl border p-3 text-left transition ${
                           templateId === template.id
                             ? 'border-indigo-400 bg-indigo-50 shadow-sm'
                             : 'border-slate-200 hover:border-indigo-200'
@@ -531,36 +633,42 @@ export function AtsCheckPage() {
                     ))}
                   </div>
 
-                  <div className="mt-4 inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1">
-                    <button
-                      type="button"
-                      className={`rounded-md px-3 py-1.5 text-xs font-semibold ${
-                        previewMode === 'original' ? 'bg-white text-navy-950 shadow-sm' : 'text-slate-600'
-                      }`}
-                      onClick={() => setPreviewMode('original')}
-                    >
-                      Original
-                    </button>
-                    <button
-                      type="button"
-                      className={`rounded-md px-3 py-1.5 text-xs font-semibold ${
-                        previewMode === 'improved' ? 'bg-white text-navy-950 shadow-sm' : 'text-slate-600'
-                      }`}
-                      onClick={() => setPreviewMode('improved')}
-                    >
-                      {report.jdMatch ? 'JD-tailored version' : 'Improved template'}
-                    </button>
+                  <div className="mt-4 inline-flex flex-wrap rounded-lg border border-slate-200 bg-slate-50 p-1">
+                    {(
+                      [
+                        ['original', 'Original'],
+                        ['improved', report.jdMatch ? 'JD-tailored' : 'Template'],
+                        ...(aiDraft ? ([['ai', 'AI rewrite']] as const) : []),
+                      ] as Array<[PreviewMode, string]>
+                    ).map(([id, label]) => (
+                      <button
+                        key={id}
+                        type="button"
+                        className={`rounded-md px-3 py-1.5 text-xs font-semibold ${
+                          previewMode === id ? 'bg-white text-navy-950 shadow-sm' : 'text-slate-600'
+                        }`}
+                        onClick={() => setPreviewMode(id)}
+                      >
+                        {label}
+                      </button>
+                    ))}
                   </div>
 
-                  <pre className="ats-fade-up mt-4 max-h-80 overflow-auto whitespace-pre-wrap rounded-xl border border-slate-200 bg-slate-50/80 p-4 text-xs leading-5 text-slate-800">
-                    {previewMode === 'original' ? resumeText : improvedText}
+                  <pre
+                    className={`ats-draft-pane mt-4 max-h-96 overflow-auto whitespace-pre-wrap rounded-xl border p-4 text-xs leading-5 text-slate-800 ${
+                      previewMode === 'ai'
+                        ? 'border-indigo-200 bg-gradient-to-br from-indigo-50/80 to-sky-50/60'
+                        : 'border-slate-200 bg-slate-50/80'
+                    }`}
+                  >
+                    {displayText}
                   </pre>
 
                   <div className="mt-4 flex flex-col gap-2 sm:flex-row">
                     <Button type="button" variant="outline" onClick={() => void copyImproved()}>
                       <span className="inline-flex items-center gap-2">
                         <ClipboardCopy className="h-4 w-4" />
-                        {copied ? 'Copied improved text' : 'Copy improved resume'}
+                        {copied ? 'Copied' : previewMode === 'ai' ? 'Copy AI rewrite' : 'Copy improved resume'}
                       </span>
                     </Button>
                     <Link to="/candidate/resume-skills">
@@ -582,38 +690,58 @@ export function AtsCheckPage() {
           ) : null}
         </div>
 
-        <aside className="ats-fade-up h-fit rounded-2xl border border-slate-200 bg-white/95 p-5 shadow-sm">
-          <p className="text-sm font-semibold text-navy-950">How this works</p>
-          <ol className="mt-3 list-decimal space-y-2 pl-4 text-sm leading-6 text-slate-600">
-            <li>Upload or paste your resume.</li>
-            <li>Optional: paste a JD — the headline score becomes job fit.</li>
-            <li>Review JD gaps, then content / ATS issues.</li>
-            <li>Copy the JD-tailored draft and only keep skills you can prove.</li>
-          </ol>
-          <p className="mt-4 text-xs text-slate-500">
-            Job fit weights JD skill coverage far above formatting. Suggestions are keyword-based — not a guarantee of interviews.
-          </p>
+        <aside className="ats-fade-up h-fit space-y-4">
+          <div className="rounded-2xl border border-slate-200 bg-white/95 p-5 shadow-sm">
+            <p className="text-sm font-semibold text-navy-950">How this works</p>
+            <ol className="mt-3 list-decimal space-y-2 pl-4 text-sm leading-6 text-slate-600">
+              <li>Upload or paste your resume.</li>
+              <li>Optional: paste a JD — headline score becomes job fit.</li>
+              <li>Review gaps, pick a free template rebuild.</li>
+              <li>
+                Spend {ATS_AI_IMPROVE_COST} AI credits for Improve with AI (resume-only or Resume + JD).
+              </li>
+            </ol>
+            <p className="mt-4 text-xs text-slate-500">
+              Credits start at 10 in this browser. AI rewrites never invent experience — missing JD tools stay listed as gaps.
+            </p>
+          </div>
+          <div className="ats-credit-card rounded-2xl border border-amber-100 bg-gradient-to-br from-amber-50 to-white p-5 shadow-sm">
+            <p className="inline-flex items-center gap-2 text-sm font-semibold text-amber-950">
+              <Coins className="h-4 w-4" />
+              Your AI credits
+            </p>
+            <p className="mt-2 text-3xl font-semibold text-navy-950">{credits}</p>
+            <p className="mt-1 text-xs text-slate-600">
+              Improve with AI costs {ATS_AI_IMPROVE_COST} credits. Failed runs are refunded.
+            </p>
+          </div>
         </aside>
       </div>
 
-      {analyzing ? (
+      {analyzing || improving ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[2px]" role="dialog" aria-modal="true">
           <div className="ats-analyze-modal w-full max-w-md rounded-2xl border border-white/20 bg-white p-5 shadow-2xl sm:p-6">
             <div className="flex items-center justify-between gap-3">
               <p className="inline-flex items-center gap-2 text-sm font-semibold text-navy-950">
                 <Loader2 className="h-4 w-4 animate-spin text-sky-700" />
-                Analyzing & preparing fixes…
+                {improving ? 'AI improving your resume…' : 'Analyzing & preparing fixes…'}
               </p>
-              <p className="text-xs font-medium text-slate-500">{Math.min(progress, 99)}% complete</p>
+              {!improving ? <p className="text-xs font-medium text-slate-500">{Math.min(progress, 99)}% complete</p> : null}
             </div>
             <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-sky-500 via-indigo-500 to-emerald-500 transition-[width] duration-200"
-                style={{ width: `${Math.min(progress, 100)}%` }}
+                className={`h-full rounded-full bg-gradient-to-r from-sky-500 via-indigo-500 to-emerald-500 ${
+                  improving ? 'ats-ai-progress w-2/3' : 'transition-[width] duration-200'
+                }`}
+                style={improving ? undefined : { width: `${Math.min(progress, 100)}%` }}
               />
             </div>
             <p className="mt-3 text-xs text-slate-600">
-              Scoring job fit vs the JD, then sections and readability — then building your tailored draft.
+              {improving
+                ? mode === 'jd'
+                  ? 'Rewriting toward the JD: summary, prioritized bullets, and honest skill gaps.'
+                  : 'Polishing structure, bullets, and keyword clarity for ATS parsers.'
+                : 'Scoring job fit vs the JD, then sections and readability — then building your tailored draft.'}
             </p>
           </div>
         </div>

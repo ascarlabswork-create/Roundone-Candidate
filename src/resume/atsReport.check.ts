@@ -1,3 +1,4 @@
+import { improveResumeLocally } from './atsAiImprove.ts'
 import { buildAtsFullReport } from './atsReport.ts'
 import { formatResumeWithTemplate } from './atsTemplates.ts'
 import { computeJobFitScore } from './atsCheck.ts'
@@ -79,5 +80,17 @@ expect(/SKILLS/i.test(flatImproved), 'flat template has skills')
 expect(/Jenkins|Kubernetes|AWS/i.test(flatImproved), 'devops skills preserved')
 expect(/SAP/i.test(flatImproved), 'JD gaps listed in tailored draft')
 expect(/NEXT STEPS FOR THIS JD/i.test(flatImproved), 'next steps included')
+
+const aiLocal = improveResumeLocally({
+  resumeText: flat,
+  jobDescription: 'Requirements: SAP UI5 Development, SAP Fiori, ABAP.',
+  templateId: 'classic',
+  matchedSkills: flatReport.jdMatch?.matchedSkills ?? [],
+  missingSkills: flatReport.jdMatch?.missingSkills ?? [],
+  suggestions: flatReport.suggestions.slice(0, 3),
+})
+expect(/SUMMARY/i.test(aiLocal), 'AI local improve has summary')
+expect(/AI NEXT STEPS FOR THIS JD/i.test(aiLocal), 'AI local improve has JD next steps')
+expect(/SAP/i.test(aiLocal), 'AI local improve keeps SAP gaps visible')
 
 console.log('atsReport.check.ts passed')

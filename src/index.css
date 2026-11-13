@@ -900,6 +900,86 @@
   box-shadow: 0 0 22px rgba(14, 165, 233, 0.28);
 }
 
+.ats-orb-c {
+  animation: ats-orb-float 11s ease-in-out infinite;
+}
+
+.ats-credit-chip {
+  animation: ats-chip-pop 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.ats-card-lift {
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+.ats-card-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+}
+
+.ats-ai-glow:not(:disabled) {
+  transition: box-shadow 0.3s ease, transform 0.2s ease;
+}
+
+.ats-ai-glow:not(:disabled):hover {
+  box-shadow: 0 0 24px rgba(99, 102, 241, 0.35);
+  transform: translateY(-1px);
+}
+
+.ats-template-card {
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    background-color 0.2s ease;
+}
+
+.ats-template-card:hover {
+  transform: translateY(-2px);
+}
+
+.ats-draft-pane {
+  animation: ats-panel-enter 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.ats-alert-pulse {
+  animation: ats-panel-enter 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.ats-credit-card {
+  animation: ats-panel-enter 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.ats-ai-panel {
+  animation: ats-panel-enter 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes ats-ai-shimmer {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(220%);
+  }
+}
+
+.ats-ai-progress {
+  position: relative;
+  overflow: hidden;
+  animation: ats-parse-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes ats-parse-pulse {
+  0%,
+  100% {
+    opacity: 0.75;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
 .ats-dropzone {
   transition:
     transform 0.25s ease,
