@@ -1,4 +1,4 @@
-import { authErrorMessage, isDuplicateSignup, parseAuthRateLimitSeconds } from './authCopy.ts'
+import { authErrorMessage, isDuplicateSignup, maskEmailAddress, parseAuthRateLimitSeconds } from './authCopy.ts'
 
 function expect(condition: boolean, message: string) {
   if (!condition) throw new Error(message)
@@ -20,5 +20,14 @@ expect(
   authErrorMessage(new Error('Password should be at least 6 characters')) === 'Your password must be at least 6 characters.',
   'short-password signup still maps correctly',
 )
+expect(
+  authErrorMessage(new Error('Token has expired or is invalid')).includes('expired') ||
+    authErrorMessage(new Error('otp_expired')).includes('expired'),
+  'expired OTP copy is clear',
+)
+expect(authErrorMessage(new Error('Invalid OTP')).includes('incorrect'), 'invalid OTP copy is clear')
+expect(maskEmailAddress('srimadhanduddelly@gmail.com').includes('@'), 'email mask keeps domain')
+expect(maskEmailAddress('srimadhanduddelly@gmail.com').startsWith('s'), 'email mask keeps first letter')
+expect(!maskEmailAddress('srimadhanduddelly@gmail.com').includes('rimadhanduddell'), 'email mask hides most of local part')
 
 console.log('auth.check passed')

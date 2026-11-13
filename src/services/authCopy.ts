@@ -1,3 +1,20 @@
+/** Mask an email for OTP screens (e.g. s******y@g*ail.com). */
+export function maskEmailAddress(email: string) {
+  const trimmed = email.trim()
+  const at = trimmed.indexOf('@')
+  if (at <= 0) return trimmed
+  const local = trimmed.slice(0, at)
+  const domain = trimmed.slice(at + 1)
+  const maskedLocal =
+    local.length <= 2
+      ? `${local[0] ?? ''}*`
+      : `${local[0]}${'*'.repeat(Math.min(6, local.length - 2))}${local[local.length - 1]}`
+  const [host, ...rest] = domain.split('.')
+  const maskedHost =
+    !host || host.length <= 2 ? `${host?.[0] ?? '*'}*` : `${host[0]}*${host[host.length - 1]}`
+  return `${maskedLocal}@${[maskedHost, ...rest].join('.')}`
+}
+
 export function parseAuthRateLimitSeconds(message: string) {
   const match = message.match(/after (\d+) seconds?/i)
   if (!match) return null
@@ -22,6 +39,29 @@ export function authErrorMessage(error: unknown): string {
     message.includes('invalid password')
   ) {
     return 'Incorrect email or password. If you created this account with Google, use Continue with Google. To sign in with email, choose Forgot password and set a password.'
+  }
+  if (
+    message.includes('token has expired') ||
+    message.includes('otp has expired') ||
+    message.includes('otp_expired') ||
+    message.includes('email link is invalid or has expired')
+  ) {
+    return 'That code has expired. Choose Resend code and try again.'
+  }
+  if (
+    message.includes('invalid otp') ||
+    message.includes('otp is invalid') ||
+    message.includes('token is invalid') ||
+    message.includes('invalid token')
+  ) {
+    return 'That code is incorrect. Check the email and try again, or resend a new code.'
+  }
+  if (
+    message.includes('signups not allowed') ||
+    message.includes('user not found') ||
+    message.includes('unable to validate email address: invalid')
+  ) {
+    return 'No account found for that email. Create an account, or use Continue with Google.'
   }
   if (message.includes('email not confirmed') || message.includes('not confirmed')) {
     return 'Please confirm your email from the link we sent, then sign in.'
@@ -55,7 +95,7 @@ export function authErrorMessage(error: unknown): string {
     message.includes('error sending magic link email') ||
     message.includes('error sending email')
   ) {
-    return 'We could not send a confirmation email right now. Use Continue with Google, or try again in a few minutes.'
+    return 'We could not send an email right now. Use Continue with Google, or try again in a few minutes.'
   }
   if (message.includes('email address not authorized')) {
     return 'This email cannot receive sign-up mail yet. Use Continue with Google, or contact support.'
