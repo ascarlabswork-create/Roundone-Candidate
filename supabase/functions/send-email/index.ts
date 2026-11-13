@@ -108,10 +108,12 @@ function messageForAction(
 
   if (action === "magiclink") {
     return {
-      subject,
+      subject: "Your jobround.ai sign-in code",
       html: htmlWrap(
-        "Sign in",
-        `<p>Use this one-time link to sign in:</p>
+        "Your sign-in code",
+        `<p>Enter this 6-digit code to sign in:</p>
+<p style="font-size:22px;font-weight:600;letter-spacing:0.12em">${emailData.token}</p>
+<p style="margin-top:16px">Or use this one-time link:</p>
 <p><a href="${confirmUrl}" style="display:inline-block;padding:12px 18px;background:#2563eb;color:#fff;text-decoration:none;border-radius:10px;font-weight:600">Sign in</a></p>`,
       ),
     };

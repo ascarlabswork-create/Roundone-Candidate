@@ -105,6 +105,40 @@ export async function signInCandidate(input: SignInInput) {
   return data.user
 }
 
+/** Send a 6-digit email sign-in code (OTP). Does not create a new account. */
+export async function sendEmailSignInCode(email: string) {
+  const trimmed = email.trim()
+  if (!trimmed) throw new Error('Enter your email first.')
+  const { error } = await supabase.auth.signInWithOtp({
+    email: trimmed,
+    options: {
+      shouldCreateUser: false,
+      emailRedirectTo: new URL(OAUTH_CALLBACK_PATH, window.location.origin).toString(),
+    },
+  })
+  if (error) throw new Error(authErrorMessage(error))
+}
+
+/** Verify the 6-digit email sign-in code and create a session. */
+export async function verifyEmailSignInCode(email: string, token: string) {
+  const trimmed = email.trim()
+  const code = token.replace(/\s+/g, '')
+  if (!trimmed) throw new Error('Enter your email first.')
+  if (!/^\d{6}$/.test(code)) throw new Error('Enter the 6-digit code from your email.')
+  const { data, error } = await supabase.auth.verifyOtp({
+    email: trimmed,
+    token: code,
+    type: 'email',
+  })
+  if (error) throw new Error(authErrorMessage(error))
+  if (!data.user || !data.session) {
+    throw new Error('Sign in did not create a session.')
+  }
+  return data.user
+}
+
+export { maskEmailAddress } from './authCopy.ts'
+
 /** Ensure this signed-in email also has a candidate persona (same login can be an interviewer). */
 export async function claimCandidatePersona(): Promise<boolean> {
   const { data, error } = await supabase.rpc('claim_candidate_persona')

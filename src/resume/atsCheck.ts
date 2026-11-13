@@ -304,3 +304,17 @@ export function atsGradeLabel(grade: AtsReadinessResult['grade']) {
   if (grade === 'fair') return 'Fair'
   return 'Needs work'
 }
+
+/**
+ * Overall job-fit when a JD is present. Keyword coverage dominates so a
+ * well-formatted DevOps resume cannot look “Strong” against an SAP UI5 JD.
+ */
+export function computeJobFitScore(readinessScore: number, jdCoverageScore: number) {
+  const readiness = Math.min(100, Math.max(0, readinessScore))
+  const coverage = Math.min(100, Math.max(0, jdCoverageScore))
+  return Math.round(coverage * 0.8 + readiness * 0.2)
+}
+
+export function gradeForScore(score: number): AtsReadinessResult['grade'] {
+  return gradeFor(score)
+}

@@ -73,8 +73,22 @@ export function AtsCheckPage() {
     if (!resumeText.trim()) return ''
     return formatResumeWithTemplate(resumeText, templateId, {
       missingJobSkills: report?.jdMatch?.missingSkills?.slice(0, 8) ?? [],
+      matchedJobSkills: report?.jdMatch?.matchedSkills?.slice(0, 8) ?? [],
+      jobDescription: report?.jdMatch ? jobText : '',
+      suggestions: report?.suggestions?.slice(0, 6) ?? [],
     })
-  }, [resumeText, templateId, report?.jdMatch?.missingSkills])
+  }, [
+    resumeText,
+    templateId,
+    jobText,
+    report?.jdMatch,
+    report?.jdMatch?.missingSkills,
+    report?.jdMatch?.matchedSkills,
+    report?.suggestions,
+  ])
+
+  const headlineScore = report?.fitScore ?? report?.readiness.score ?? 0
+  const headlineGrade = report?.fitGrade ?? report?.readiness.grade ?? 'needs_work'
 
   const categoryIssues = useMemo(() => {
     if (!report) return [] as AtsIssue[]
@@ -116,7 +130,11 @@ export function AtsCheckPage() {
       try {
         const next = buildAtsFullReport(text, useJd ? jd : '', '')
         setReport(next)
-        setActiveCategory(next.categories.sort((a, b) => b.issueCount - a.issueCount)[0]?.id ?? 'content')
+        setActiveCategory(
+          next.jdMatch && next.jdMatch.score < 50
+            ? 'content'
+            : (next.categories.sort((a, b) => b.issueCount - a.issueCount)[0]?.id ?? 'content'),
+        )
         setPreviewMode('improved')
         setProgress(100)
         window.setTimeout(() => {
@@ -342,13 +360,29 @@ export function AtsCheckPage() {
             <div ref={resultsRef} className="ats-panel grid gap-5 lg:grid-cols-[17rem_minmax(0,1fr)]">
               <aside className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  {report.jdMatch ? 'Readiness score' : 'Your score'}
+                  {report.fitScore != null ? 'Job fit score' : 'Your score'}
                 </p>
-                <Gauge score={report.readiness.score} />
-                <p className={`mx-auto mt-2 w-fit rounded-full border px-2.5 py-0.5 text-xs font-semibold ${scoreTone(report.readiness.score)}`}>
-                  {atsGradeLabel(report.readiness.grade)}
+                <Gauge score={headlineScore} />
+                <p className={`mx-auto mt-2 w-fit rounded-full border px-2.5 py-0.5 text-xs font-semibold ${scoreTone(headlineScore)}`}>
+                  {atsGradeLabel(headlineGrade)}
                 </p>
-                <p className="mt-2 text-center text-xs text-slate-500">Checklist only — not a hiring prediction.</p>
+                <p className="mt-2 text-center text-xs text-slate-500">
+                  {report.fitScore != null
+                    ? 'Mostly JD skill coverage — not a hiring prediction.'
+                    : 'Checklist only — not a hiring prediction.'}
+                </p>
+                {report.jdMatch ? (
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-center">
+                    <div className="rounded-lg border border-slate-100 bg-slate-50 px-2 py-2">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">ATS readiness</p>
+                      <p className="text-sm font-semibold text-navy-950">{report.readiness.score}</p>
+                    </div>
+                    <div className="rounded-lg border border-indigo-100 bg-indigo-50/60 px-2 py-2">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-indigo-800">JD coverage</p>
+                      <p className="text-sm font-semibold text-navy-950">{report.jdMatch.score}%</p>
+                    </div>
+                  </div>
+                ) : null}
                 <div className="mt-5 space-y-2">
                   {report.categories.map((category) => (
                     <button
@@ -375,12 +409,9 @@ export function AtsCheckPage() {
                   <div className="mt-4 rounded-xl border border-indigo-100 bg-indigo-50/50 p-3">
                     <p className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-indigo-900">
                       <Target className="h-3.5 w-3.5" />
-                      JD coverage
+                      JD coverage detail
                     </p>
-                    <p className={`mt-1 text-2xl font-semibold ${scoreTone(report.jdMatch.score).split(' ')[0]}`}>
-                      {report.jdMatch.score}%
-                    </p>
-                    <p className="text-xs text-slate-600">
+                    <p className="mt-1 text-xs text-slate-600">
                       {report.jdMatch.matchedSkills.length}/{report.jdMatch.jobSkills.length} required skills found
                     </p>
                     {report.jdMatch.missingSkills.length > 0 ? (
@@ -396,6 +427,29 @@ export function AtsCheckPage() {
               </aside>
 
               <div className="space-y-5">
+                {report.jdMatch && report.fitScore != null && report.fitScore < 50 ? (
+                  <div className="rounded-2xl border border-rose-200 bg-rose-50/70 p-4 sm:p-5">
+                    <p className="inline-flex items-center gap-2 text-sm font-semibold text-rose-950">
+                      <AlertTriangle className="h-4 w-4" />
+                      Weak match for this job description
+                    </p>
+                    <p className="mt-1 text-sm leading-6 text-rose-900/90">
+                      ATS readiness can still look high when the resume is well formatted. Job fit is driven by JD skills —
+                      this resume covers {report.jdMatch.matchedSkills.length}/{report.jdMatch.jobSkills.length} required
+                      tools.
+                    </p>
+                    {report.suggestions.length > 0 ? (
+                      <ul className="mt-3 space-y-1.5 text-sm text-rose-950">
+                        {report.suggestions.slice(0, 5).map((item) => (
+                          <li key={item} className="leading-5">
+                            • {item}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </div>
+                ) : null}
+
                 <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <h2 className="text-lg font-semibold text-navy-950 capitalize">{activeCategory === 'ats' ? 'ATS essentials' : activeCategory}</h2>
@@ -407,7 +461,7 @@ export function AtsCheckPage() {
                   <div className="mt-5">
                     <p className="text-sm font-semibold text-navy-950">Estimated parse coverage</p>
                     <p className="mt-1 text-sm text-slate-600">
-                      How cleanly a typical ATS can read contact, headings, and keywords from this text.
+                      How cleanly a typical ATS can read contact, headings, and keywords from this text (separate from job fit).
                     </p>
                     <div className="mt-3 h-3 overflow-hidden rounded-full bg-slate-100">
                       <div
@@ -428,9 +482,16 @@ export function AtsCheckPage() {
                       </li>
                     ) : (
                       categoryIssues.map((issue) => (
-                        <li key={issue.id} className="rounded-xl border border-amber-100 bg-amber-50/40 px-3 py-3 text-sm">
+                        <li
+                          key={issue.id}
+                          className={`rounded-xl border px-3 py-3 text-sm ${
+                            issue.severity === 'high'
+                              ? 'border-rose-100 bg-rose-50/50'
+                              : 'border-amber-100 bg-amber-50/40'
+                          }`}
+                        >
                           <p className="inline-flex items-center gap-2 font-semibold text-navy-950">
-                            <AlertTriangle className="h-4 w-4 text-amber-700" />
+                            <AlertTriangle className={`h-4 w-4 ${issue.severity === 'high' ? 'text-rose-700' : 'text-amber-700'}`} />
                             {issue.title}
                           </p>
                           <p className="mt-1 text-slate-600">{issue.detail}</p>
@@ -441,10 +502,13 @@ export function AtsCheckPage() {
                 </section>
 
                 <section className="rounded-2xl border border-indigo-100 bg-white p-5 shadow-sm sm:p-6">
-                  <h2 className="text-lg font-semibold text-navy-950">Improve with a template</h2>
+                  <h2 className="text-lg font-semibold text-navy-950">
+                    {report.jdMatch ? 'Tailor resume to this JD' : 'Improve with a template'}
+                  </h2>
                   <p className="mt-1 text-sm text-slate-600">
-                    Choose a layout. We rebuild a cleaner text version — missing JD skills are added to the Skills block when you used JD
-                    tailor mode.
+                    {report.jdMatch
+                      ? 'We rebuild the resume toward this job: target summary, prioritized skills, and concrete next steps. Missing tools are listed as gaps — only keep them if you can prove them.'
+                      : 'Choose a layout. We rebuild a cleaner text version for parsers and recruiters.'}
                   </p>
                   <div className="mt-4 grid gap-3 sm:grid-cols-3">
                     {ATS_TEMPLATES.map((template) => (
@@ -484,7 +548,7 @@ export function AtsCheckPage() {
                       }`}
                       onClick={() => setPreviewMode('improved')}
                     >
-                      Improved template
+                      {report.jdMatch ? 'JD-tailored version' : 'Improved template'}
                     </button>
                   </div>
 
@@ -522,12 +586,12 @@ export function AtsCheckPage() {
           <p className="text-sm font-semibold text-navy-950">How this works</p>
           <ol className="mt-3 list-decimal space-y-2 pl-4 text-sm leading-6 text-slate-600">
             <li>Upload or paste your resume.</li>
-            <li>Optional: paste a JD to see coverage gaps.</li>
-            <li>Review score + issues by category.</li>
-            <li>Pick a template and copy the improved text.</li>
+            <li>Optional: paste a JD — the headline score becomes job fit.</li>
+            <li>Review JD gaps, then content / ATS issues.</li>
+            <li>Copy the JD-tailored draft and only keep skills you can prove.</li>
           </ol>
           <p className="mt-4 text-xs text-slate-500">
-            Suggestions are based on structure and keywords in your text — not a guarantee of interviews or offers.
+            Job fit weights JD skill coverage far above formatting. Suggestions are keyword-based — not a guarantee of interviews.
           </p>
         </aside>
       </div>
@@ -548,7 +612,9 @@ export function AtsCheckPage() {
                 style={{ width: `${Math.min(progress, 100)}%` }}
               />
             </div>
-            <p className="mt-3 text-xs text-slate-600">Checking sections, keywords, and readability — then building your template preview.</p>
+            <p className="mt-3 text-xs text-slate-600">
+              Scoring job fit vs the JD, then sections and readability — then building your tailored draft.
+            </p>
           </div>
         </div>
       ) : null}

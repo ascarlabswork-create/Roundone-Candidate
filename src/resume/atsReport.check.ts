@@ -1,5 +1,6 @@
 import { buildAtsFullReport } from './atsReport.ts'
 import { formatResumeWithTemplate } from './atsTemplates.ts'
+import { computeJobFitScore } from './atsCheck.ts'
 
 function expect(condition: boolean, message: string) {
   if (!condition) throw new Error(message)
@@ -29,6 +30,7 @@ const report = buildAtsFullReport(resume)
 expect(report.readiness.score >= 60, 'solid resume scores reasonably')
 expect(report.categories.length === 3, 'three categories')
 expect(report.parseRate >= 50, 'parse rate present')
+expect(report.fitScore == null, 'no fit score without JD')
 
 const tailored = buildAtsFullReport(
   resume,
@@ -37,10 +39,22 @@ const tailored = buildAtsFullReport(
 )
 expect(Boolean(tailored.jdMatch), 'JD match included')
 expect((tailored.jdMatch?.missingSkills.length ?? 0) >= 1, 'SAP gap flagged')
+expect(typeof tailored.fitScore === 'number', 'fit score present with JD')
+expect((tailored.fitScore ?? 100) < (tailored.readiness.score ?? 0), 'fit below readiness when JD gaps exist')
+expect(tailored.suggestions.length >= 1, 'suggestions present')
+expect(
+  tailored.fitScore === computeJobFitScore(tailored.readiness.score, tailored.jdMatch?.score ?? 0),
+  'fit uses JD-weighted formula',
+)
 
-const improved = formatResumeWithTemplate(resume, 'classic', { missingJobSkills: ['SAP UI5'] })
+const improved = formatResumeWithTemplate(resume, 'classic', {
+  missingJobSkills: ['SAP UI5'],
+  matchedJobSkills: ['AWS', 'Docker'],
+  jobDescription: 'Must have SAP UI5 Development, AWS, Docker.',
+})
 expect(/SKILLS/i.test(improved), 'skills heading present')
-expect(/SAP UI5/i.test(improved), 'missing JD skill injected')
+expect(/SAP UI5/i.test(improved), 'missing JD skill listed')
+expect(/Targeting|Target keywords|Gap/i.test(improved), 'JD-tailored framing present')
 expect(/SUMMARY/i.test(improved), 'summary heading present')
 
 const flat =
@@ -50,14 +64,20 @@ const flatReport = buildAtsFullReport(
   'Requirements: 3 years of experience in SAP UI5 Development. Must know SAP Fiori, OData, JavaScript, and ABAP.',
 )
 expect(flatReport.readiness.score >= 55, 'flattened PDF still scores')
-expect((flatReport.jdMatch?.score ?? 100) < 40, 'DevOps vs SAP UI5 scores low')
+expect((flatReport.jdMatch?.score ?? 100) < 40, 'DevOps vs SAP UI5 coverage low')
+expect((flatReport.fitScore ?? 100) < 40, 'DevOps vs SAP UI5 fit score low')
 expect((flatReport.jdMatch?.missingSkills.length ?? 0) >= 2, 'SAP skills flagged missing')
+expect(flatReport.issues.some((issue) => issue.id === 'jd-fit'), 'jd-fit issue raised')
 const flatImproved = formatResumeWithTemplate(flat, 'classic', {
   missingJobSkills: flatReport.jdMatch?.missingSkills.slice(0, 6) ?? [],
+  matchedJobSkills: flatReport.jdMatch?.matchedSkills.slice(0, 6) ?? [],
+  jobDescription: 'SAP UI5 Development with SAP Fiori and ABAP.',
+  suggestions: flatReport.suggestions.slice(0, 4),
 })
 expect(/Viraj/i.test(flatImproved), 'name recovered from flat text')
 expect(/SKILLS/i.test(flatImproved), 'flat template has skills')
 expect(/Jenkins|Kubernetes|AWS/i.test(flatImproved), 'devops skills preserved')
-expect(/SAP/i.test(flatImproved), 'JD gaps injected into template')
+expect(/SAP/i.test(flatImproved), 'JD gaps listed in tailored draft')
+expect(/NEXT STEPS FOR THIS JD/i.test(flatImproved), 'next steps included')
 
 console.log('atsReport.check.ts passed')
