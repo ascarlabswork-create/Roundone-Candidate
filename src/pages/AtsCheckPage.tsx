@@ -480,7 +480,7 @@ export function AtsCheckPage() {
 
           {report ? (
             <div ref={resultsRef} className="ats-panel grid gap-5 lg:grid-cols-[17rem_minmax(0,1fr)]">
-              <aside className="ats-card-lift rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+              <aside className="ats-card-lift min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                   {report.fitScore != null ? 'Job fit score' : 'Your score'}
                 </p>
@@ -548,7 +548,7 @@ export function AtsCheckPage() {
                 ) : null}
               </aside>
 
-              <div className="space-y-5">
+              <div className="min-w-0 space-y-5">
                 {report.jdMatch && report.fitScore != null && report.fitScore < 50 ? (
                   <div className="ats-alert-pulse rounded-2xl border border-rose-200 bg-rose-50/70 p-4 sm:p-5">
                     <p className="inline-flex items-center gap-2 text-sm font-semibold text-rose-950">
@@ -622,8 +622,8 @@ export function AtsCheckPage() {
                   </ul>
                 </section>
 
-                <section className="ats-ai-panel relative overflow-hidden rounded-2xl border border-indigo-100 bg-white p-5 shadow-sm sm:p-6">
-                  <div className="pointer-events-none absolute -right-10 -top-10 h-36 w-36 rounded-full bg-indigo-200/30 blur-2xl" aria-hidden />
+                <section className="ats-ai-panel relative rounded-2xl border border-indigo-100 bg-white p-5 shadow-sm sm:p-6">
+                  <div className="pointer-events-none absolute -right-10 -top-10 -z-10 h-36 w-36 rounded-full bg-indigo-200/30 blur-2xl" aria-hidden />
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <h2 className="text-lg font-semibold text-navy-950">
@@ -739,62 +739,78 @@ export function AtsCheckPage() {
                     )}
                   </div>
 
-                  <div className="ats-action-row mt-4 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => void copyImproved()}
-                      className="ats-action-btn w-full whitespace-nowrap"
-                    >
-                      <ClipboardCopy className="h-4 w-4 shrink-0" />
-                      {copied ? 'Copied resume' : 'Copy resume'}
-                    </Button>
-                    <Button type="button" variant="outline" size="sm" onClick={downloadResume} className="ats-action-btn w-full whitespace-nowrap">
-                      <Download className="h-4 w-4 shrink-0" />
-                      Download .txt
-                    </Button>
-                    <Button type="button" variant="outline" size="sm" onClick={printResume} className="ats-action-btn w-full whitespace-nowrap">
-                      <Printer className="h-4 w-4 shrink-0" />
-                      Print / Save PDF
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      onClick={applyToEditor}
-                      className="ats-action-btn w-full whitespace-nowrap"
-                    >
-                      <PencilLine className="h-4 w-4 shrink-0" />
-                      {applied ? 'Applied to editor' : 'Apply to editor'}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      disabled={busy || analyzing || improving}
-                      onClick={() => void onImproveWithAi()}
-                      className="ats-action-btn w-full whitespace-nowrap"
-                    >
-                      <RefreshCw className={`h-4 w-4 shrink-0 ${improving ? 'animate-spin' : ''}`} />
-                      Re-run AI (−{ATS_AI_IMPROVE_COST})
-                    </Button>
-                    <Link
-                      to="/candidate/resume-skills"
-                      className="ats-action-link inline-flex h-9 min-h-9 w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border border-slate-200 bg-white px-3.5 text-sm font-semibold text-navy-950"
-                    >
-                      Resume skills
-                      <span aria-hidden>→</span>
-                    </Link>
-                    {mode === 'jd' ? (
-                      <Link
-                        to="/candidate/job-match"
-                        className="ats-action-link inline-flex h-9 min-h-9 w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border border-indigo-200 bg-indigo-50/70 px-3.5 text-sm font-semibold text-indigo-950 sm:col-span-2 lg:col-span-1"
+                  <div className="ats-action-row mt-4 flex flex-col gap-2.5">
+                    <div className="flex flex-col gap-2.5 sm:flex-row sm:flex-wrap">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => void copyImproved()}
+                        className="ats-action-btn sm:min-w-[10.5rem] sm:flex-1"
                       >
-                        Find interviewers
+                        <ClipboardCopy className="h-4 w-4 shrink-0" />
+                        <span className="truncate">{copied ? 'Copied resume' : 'Copy resume'}</span>
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={downloadResume}
+                        className="ats-action-btn sm:min-w-[10.5rem] sm:flex-1"
+                      >
+                        <Download className="h-4 w-4 shrink-0" />
+                        <span className="truncate">Download .txt</span>
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={printResume}
+                        className="ats-action-btn sm:min-w-[10.5rem] sm:flex-1"
+                      >
+                        <Printer className="h-4 w-4 shrink-0" />
+                        <span className="truncate">Print / Save PDF</span>
+                      </Button>
+                    </div>
+                    <div className="flex flex-col gap-2.5 sm:flex-row sm:flex-wrap">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={applyToEditor}
+                        className="ats-action-btn sm:min-w-[10.5rem] sm:flex-1"
+                      >
+                        <PencilLine className="h-4 w-4 shrink-0" />
+                        <span className="truncate">{applied ? 'Applied to editor' : 'Apply to editor'}</span>
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={busy || analyzing || improving}
+                        onClick={() => void onImproveWithAi()}
+                        className="ats-action-btn sm:min-w-[10.5rem] sm:flex-1"
+                      >
+                        <RefreshCw className={`h-4 w-4 shrink-0 ${improving ? 'animate-spin' : ''}`} />
+                        <span className="truncate">Re-run AI (−{ATS_AI_IMPROVE_COST})</span>
+                      </Button>
+                      <Link
+                        to="/candidate/resume-skills"
+                        className="ats-action-link inline-flex h-9 min-h-9 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 text-sm font-semibold text-navy-950 sm:min-w-[10.5rem] sm:flex-1"
+                      >
+                        <span className="truncate">Resume skills</span>
                         <span aria-hidden>→</span>
                       </Link>
-                    ) : null}
+                      {mode === 'jd' ? (
+                        <Link
+                          to="/candidate/job-match"
+                          className="ats-action-link inline-flex h-9 min-h-9 items-center justify-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50/70 px-3.5 text-sm font-semibold text-indigo-950 sm:min-w-[10.5rem] sm:flex-1"
+                        >
+                          <span className="truncate">Find interviewers</span>
+                          <span aria-hidden>→</span>
+                        </Link>
+                      ) : null}
+                    </div>
                   </div>
                 </section>
               </div>
