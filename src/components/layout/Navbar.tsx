@@ -1,4 +1,4 @@
-import { Bell, LogOut, Menu, X } from 'lucide-react'
+import { LogOut, Menu, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
 import { cn } from '../../lib/cn.ts'
@@ -6,6 +6,7 @@ import { useBodyScrollLock } from '../../lib/bodyScrollLock.ts'
 import { useAuthModal } from '../../state/authModal.tsx'
 import { useNotifications } from '../../state/notifications.tsx'
 import { useSession } from '../../state/session.tsx'
+import { NotificationBell } from '../notifications/NotificationBell.tsx'
 import { Button } from '../ui/Button.tsx'
 import { Avatar } from '../ui/identity.tsx'
 import { Logo } from './Logo.tsx'
@@ -87,19 +88,8 @@ export function Navbar() {
         <div className="flex h-14 items-center justify-between gap-2 px-3 sm:px-4">
           <Logo compact />
           <div className="flex min-w-0 items-center gap-1">
+            <NotificationBell />
             <AccountMenu compact />
-            <Link
-              to="/candidate/notifications"
-              className="relative inline-flex h-11 w-11 items-center justify-center rounded-xl text-navy-800 hover:bg-black/[0.04]"
-              aria-label={unreadBadge ? `Notifications, ${unreadBadge} unread` : 'Notifications'}
-            >
-              <Bell className="h-5 w-5" />
-              {unreadBadge ? (
-                <span className="absolute right-1.5 top-1.5 min-w-4 rounded-full bg-coral-600 px-1 text-center text-[10px] font-bold leading-4 text-white">
-                  {unreadBadge}
-                </span>
-              ) : null}
-            </Link>
             <button
               type="button"
               className="inline-flex h-11 w-11 items-center justify-center rounded-xl hover:bg-black/[0.04]"
@@ -217,7 +207,8 @@ function AccountMenu({ compact = false }: { compact?: boolean }) {
 
 export function SignedInDesktopBar() {
   return (
-    <div className="hidden h-16 items-center justify-end border-b border-black/[0.06] bg-white px-6 lg:flex">
+    <div className="hidden h-16 items-center justify-end gap-1 border-b border-black/[0.06] bg-white px-6 lg:flex">
+      <NotificationBell />
       <AccountMenu />
     </div>
   )

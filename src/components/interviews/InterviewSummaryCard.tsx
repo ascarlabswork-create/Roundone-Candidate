@@ -57,7 +57,9 @@ export function InterviewSummaryCard({
                     ? 'blue'
                     : interview.status === 'completed'
                       ? 'green'
-                      : 'slate'
+                      : interview.status === 'rescheduled'
+                        ? 'violet'
+                        : 'slate'
                 }
               >
                 {status}
@@ -77,6 +79,18 @@ export function InterviewSummaryCard({
             <p className="mt-1 text-xs text-slate-500">
               {interview.durationMin} minutes · {zone}
             </p>
+            {interview.status === 'rescheduled' ? (
+              <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-950">
+                Your interviewer rescheduled this interview. Check <span className="font-semibold">Upcoming</span> for
+                the new confirmed time.
+              </p>
+            ) : null}
+            {interview.rescheduledFromBookingId &&
+            (interview.status === 'confirmed' || interview.status === 'in_progress' || interview.status === 'requested') ? (
+              <p className="mt-3 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs leading-5 text-sky-950">
+                New time set by your interviewer after a reschedule.
+              </p>
+            ) : null}
           </div>
         </div>
         <div

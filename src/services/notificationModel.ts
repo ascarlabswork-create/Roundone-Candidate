@@ -128,6 +128,25 @@ export function isUnread(notification: CandidateNotification) {
   return notification.readAt == null
 }
 
+/** Candidate-facing copy so reschedules clearly say the interviewer moved the time. */
+export function notificationDisplayTitle(notification: CandidateNotification) {
+  if (notification.kind === 'booking_rescheduled') return 'Interviewer rescheduled'
+  if (
+    notification.kind === 'booking_confirmed' &&
+    /reschedul|new (confirmed )?time|moved/i.test(`${notification.title} ${notification.body}`)
+  ) {
+    return 'New interview time'
+  }
+  return notification.title
+}
+
+export function notificationDisplayBody(notification: CandidateNotification) {
+  if (notification.kind === 'booking_rescheduled') {
+    return 'Your interviewer moved this interview to a new time. Open My Interviews to see the updated booking.'
+  }
+  return notification.body
+}
+
 export function notificationHref(notification: CandidateNotification): string | null {
   const bookingId = notification.bookingId
   if (!bookingId || !isUuid(bookingId)) return null
@@ -135,11 +154,11 @@ export function notificationHref(notification: CandidateNotification): string | 
   if (notification.kind === 'feedback_ready' || notification.kind === 'interview_completed') {
     return `/candidate/feedback/${bookingId}`
   }
-  if (
-    notification.kind === 'booking_confirmed' ||
-    notification.kind === 'booking_rescheduled' ||
-    notification.kind === 'interview_reminder'
-  ) {
+  // Old booking is retired on reschedule — send the candidate to My Interviews (upcoming).
+  if (notification.kind === 'booking_rescheduled') {
+    return '/candidate/interviews'
+  }
+  if (notification.kind === 'booking_confirmed' || notification.kind === 'interview_reminder') {
     return `/candidate/interview/${bookingId}`
   }
   if (

@@ -88,8 +88,8 @@ export function runNotificationChecks() {
       bookingId: '00000000-0000-4000-8000-000000000024',
       readAt: null,
       createdAt: '2026-09-18T08:00:00.000Z',
-    }) === '/candidate/interview/00000000-0000-4000-8000-000000000024',
-    'Rescheduled bookings route to interview details',
+    }) === '/candidate/interviews',
+    'Rescheduled bookings route to My Interviews (old booking is retired)',
   )
   expect(
     notificationHref({

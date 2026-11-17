@@ -61,7 +61,7 @@ export function interviewStatusLabel(status: string) {
   if (status === 'pending_payment') return 'Payment pending'
   if (status === 'rejected') return 'Booking declined'
   if (status === 'expired') return 'Hold expired'
-  if (status === 'rescheduled') return 'Rescheduled'
+  if (status === 'rescheduled') return 'Rescheduled by interviewer'
   return status
 }
 
