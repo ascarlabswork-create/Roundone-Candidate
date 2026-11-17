@@ -16,6 +16,7 @@ import { SavedJobTargets } from '../components/profile/SavedJobTargets.tsx'
 import { NotificationPreferencesCard } from '../components/notifications/NotificationPreferencesCard.tsx'
 import { Button } from '../components/ui/Button.tsx'
 import { Avatar } from '../components/ui/identity.tsx'
+import { SkillMultiInput } from '../components/ui/SkillMultiInput.tsx'
 import {
   EmptyState,
   ErrorState,
@@ -27,7 +28,6 @@ import {
 } from '../components/ui/primitives.tsx'
 import {
   COMPANIES,
-  SKILLS,
   TIME_WINDOWS,
 } from '../data/catalogs.ts'
 import { candidateDisplayTimezone, formatTimezoneLabel } from '../lib/candidateTimezone.ts'
@@ -280,14 +280,23 @@ export function CandidateProfilePage() {
     }
   }
 
-  function addSkill(value: string) {
-    const skill = value.trim().replace(/\s+/g, ' ')
-    if (!skill) return
-    if (isCanonicalSkillDuplicate(form.skills, skill)) {
-      setSkillError('You already have this skill.')
+  function addSkills(values: string[]) {
+    const cleaned = values.map((value) => value.trim().replace(/\s+/g, ' ')).filter(Boolean)
+    if (cleaned.length === 0) return
+    let next = [...form.skills]
+    let added = 0
+    for (const skill of cleaned) {
+      if (isCanonicalSkillDuplicate(next, skill)) continue
+      next = uniqueCandidateSkillWording([...next, skill])
+      added += 1
+    }
+    if (added === 0) {
+      setSkillError(cleaned.length === 1 ? 'You already have this skill.' : 'Those skills are already on your profile.')
       return
     }
-    void persistSkills([...form.skills, skill])
+    setSkillError(null)
+    setSkillDraft('')
+    void persistSkills(next)
   }
 
   function saveSkillEdit() {
@@ -624,29 +633,15 @@ export function CandidateProfilePage() {
 
                 <div>
                   <FieldLabel htmlFor="skills">Skills</FieldLabel>
-                  <div className="flex gap-2">
-                    <TextInput
-                      id="skills"
-                      list="profile-skill-options"
-                      placeholder="Java, AWS, Microservices"
-                      value={skillDraft}
-                      onChange={(event) => setSkillDraft(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter') {
-                          event.preventDefault()
-                          addSkill(skillDraft)
-                        }
-                      }}
-                    />
-                    <Button variant="outline" onClick={() => addSkill(skillDraft)}>
-                      Add
-                    </Button>
-                  </div>
-                  <datalist id="profile-skill-options">
-                    {SKILLS.map((skill) => (
-                      <option key={skill} value={skill} />
-                    ))}
-                  </datalist>
+                  <SkillMultiInput
+                    id="skills"
+                    value={skillDraft}
+                    onChange={setSkillDraft}
+                    selected={form.skills}
+                    onAdd={addSkills}
+                    placeholder="Java, AWS, Microservices"
+                    disabled={skillBusy}
+                  />
                   {skillError ? <p className="mt-2 text-sm text-red-700">{skillError}</p> : null}
 
                   <div className="mt-3 flex flex-wrap gap-2">

@@ -24,6 +24,7 @@ import { PracticeProgressPage } from '../pages/PracticeProgressPage.tsx'
 import { PracticeSessionDetailPage } from '../pages/PracticeSessionDetailPage.tsx'
 import { PreparationPage } from '../pages/PreparationPage.tsx'
 import { AtsCheckPage } from '../pages/AtsCheckPage.tsx'
+import { AtsResumeStudioPage } from '../pages/AtsResumeStudioPage.tsx'
 import { ResumeSkillsPage } from '../pages/ResumeSkillsPage.tsx'
 import { ProgressPage } from '../pages/ProgressPage.tsx'
 import { SearchPage } from '../pages/SearchPage.tsx'
@@ -80,6 +81,7 @@ export function AppRouter() {
             <Route path="/candidate/preparation" element={<PreparationPage />} />
             <Route path="/candidate/resume-skills" element={<ResumeSkillsPage />} />
             <Route path="/candidate/ats-check" element={<AtsCheckPage />} />
+            <Route path="/candidate/ats-check/studio" element={<AtsResumeStudioPage />} />
             <Route path="/candidate/practice/:type" element={<PracticePage />} />
             <Route path="/candidate/interview-types" element={<Navigate to="/candidate/interviewers" replace />} />
             <Route path="/candidate/resources" element={<ResourcesPage />} />

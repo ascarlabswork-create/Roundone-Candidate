@@ -1,7 +1,12 @@
 import { requestRealtimeSession, requestSpeechAudio } from './aiAssist.ts'
 import type { PracticeSetup } from './aiModel.ts'
 import { microphoneFailureMessage, requestPracticeMicrophone } from './microphoneAccess.ts'
-import { ANSWER_HOLD_MS, ANSWER_MIN_CHARS } from './voiceTurn.ts'
+import {
+  ANSWER_HOLD_MS,
+  ANSWER_MIN_CHARS,
+  NO_SPEECH_AFTER_MUMBLE_MS,
+  NO_SPEECH_SKIP_MS,
+} from './voiceTurn.ts'
 
 export type VoiceState =
   | 'idle'
@@ -18,6 +23,8 @@ export type VoiceClientCallbacks = {
   onAiSpeakingProgress?: (transcriptDelta: string) => void
   onError: (error: string) => void
   onTurnComplete?: (finalCandidateText: string) => void
+  /** Fired when the candidate stays quiet long enough that a real interviewer would move on. */
+  onNoSpeechTimeout?: () => void
 }
 
 export class VoiceClient {
@@ -40,6 +47,9 @@ export class VoiceClient {
 
   // A thinking pause must not finish the answer. This fires only after a long silence.
   private silenceHoldTimer: number | null = null
+
+  // After the question, move on if the candidate never really starts answering.
+  private noSpeechTimer: number | null = null
 
   // Active voice for TTS
   private currentVoice = 'echo'
@@ -70,6 +80,7 @@ export class VoiceClient {
   public resetTurnTranscript() {
     this.accumulatedTranscript = ''
     this.cancelSilenceTimer()
+    this.cancelNoSpeechTimer()
     this.flushRecognitionBuffer()
   }
 
@@ -91,11 +102,39 @@ export class VoiceClient {
     }
   }
 
+  public cancelNoSpeechTimer() {
+    if (this.noSpeechTimer) {
+      window.clearTimeout(this.noSpeechTimer)
+      this.noSpeechTimer = null
+    }
+  }
+
+  private startNoSpeechWatch(thresholdMs = NO_SPEECH_SKIP_MS) {
+    this.cancelNoSpeechTimer()
+    if (this.aiSpeaking || this.state === 'evaluating' || !this.sessionActive) return
+    if (this.accumulatedTranscript.trim().length >= ANSWER_MIN_CHARS) return
+
+    this.noSpeechTimer = window.setTimeout(() => {
+      this.noSpeechTimer = null
+      if (this.aiSpeaking || this.state === 'evaluating' || !this.sessionActive) return
+      if (this.accumulatedTranscript.trim().length >= ANSWER_MIN_CHARS) return
+      this.setState('thinking')
+      this.callbacks.onNoSpeechTimeout?.()
+    }, thresholdMs)
+  }
+
   private startSilenceHold() {
     this.cancelSilenceTimer()
     if (this.aiSpeaking || this.state === 'evaluating') return
-    if (this.accumulatedTranscript.trim().length < ANSWER_MIN_CHARS) return
 
+    const text = this.accumulatedTranscript.trim()
+    if (text.length < ANSWER_MIN_CHARS) {
+      // Brief sounds / "um" — give a shorter window, then move on like a live interview.
+      this.startNoSpeechWatch(NO_SPEECH_AFTER_MUMBLE_MS)
+      return
+    }
+
+    this.cancelNoSpeechTimer()
     this.silenceHoldTimer = window.setTimeout(() => {
       this.silenceHoldTimer = null
       const textToSubmit = this.accumulatedTranscript.trim()
@@ -236,6 +275,7 @@ export class VoiceClient {
       } else if (type === 'input_audio_buffer.speech_started') {
         // Candidate continued after a pause. Keep the same answer.
         this.cancelSilenceTimer()
+        this.cancelNoSpeechTimer()
         if (!this.aiSpeaking) {
           this.setState('listening')
         }
@@ -376,6 +416,7 @@ export class VoiceClient {
   private beginAiSpeaking() {
     this.aiSpeaking = true
     this.cancelSilenceTimer()
+    this.cancelNoSpeechTimer()
     this.stopRecognition()
     if (this.micStream) {
       this.micStream.getAudioTracks().forEach((track) => {
@@ -400,6 +441,10 @@ export class VoiceClient {
       if (this.isUsingFallback) {
         this.startRecognition()
       }
+    }
+    // Real interview pacing: if they never start answering, move on.
+    if (this.state !== 'evaluating') {
+      this.startNoSpeechWatch(NO_SPEECH_SKIP_MS)
     }
   }
 
@@ -547,6 +592,7 @@ export class VoiceClient {
     this.aiSpeaking = false
     this.stopAudioPlayback()
     this.cancelSilenceTimer()
+    this.cancelNoSpeechTimer()
 
     if (this.recognition) {
       this.recognitionRunning = false

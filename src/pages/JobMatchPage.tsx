@@ -5,6 +5,7 @@ import { RESUME_TEXT_MAX, RESUME_TEXT_MIN } from '../resume/aiModel.ts'
 import { JobMatchCard } from '../components/interviewer/JobMatchCard.tsx'
 import { AtsReadinessPanel, JdMatchPanel } from '../components/resume/AtsCheckPanel.tsx'
 import { Button } from '../components/ui/Button.tsx'
+import { SkillMultiInput } from '../components/ui/SkillMultiInput.tsx'
 import { Chip, EmptyState, FieldLabel, Skeleton, TextArea, TextInput } from '../components/ui/primitives.tsx'
 import { skillsFromJobDescription } from '../jobMatch/extractJobSkills.ts'
 import { dedupeSkills } from '../matching/skills.ts'
@@ -268,9 +269,9 @@ export function JobMatchPage() {
     }
   }, [])
 
-  function addSkill() {
-    if (!review) return
-    const next = dedupeSkills([...review.skills, review.skillDraft])
+  function addSkills(values: string[]) {
+    if (!review || values.length === 0) return
+    const next = dedupeSkills([...review.skills, ...values])
     setReview({ ...review, skills: next, skillDraft: '' })
     setSkillsEdited(true)
     setMatches(null)
@@ -510,22 +511,16 @@ export function JobMatchPage() {
                 ))}
               </div>
             )}
-            <Motion className="mt-4 flex flex-col gap-2 sm:flex-row">
-              <TextInput
+            <Motion className="mt-4">
+              <SkillMultiInput
+                id="job-match-skills"
                 value={review.skillDraft}
-                onChange={(event) => setReview({ ...review, skillDraft: event.target.value })}
+                onChange={(draft) => setReview({ ...review, skillDraft: draft })}
+                selected={review.skills}
+                onAdd={addSkills}
                 placeholder="TypeScript, Machine Learning, System Design…"
-                aria-label="Add a required skill"
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') {
-                    event.preventDefault()
-                    addSkill()
-                  }
-                }}
+                addLabel="Add skill"
               />
-              <Button type="button" variant="outline" onClick={addSkill}>
-                Add skill
-              </Button>
             </Motion>
           </Motion>
 

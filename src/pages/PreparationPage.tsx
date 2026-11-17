@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { BookMarked, BookOpen, CalendarDays, Compass, Library, Sparkles, Target } from 'lucide-react'
 import { DataUseConsent } from '../components/legal/DataUseConsent.tsx'
 import { Button } from '../components/ui/Button.tsx'
+import { SkillMultiInput } from '../components/ui/SkillMultiInput.tsx'
 import {
   Badge,
   Card,
@@ -13,7 +14,8 @@ import {
   TextArea,
   TextInput,
 } from '../components/ui/primitives.tsx'
-import { CANDIDATE_LEVELS, INTERVIEW_TYPES, SKILLS, TARGET_ROLES } from '../data/catalogs.ts'
+import { CANDIDATE_LEVELS, INTERVIEW_TYPES, TARGET_ROLES } from '../data/catalogs.ts'
+import { uniqueCandidateSkillWording } from '../matching/skills.ts'
 import { requestPreparationAssist } from '../preparation/aiAssist.ts'
 import {
   canGeneratePreparation,
@@ -173,10 +175,10 @@ export function PreparationPage() {
     setChecked((current) => (current.includes(item) ? current.filter((entry) => entry !== item) : [...current, item]))
   }
 
-  function addSkill(value: string) {
-    const skill = value.trim()
-    if (!skill || input.skills.includes(skill) || input.skills.length >= 12) return
-    setInput({ ...input, skills: [...input.skills, skill] })
+  function addSkills(values: string[]) {
+    if (values.length === 0 || input.skills.length >= 12) return
+    const next = uniqueCandidateSkillWording([...input.skills, ...values]).slice(0, 12)
+    setInput({ ...input, skills: next })
     setSkillDraft('')
   }
 
@@ -318,29 +320,15 @@ export function PreparationPage() {
 
           <div>
             <FieldLabel htmlFor="prep-skills">Skills to emphasize</FieldLabel>
-            <div className="flex gap-2">
-              <TextInput
-                id="prep-skills"
-                list="prep-skill-options"
-                placeholder="Python, FastAPI"
-                value={skillDraft}
-                onChange={(event) => setSkillDraft(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') {
-                    event.preventDefault()
-                    addSkill(skillDraft)
-                  }
-                }}
-              />
-              <Button type="button" variant="outline" onClick={() => addSkill(skillDraft)}>
-                Add
-              </Button>
-            </div>
-            <datalist id="prep-skill-options">
-              {SKILLS.map((skill) => (
-                <option key={skill} value={skill} />
-              ))}
-            </datalist>
+            <SkillMultiInput
+              id="prep-skills"
+              value={skillDraft}
+              onChange={setSkillDraft}
+              selected={input.skills}
+              onAdd={addSkills}
+              max={12}
+              placeholder="Python, FastAPI, System Design"
+            />
             <div className="mt-3 flex flex-wrap gap-2">
               {input.skills.length === 0 ? (
                 <p className="text-sm text-slate-500">Add skills or paste background text below.</p>

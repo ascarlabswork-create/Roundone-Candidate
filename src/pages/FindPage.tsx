@@ -2,12 +2,12 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   COMPANIES,
-  SKILLS,
   TIME_WINDOWS,
 } from '../data/catalogs.ts'
 import { NormalizationSuggestions } from '../components/matching/NormalizationSuggestions.tsx'
 import { ResumeExtractingBanner } from '../components/matching/ResumeExtractingBanner.tsx'
 import { Button } from '../components/ui/Button.tsx'
+import { SkillMultiInput } from '../components/ui/SkillMultiInput.tsx'
 import { Chip, FieldLabel, PageHeader, SelectInput, TextInput } from '../components/ui/primitives.tsx'
 import { preferredDateRangeError } from '../lib/dates.ts'
 import { isCanonicalSkillDuplicate, uniqueCandidateSkillWording } from '../matching/skills.ts'
@@ -85,10 +85,9 @@ export function FindPage() {
     Boolean(initial.targetCompany || initial.naturalLanguageQuery?.trim()),
   )
 
-  function addSkill(skill: string) {
-    const value = skill.trim()
-    if (!value || isCanonicalSkillDuplicate(form.skills, value)) return
-    setForm({ ...form, skills: uniqueCandidateSkillWording([...form.skills, value]) })
+  function addSkills(values: string[]) {
+    if (values.length === 0) return
+    setForm({ ...form, skills: mergeUniqueSkills(form.skills, values) })
     setSkillDraft('')
   }
 
@@ -324,29 +323,14 @@ export function FindPage() {
 
         <div>
           <FieldLabel htmlFor="skills">Skills / Technologies</FieldLabel>
-          <div className="flex gap-2">
-            <TextInput
-              id="skills"
-              list="skill-options"
-              placeholder="Java, AWS, Microservices"
-              value={skillDraft}
-              onChange={(event) => setSkillDraft(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                  event.preventDefault()
-                  addSkill(skillDraft)
-                }
-              }}
-            />
-            <Button variant="outline" onClick={() => addSkill(skillDraft)}>
-              Add
-            </Button>
-          </div>
-          <datalist id="skill-options">
-            {SKILLS.map((skill) => (
-              <option key={skill} value={skill} />
-            ))}
-          </datalist>
+          <SkillMultiInput
+            id="skills"
+            value={skillDraft}
+            onChange={setSkillDraft}
+            selected={form.skills}
+            onAdd={addSkills}
+            placeholder="Java, AWS, Microservices"
+          />
           <div className="mt-3 flex flex-wrap gap-2">
             {form.skills.map((skill) => (
               <Chip

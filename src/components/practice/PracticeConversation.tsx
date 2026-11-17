@@ -142,7 +142,7 @@ export function PracticeConversation({
               maxLength={answerMax}
               disabled={busy || interviewerSpeaking}
               onChange={(event) => onAnswerChange(event.target.value.slice(0, answerMax))}
-              placeholder="Speak your answer. A pause to think will not end it."
+              placeholder={'Speak your answer. Say "I don\'t know" or stay quiet to move on. Ask to repeat if you need the question again.'}
               className="mt-2 min-h-16 w-full resize-none bg-transparent text-base leading-relaxed text-neutral-100 outline-none placeholder:text-neutral-500 sm:text-sm"
             />
           </>

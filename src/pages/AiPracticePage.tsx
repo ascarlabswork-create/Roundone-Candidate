@@ -11,9 +11,10 @@ import {
   SelectInput,
   TextInput,
 } from '../components/ui/primitives.tsx'
+import { SkillMultiInput } from '../components/ui/SkillMultiInput.tsx'
 import { INTERVIEW_TYPES, SKILLS, TARGET_ROLES } from '../data/catalogs.ts'
 import { useBodyScrollLock } from '../lib/bodyScrollLock.ts'
-import { dedupeSkills } from '../matching/skills.ts'
+import { dedupeSkills, uniqueCandidateSkillWording } from '../matching/skills.ts'
 import { isUuid } from '../lib/uuid.ts'
 import { requestNextPracticeQuestion, requestPracticeFeedback } from '../practice/aiAssist.ts'
 import {
@@ -32,12 +33,14 @@ import {
   recordAskedQuestion,
   recordAskedQuestions,
   uniqueThemes,
+  type PracticeAiFeedback,
   type PracticeAiQuestion,
   type PracticeDifficulty,
   type PracticeQuestionCount,
   type PracticeSetup,
   type PracticeTurn,
 } from '../practice/aiModel.ts'
+import { classifyPracticeTurnIntent } from '../practice/turnIntent.ts'
 import {
   buildStructuredContext,
   type CandidateContext,
@@ -293,10 +296,10 @@ export function AiPracticePage() {
     setSession((current) => ({ ...current, setup: { ...current.setup, ...patch } }))
   }
 
-  function addSkill(value: string) {
-    const skill = value.trim()
-    if (!skill || session.setup.skills.includes(skill) || session.setup.skills.length >= 6) return
-    updateSetup({ skills: [...session.setup.skills, skill] })
+  function addSkills(values: string[]) {
+    if (values.length === 0 || session.setup.skills.length >= 6) return
+    const next = uniqueCandidateSkillWording([...session.setup.skills, ...values]).slice(0, 6)
+    updateSetup({ skills: next })
     setSkillDraft('')
   }
 
@@ -437,9 +440,16 @@ export function AiPracticePage() {
         setError(errMsg)
       },
       onTurnComplete: (transcript) => {
-        if (transcript.trim().length >= 8 && !submittingRef.current) {
-          void handleTurnAnswer(transcript.trim())
+        const text = transcript.trim()
+        if (!text || submittingRef.current) return
+        const intent = classifyPracticeTurnIntent(text)
+        if (intent !== 'answer' || text.length >= 8) {
+          void handleTurnAnswer(text)
         }
+      },
+      onNoSpeechTimeout: () => {
+        if (submittingRef.current) return
+        void skipCurrentQuestion('no_speech')
       },
     })
 
@@ -451,12 +461,201 @@ export function AiPracticePage() {
     }
   }
 
+  function skipFeedback(
+    question: PracticeAiQuestion,
+    reason: 'dont_know' | 'no_speech',
+  ): PracticeAiFeedback {
+    if (reason === 'no_speech') {
+      return {
+        score: 1,
+        strengths: [],
+        improvements: [
+          'Even a short partial answer helps — interviewers prefer an attempt over silence.',
+        ],
+        missingPoints: question.expectedFocus.slice(0, 3),
+        summary: 'Moved on after a long silence with no answer.',
+      }
+    }
+    return {
+      score: 2,
+      strengths: ['Honest about the gap instead of guessing wildly.'],
+      improvements: [
+        'Next time, outline how you would approach finding the answer or what you do know nearby.',
+      ],
+      missingPoints: question.expectedFocus.slice(0, 3),
+      summary: 'Candidate chose to skip this question.',
+    }
+  }
+
+  async function advanceAfterTurn(
+    turns: PracticeTurn[],
+    bridgeLine: string | null,
+  ) {
+    const curSession = sessionRef.current
+    const nextIndex = curSession.index + 1
+    if (nextIndex >= curSession.setup.questionCount) {
+      if (voiceClientRef.current) {
+        voiceClientRef.current.close()
+        voiceClientRef.current = null
+      }
+      setSession({
+        ...curSession,
+        phase: 'complete',
+        turns,
+        currentAnswer: '',
+      })
+      submittingRef.current = false
+      setBusy(false)
+      return
+    }
+
+    setVoiceState('thinking')
+    const candContext = getCandidateContext()
+    const structured = buildStructuredContext(candContext, curSession.setup, turns)
+    const persona = getInterviewerPersona(curSession.setup.interviewerId)
+
+    const priorTurnsData = turns.map((t) => ({
+      question: t.question.question,
+      topic: t.question.topic,
+      answer: t.answer,
+      score: t.feedback?.score ?? null,
+      missingPoints: t.feedback?.missingPoints ?? [],
+    }))
+
+    const recent = [
+      ...curSession.questions.map((q) => q.question),
+      ...getRecentAskedQuestions(),
+    ]
+    const focusDim = pickRandomFocusDimension(curSession.questions.map((q) => q.topic))
+    const seed = `${Date.now()}-${Math.random().toString(36).substring(2, 7)}`
+
+    const nextQuestion = await requestNextPracticeQuestion(
+      curSession.setup,
+      nextIndex + 1,
+      priorTurnsData,
+      {
+        candidate: candContext,
+        structured,
+        interviewerName: persona.name,
+        excludeQuestions: recent,
+        focusDimension: focusDim,
+        sessionSeed: seed,
+      },
+    )
+
+    if (!nextQuestion) {
+      submittingRef.current = false
+      setBusy(false)
+      setError(UNAVAILABLE)
+      return
+    }
+
+    recordAskedQuestion(nextQuestion.question)
+    const nextQuestions = [...curSession.questions, nextQuestion]
+    voiceClientRef.current?.resetTurnTranscript()
+
+    setSession({
+      ...curSession,
+      phase: 'question',
+      index: nextIndex,
+      questions: nextQuestions,
+      turns,
+      currentAnswer: '',
+    })
+
+    submittingRef.current = false
+    setBusy(false)
+
+    if (voiceClientRef.current) {
+      const spoken = bridgeLine
+        ? `${bridgeLine} ${nextQuestion.question}`
+        : nextQuestion.question
+      await voiceClientRef.current.speakQuestion(spoken, persona.voice)
+    }
+  }
+
+  async function skipCurrentQuestion(reason: 'dont_know' | 'no_speech', spokenText?: string) {
+    const curSession = sessionRef.current
+    const question = curSession.questions[curSession.index]
+    if (!question || busy || submittingRef.current) return
+
+    voiceClientRef.current?.cancelSilenceTimer()
+    voiceClientRef.current?.cancelNoSpeechTimer()
+    submittingRef.current = true
+    setBusy(true)
+    setError(null)
+    setPersistError(null)
+    setVoiceState('thinking')
+
+    const answer =
+      spokenText?.trim() ||
+      (reason === 'no_speech' ? '(No answer — moved on after silence)' : "I don't know")
+    const feedback = skipFeedback(question, reason)
+    const turn: PracticeTurn = { question, answer, feedback }
+    const turns = [...curSession.turns.filter((item) => item.question.id !== question.id), turn]
+
+    if (curSession.savedSessionId) {
+      try {
+        await savePracticeTurn(curSession.savedSessionId, curSession.index, turn)
+      } catch (caught: unknown) {
+        setPersistError(caught instanceof Error ? caught.message : 'Unable to save this answer.')
+      }
+    }
+
+    const bridge =
+      reason === 'dont_know'
+        ? "That's alright. Let's move to the next question."
+        : "No worries — we'll move to the next question."
+
+    try {
+      await advanceAfterTurn(turns, bridge)
+    } catch (err: unknown) {
+      submittingRef.current = false
+      setBusy(false)
+      setVoiceState('listening')
+      setError(err instanceof Error ? err.message : UNAVAILABLE)
+    }
+  }
+
   async function handleTurnAnswer(answerText: string) {
     const curSession = sessionRef.current
     const question = curSession.questions[curSession.index]
-    if (!question || busy || submittingRef.current || answerText.length < 8) return
+    if (!question || busy || submittingRef.current) return
+    const intent = classifyPracticeTurnIntent(answerText)
+    if (intent === 'answer' && answerText.length < 8) return
 
     voiceClientRef.current?.cancelSilenceTimer()
+    voiceClientRef.current?.cancelNoSpeechTimer()
+
+    // Real conversation: "repeat the question" stays on the same turn.
+    if (intent === 'repeat') {
+      submittingRef.current = true
+      setBusy(true)
+      setError(null)
+      const persona = getInterviewerPersona(curSession.setup.interviewerId)
+      voiceClientRef.current?.resetTurnTranscript()
+      setSession((current) => ({ ...current, currentAnswer: '' }))
+      try {
+        if (voiceClientRef.current) {
+          await voiceClientRef.current.speakQuestion(
+            `Of course. Here's the question again. ${question.question}`,
+            persona.voice,
+          )
+        }
+      } finally {
+        submittingRef.current = false
+        setBusy(false)
+        setVoiceState('listening')
+      }
+      return
+    }
+
+    // "I don't know" / skip / pass — move on like a live interviewer.
+    if (intent === 'skip') {
+      await skipCurrentQuestion('dont_know', answerText)
+      return
+    }
+
     submittingRef.current = true
     setBusy(true)
     setError(null)
@@ -484,87 +683,7 @@ export function AiPracticePage() {
         }
       }
 
-      const nextIndex = curSession.index + 1
-      if (nextIndex >= curSession.setup.questionCount) {
-        // Complete interview
-        if (voiceClientRef.current) {
-          voiceClientRef.current.close()
-          voiceClientRef.current = null
-        }
-        setSession({
-          ...curSession,
-          phase: 'complete',
-          turns,
-          currentAnswer: '',
-        })
-        submittingRef.current = false
-        setBusy(false)
-        return
-      }
-
-      // Generate next adaptive context-aware question
-      setVoiceState('thinking')
-      const candContext = getCandidateContext()
-      const structured = buildStructuredContext(candContext, curSession.setup, turns)
-      const persona = getInterviewerPersona(curSession.setup.interviewerId)
-
-      const priorTurnsData = turns.map((t) => ({
-        question: t.question.question,
-        topic: t.question.topic,
-        answer: t.answer,
-        score: t.feedback?.score ?? null,
-        missingPoints: t.feedback?.missingPoints ?? [],
-      }))
-
-      const recent = [
-        ...curSession.questions.map((q) => q.question),
-        ...getRecentAskedQuestions(),
-      ]
-      const focusDim = pickRandomFocusDimension(curSession.questions.map((q) => q.topic))
-      const seed = `${Date.now()}-${Math.random().toString(36).substring(2, 7)}`
-
-      const nextQuestion = await requestNextPracticeQuestion(
-        curSession.setup,
-        nextIndex + 1,
-        priorTurnsData,
-        {
-          candidate: candContext,
-          structured,
-          interviewerName: persona.name,
-          excludeQuestions: recent,
-          focusDimension: focusDim,
-          sessionSeed: seed,
-        },
-      )
-
-      if (!nextQuestion) {
-        submittingRef.current = false
-        setBusy(false)
-        setError(UNAVAILABLE)
-        return
-      }
-
-      recordAskedQuestion(nextQuestion.question)
-
-      const nextQuestions = [...curSession.questions, nextQuestion]
-      voiceClientRef.current?.resetTurnTranscript()
-
-      setSession({
-        ...curSession,
-        phase: 'question',
-        index: nextIndex,
-        questions: nextQuestions,
-        turns,
-        currentAnswer: '',
-      })
-
-      submittingRef.current = false
-      setBusy(false)
-
-      // AI speaks next question
-      if (voiceClientRef.current) {
-        await voiceClientRef.current.speakQuestion(nextQuestion.question, persona.voice)
-      }
+      await advanceAfterTurn(turns, null)
     } catch (err: unknown) {
       submittingRef.current = false
       setBusy(false)
@@ -1064,30 +1183,17 @@ export function AiPracticePage() {
           <p className="mt-1 text-xs text-slate-500">
             Add the technologies and topics this interview should cover. Keep it focused — up to 6.
           </p>
-          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-            <TextInput
+          <div className="mt-3">
+            <SkillMultiInput
               id="practice-skills"
-              list="practice-skill-options"
-              placeholder="Python, React, System Design"
               value={skillDraft}
-              className="text-base"
-              onChange={(event) => setSkillDraft(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                  event.preventDefault()
-                  addSkill(skillDraft)
-                }
-              }}
+              onChange={setSkillDraft}
+              selected={session.setup.skills}
+              onAdd={addSkills}
+              max={6}
+              placeholder="Python, SQL, System Design"
             />
-            <Button type="button" variant="outline" onClick={() => addSkill(skillDraft)} disabled={!skillDraft.trim()}>
-              Add
-            </Button>
           </div>
-          <datalist id="practice-skill-options">
-            {SKILLS.map((skill) => (
-              <option key={skill} value={skill} />
-            ))}
-          </datalist>
           <div className="mt-3 flex flex-wrap gap-2">
             {SKILLS.filter((skill) => !session.setup.skills.includes(skill))
               .slice(0, 10)
@@ -1096,7 +1202,7 @@ export function AiPracticePage() {
                   key={skill}
                   type="button"
                   disabled={session.setup.skills.length >= 6}
-                  onClick={() => addSkill(skill)}
+                  onClick={() => addSkills([skill])}
                   className="rounded-full border border-dashed border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-600 hover:border-navy-700 hover:text-navy-900 disabled:opacity-40"
                 >
                   + {skill}
