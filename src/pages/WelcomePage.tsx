@@ -16,12 +16,26 @@ import {
 import { useMatching } from '../state/matching.tsx'
 
 const INTENT_READY_KEY = 'roundone.intentReady'
+const QUICK_ROLES = [
+  'Software Engineer',
+  'Backend Engineer',
+  'Frontend Engineer',
+  'Full Stack Engineer',
+  'Data Scientist',
+  'ML Engineer',
+  'DevOps Engineer',
+  'Product Manager',
+] as const
 const QUICK_SKILLS = ['Python', 'Java', 'SQL', 'React', 'Machine Learning', 'System Design'] as const
 
 function pillClass(selected: boolean) {
   return selected
     ? 'inline-flex min-h-11 items-center rounded-full bg-navy-950 px-3.5 py-2 text-sm text-white'
     : 'inline-flex min-h-11 items-center rounded-full border border-slate-300 bg-white px-3.5 py-2 text-sm text-slate-700 hover:border-navy-700'
+}
+
+function rolesMatch(left: string, right: string) {
+  return left.trim().toLowerCase() === right.trim().toLowerCase()
 }
 
 export function WelcomePage() {
@@ -157,19 +171,63 @@ export function WelcomePage() {
           <p className="text-sm text-slate-600">Loading your profile…</p>
         ) : (
           <form className="grid gap-6" onSubmit={(event) => void save(event)}>
-            <div>
-              <FieldLabel htmlFor="welcome-role">Role you want</FieldLabel>
-              <TextInput
-                id="welcome-role"
-                required
-                autoComplete="organization-title"
-                enterKeyHint="next"
-                placeholder="Software Engineer"
-                className="text-base"
-                value={role}
-                onChange={(event) => setRole(event.target.value)}
-              />
-            </div>
+            <fieldset>
+              <legend className="text-sm font-semibold text-navy-950">Role you want</legend>
+              <p className="mt-1 text-xs text-slate-500">Pick one below, or type a custom role.</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {QUICK_ROLES.map((option) => {
+                  const selected = rolesMatch(role, option)
+                  return (
+                    <button
+                      key={option}
+                      type="button"
+                      aria-pressed={selected}
+                      onClick={() => {
+                        setError(null)
+                        setRole(selected ? '' : option)
+                      }}
+                      className={pillClass(selected)}
+                    >
+                      {option}
+                    </button>
+                  )
+                })}
+              </div>
+              {role.trim() && !QUICK_ROLES.some((option) => rolesMatch(role, option)) ? (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    aria-label={`Clear ${role.trim()}`}
+                    onClick={() => setRole('')}
+                    className={pillClass(true)}
+                  >
+                    {role.trim()} ×
+                  </button>
+                </div>
+              ) : null}
+              <div className="mt-3">
+                <FieldLabel htmlFor="welcome-role">Or type your role</FieldLabel>
+                <TextInput
+                  id="welcome-role"
+                  required
+                  list="welcome-role-options"
+                  autoComplete="organization-title"
+                  enterKeyHint="next"
+                  placeholder="Software Engineer, ML Engineer…"
+                  className="text-base"
+                  value={role}
+                  onChange={(event) => {
+                    setError(null)
+                    setRole(event.target.value)
+                  }}
+                />
+                <datalist id="welcome-role-options">
+                  {QUICK_ROLES.map((option) => (
+                    <option key={option} value={option} />
+                  ))}
+                </datalist>
+              </div>
+            </fieldset>
 
             <fieldset>
               <legend className="text-sm font-semibold text-navy-950">Skills</legend>
