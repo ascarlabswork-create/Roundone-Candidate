@@ -4,6 +4,12 @@ export const ANSWER_HOLD_MS = 12_000
 export const ANSWER_MIN_CHARS = 8
 
 /**
+ * Short commands like "repeat that", "I don't know", or "skip" should be acted on
+ * quickly instead of waiting out the full answer hold — a real interviewer reacts fast.
+ */
+export const COMMAND_HOLD_MS = 1_600
+
+/**
  * After the question is asked, how long to wait with no real answer before
  * moving on — like a live interviewer who won't leave you hanging forever.
  */

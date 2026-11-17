@@ -4,9 +4,11 @@ import { microphoneFailureMessage, requestPracticeMicrophone } from './microphon
 import {
   ANSWER_HOLD_MS,
   ANSWER_MIN_CHARS,
+  COMMAND_HOLD_MS,
   NO_SPEECH_AFTER_MUMBLE_MS,
   NO_SPEECH_SKIP_MS,
 } from './voiceTurn.ts'
+import { classifyPracticeTurnIntent } from './turnIntent.ts'
 
 export type VoiceState =
   | 'idle'
@@ -128,6 +130,26 @@ export class VoiceClient {
     if (this.aiSpeaking || this.state === 'evaluating') return
 
     const text = this.accumulatedTranscript.trim()
+    const intent = classifyPracticeTurnIntent(text)
+
+    // Quick commands ("repeat that", "I don't know", "skip") act fast like a real conversation.
+    if (intent !== 'answer') {
+      this.cancelNoSpeechTimer()
+      this.silenceHoldTimer = window.setTimeout(() => {
+        this.silenceHoldTimer = null
+        const cmd = this.accumulatedTranscript.trim()
+        if (this.aiSpeaking || this.state === 'evaluating') return
+        if (classifyPracticeTurnIntent(cmd) !== 'answer') {
+          this.setState('thinking')
+          this.callbacks.onTurnComplete?.(cmd)
+        } else {
+          // They kept talking into a real answer — fall back to normal handling.
+          this.startSilenceHold()
+        }
+      }, COMMAND_HOLD_MS)
+      return
+    }
+
     if (text.length < ANSWER_MIN_CHARS) {
       // Brief sounds / "um" — give a shorter window, then move on like a live interview.
       this.startNoSpeechWatch(NO_SPEECH_AFTER_MUMBLE_MS)
