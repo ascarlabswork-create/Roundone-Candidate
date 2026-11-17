@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { Button } from '../components/ui/Button.tsx'
+import { SkillMultiInput } from '../components/ui/SkillMultiInput.tsx'
 import { Card, FieldLabel, TextInput } from '../components/ui/primitives.tsx'
 import { dedupeSkills } from '../matching/skills.ts'
 import { localResumeSkillPlan } from '../resume/localSkillPlan.ts'
@@ -64,9 +65,10 @@ export function WelcomePage() {
     }
   }, [])
 
-  function addSkill(raw: string) {
-    const next = dedupeSkills([...skills, raw])
-    if (next.length === skills.length && raw.trim()) {
+  function addSkills(values: string[]) {
+    if (values.length === 0) return
+    const next = dedupeSkills([...skills, ...values])
+    if (next.length === skills.length) {
       setError('Add a skill such as Python, SQL, or System Design.')
       return
     }
@@ -223,27 +225,16 @@ export function WelcomePage() {
                     if (file) void readResume(file)
                   }}
                 />
-                <TextInput
+                <SkillMultiInput
                   id="welcome-skill"
                   value={skillDraft}
-                  enterKeyHint="done"
-                  autoCapitalize="words"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  placeholder="Add a skill"
-                  className="text-base"
-                  onChange={(event) => setSkillDraft(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') {
-                      event.preventDefault()
-                      addSkill(skillDraft)
-                    }
-                  }}
+                  onChange={setSkillDraft}
+                  selected={skills}
+                  onAdd={addSkills}
+                  placeholder="Python, SQL, System Design"
+                  disabled={readingResume || saving}
                 />
-                <div className="grid grid-cols-2 gap-2">
-                  <Button type="button" variant="outline" fullWidth onClick={() => addSkill(skillDraft)} disabled={!skillDraft.trim()}>
-                    Add
-                  </Button>
+                <div className="mt-2">
                   <Button type="button" variant="outline" fullWidth disabled={readingResume} onClick={() => fileRef.current?.click()}>
                     {readingResume ? 'Reading…' : 'Upload resume'}
                   </Button>

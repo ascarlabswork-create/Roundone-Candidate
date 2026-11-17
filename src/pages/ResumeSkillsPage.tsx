@@ -13,15 +13,16 @@ import { DataUseConsent } from '../components/legal/DataUseConsent.tsx'
 import { ResumeExtractingBanner } from '../components/matching/ResumeExtractingBanner.tsx'
 import { AtsReadinessPanel } from '../components/resume/AtsCheckPanel.tsx'
 import { Button } from '../components/ui/Button.tsx'
+import { SkillMultiInput } from '../components/ui/SkillMultiInput.tsx'
 import { evaluateAtsReadiness } from '../resume/atsCheck.ts'
 import {
   Badge,
   EmptyState,
   FieldLabel,
   TextArea,
-  TextInput,
   Toggle,
 } from '../components/ui/primitives.tsx'
+import { parseSkillDraft } from '../matching/skillInput.ts'
 import { requestResumeSkillPlan } from '../resume/aiAssist.ts'
 import { keepTechnicalSkillsOnly, localResumeSkillPlan } from '../resume/localSkillPlan.ts'
 import {
@@ -277,24 +278,27 @@ export function ResumeSkillsPage() {
     setSaved(false)
   }
 
-  function addManualSkill() {
-    const skill = manualDraft.trim()
-    if (!skill) return
-    if (items.some((item) => item.skill.toLowerCase() === skill.toLowerCase())) {
-      setManualDraft('')
-      return
-    }
-    setItems((current) => [
-      ...current,
-      {
-        key: keyFor('manual', skill, current.length),
-        skill,
-        category: 'manual',
-        evidenceType: null,
-        evidenceDetail: '',
-        accepted: true,
-      },
-    ])
+  function addManualSkills(values: string[]) {
+    const skills = values.length > 0 ? values : parseSkillDraft(manualDraft)
+    if (skills.length === 0) return
+    setItems((current) => {
+      const existing = new Set(current.map((item) => item.skill.toLowerCase()))
+      const additions = skills
+        .map((skill) => skill.trim().replace(/\s+/g, ' '))
+        .filter((skill) => skill && !existing.has(skill.toLowerCase()))
+      if (additions.length === 0) return current
+      return [
+        ...current,
+        ...additions.map((skill, index) => ({
+          key: keyFor('manual', skill, current.length + index),
+          skill,
+          category: 'manual' as const,
+          evidenceType: null,
+          evidenceDetail: '',
+          accepted: true,
+        })),
+      ]
+    })
     setManualDraft('')
     setSaved(false)
   }
@@ -811,23 +815,14 @@ export function ResumeSkillsPage() {
 
                 <div className="mt-6 border-t border-slate-100 pt-4">
                   <FieldLabel htmlFor="manual-skill">Add a skill manually</FieldLabel>
-                  <div className="flex gap-2">
-                    <TextInput
-                      id="manual-skill"
-                      value={manualDraft}
-                      placeholder="e.g. GraphQL"
-                      onChange={(event) => setManualDraft(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter') {
-                          event.preventDefault()
-                          addManualSkill()
-                        }
-                      }}
-                    />
-                    <Button variant="outline" onClick={addManualSkill}>
-                      Add
-                    </Button>
-                  </div>
+                  <SkillMultiInput
+                    id="manual-skill"
+                    value={manualDraft}
+                    onChange={setManualDraft}
+                    selected={items.map((item) => item.skill)}
+                    onAdd={addManualSkills}
+                    placeholder="GraphQL, Redis, Kafka"
+                  />
                 </div>
               </div>
             </section>
