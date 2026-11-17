@@ -3,7 +3,7 @@ import { asRecord, readBoolean, readNullableString, readNumber, readString } fro
 import { isUuid } from '../lib/uuid.ts'
 
 export const PUBLIC_DIRECTORY_SELECT =
-  'interviewer_profile_id, full_name, avatar_url, headline, bio, current_role, company, experience_years, timezone, languages, list_price_paise, currency, is_online, rating_avg, review_count, completed_interviews_count, identity_verified, employment_verified, linkedin_verified'
+  'interviewer_profile_id, full_name, avatar_url, headline, bio, current_role, company, experience_years, timezone, languages, list_price_paise, currency, is_online, rating_avg, review_count, completed_interviews_count, identity_verified, employment_verified, linkedin_verified, public_code'
 
 export const PUBLIC_SERVICE_SELECT =
   'id, interviewer_profile_id, name, interview_type, duration_min, price_paise, currency, description'
@@ -18,6 +18,7 @@ export type PublicInterviewer = {
   bio: string | null
   currentRole: string | null
   company: string | null
+  publicCode: string | null
   experienceYears: number
   timezone: string
   languages: string[]
@@ -79,6 +80,7 @@ function mapPublicInterviewer(value: unknown): PublicInterviewer | null {
     bio: readNullableString(row, 'bio'),
     currentRole: readNullableString(row, 'current_role'),
     company: readNullableString(row, 'company'),
+    publicCode: readNullableString(row, 'public_code'),
     experienceYears: readNumber(row, 'experience_years') ?? 0,
     timezone,
     languages: readStringList(row, 'languages'),

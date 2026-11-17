@@ -71,6 +71,13 @@ export function JobMatchCard({
         <div className="min-w-0 flex-1">
           <h3 className="break-words text-lg font-semibold text-navy-950">{interviewer.name}</h3>
           {roleLine ? <p className="mt-0.5 break-words text-sm text-slate-600">{roleLine}</p> : null}
+          {interviewer.publicCode ? (
+            <p className="mt-1.5">
+              <span className="inline-flex items-center rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 font-mono text-[11px] font-semibold tracking-wide text-slate-600">
+                {interviewer.publicCode}
+              </span>
+            </p>
+          ) : null}
           <p className="mt-1 text-sm text-slate-600">
             <span className="font-semibold text-navy-950">{percentLabel ?? '0'}% job skill coverage</span>
             {ratingAvg != null ? <span> · {ratingAvg} rating</span> : null}

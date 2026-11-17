@@ -1,4 +1,8 @@
-import { mapSkillMatchRpcRow, skillMatchRowToMatchResult } from '../services/skillMatchMap.ts'
+import {
+  mapSkillMatchRpcRow,
+  skillMatchRowToCatalogPerson,
+  skillMatchRowToMatchResult,
+} from '../services/skillMatchMap.ts'
 import { compareSkillSets, dedupeSkills } from './skills.ts'
 
 function expect(condition: boolean, message: string) {
@@ -71,6 +75,7 @@ function almostEqual(a: number, b: number, eps = 1e-9) {
     bio: null,
     current_role: 'Engineer',
     company: 'RoundOne',
+    public_code: 'ID003001',
     experience_years: 5,
     timezone: 'Asia/Kolkata',
     languages: ['English'],
@@ -93,11 +98,14 @@ function almostEqual(a: number, b: number, eps = 1e-9) {
   expect(mapped !== null, 'mapper accepts row')
   expect(mapped!.isListed === false, 'TEST 4 is_listed false still mappable')
   expect(mapped!.skillPercent === 100, 'mapper percent')
+  expect(mapped!.publicCode === 'ID003001', 'mapper keeps public_code')
   expect(!('whatsapp_phone' in mapped!), 'whatsapp not on mapped type')
   expect(!('email' in mapped!), 'email not on mapped type')
   const match = skillMatchRowToMatchResult(mapped!)
   expect(match.score === 100, 'match score')
   expect(match.skillMatch.matchedSkills.length === 2, 'match matched skills')
+  const person = skillMatchRowToCatalogPerson(mapped!)
+  expect(person.publicCode === 'ID003001', 'catalog person keeps public code')
 }
 
 console.log('skill match RPC client checks passed')

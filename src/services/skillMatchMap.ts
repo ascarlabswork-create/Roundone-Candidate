@@ -11,6 +11,7 @@ export type SkillMatchRpcRow = {
   bio: string | null
   currentRole: string | null
   company: string | null
+  publicCode: string | null
   experienceYears: number
   timezone: string
   languages: string[]
@@ -64,6 +65,7 @@ export function mapSkillMatchRpcRow(value: unknown): SkillMatchRpcRow | null {
     bio: readNullableString(row, 'bio'),
     currentRole: readNullableString(row, 'current_role'),
     company: readNullableString(row, 'company'),
+    publicCode: readNullableString(row, 'public_code'),
     experienceYears: readNumber(row, 'experience_years') ?? 0,
     timezone,
     languages: readStringList(row, 'languages'),
@@ -90,8 +92,9 @@ export function skillMatchRowToCatalogPerson(row: SkillMatchRpcRow): MatchingCat
     id: row.interviewerProfileId,
     name: row.fullName,
     photo: row.avatarUrl ?? '',
-    currentRole: row.currentRole ?? row.headline ?? 'Interviewer',
+    currentRole: row.currentRole ?? 'Interviewer',
     company: row.company ?? '',
+    publicCode: row.publicCode,
     experienceYears: row.experienceYears,
     skills: row.skills,
     technologies: [],
