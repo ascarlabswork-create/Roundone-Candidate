@@ -12,7 +12,11 @@ import { Chip, FieldLabel, PageHeader, SelectInput, TextInput } from '../compone
 import { preferredDateRangeError } from '../lib/dates.ts'
 import { isCanonicalSkillDuplicate, uniqueCandidateSkillWording } from '../matching/skills.ts'
 import { toNormalizationInput, type NormalizationPatch } from '../matching/normalizeModel.ts'
-import { updateCandidatePreferences, updateCandidateSkills } from '../services/candidateProfile.ts'
+import {
+  getCandidateSkills,
+  updateCandidatePreferences,
+  updateCandidateSkills,
+} from '../services/candidateProfile.ts'
 import { usePreferenceNormalization } from '../matching/usePreferenceNormalization.ts'
 import { requestResumeSkillPlan } from '../resume/aiAssist.ts'
 import { canAnalyzeResume, type ResumeSkillPlan } from '../resume/aiModel.ts'
@@ -204,8 +208,12 @@ export function FindPage() {
           preferredDateEnd: form.preferredDateEnd || null,
           preferredTimeWindow: form.preferredTime || null,
         }),
-        // Persist Find skills so Matches / profile use the same skill set.
-        skills.length > 0 ? updateCandidateSkills(skills) : Promise.resolve([]),
+        // Merge Find skills into the profile — never replace the full skill list with this search only.
+        skills.length > 0
+          ? getCandidateSkills()
+              .then((existing) => updateCandidateSkills(mergeUniqueSkills(existing, skills)))
+              .catch(() => updateCandidateSkills(skills))
+          : Promise.resolve([]),
       ])
     } catch {
       // Matching still uses the in-session skills if the preference row cannot be saved.
@@ -237,7 +245,7 @@ export function FindPage() {
       <PageHeader
         eyebrow="Match"
         title="Tell us about your interview"
-        subtitle="We’ll rank interviewers against this goal by skill overlap."
+        subtitle="We’ll rank interviewers by overlap with the skills you list below — not your full profile."
         actions={
           <div className="flex flex-wrap gap-2">
             <Link
@@ -331,6 +339,10 @@ export function FindPage() {
             onAdd={addSkills}
             placeholder="Java, AWS, Microservices"
           />
+          <p className="mt-1 text-xs text-slate-500">
+            Type several at once with commas (e.g. Python, SQL), or open the list and pick multiple. Matching uses
+            only these chips — remove any you do not want covered.
+          </p>
           <div className="mt-3 flex flex-wrap gap-2">
             {form.skills.map((skill) => (
               <Chip

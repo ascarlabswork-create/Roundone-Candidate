@@ -231,46 +231,63 @@ export function WelcomePage() {
 
             <fieldset>
               <legend className="text-sm font-semibold text-navy-950">Skills</legend>
-              <p className="mt-1 text-xs text-slate-500">Pick a few, type one, or upload a resume.</p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {QUICK_SKILLS.map((skill) => {
-                  const selected = skills.some((item) => item.toLowerCase() === skill.toLowerCase())
-                  return (
-                    <button
-                      key={skill}
-                      type="button"
-                      aria-pressed={selected}
-                      onClick={() =>
-                        setSkills((current) =>
-                          selected
-                            ? current.filter((item) => item.toLowerCase() !== skill.toLowerCase())
-                            : dedupeSkills([...current, skill]),
-                        )
-                      }
-                      className={pillClass(selected)}
-                    >
-                      {skill}
-                    </button>
-                  )
-                })}
-              </div>
-              {skills.some((skill) => !QUICK_SKILLS.some((item) => item.toLowerCase() === skill.toLowerCase())) ? (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {skills
-                    .filter((skill) => !QUICK_SKILLS.some((item) => item.toLowerCase() === skill.toLowerCase()))
-                    .map((skill) => (
+              <p className="mt-1 text-xs text-slate-500">
+                Selected skills show below with × to remove. Suggestions are only for adding.
+              </p>
+
+              <div className="mt-3">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">Your skills</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {skills.length === 0 ? (
+                    <p className="text-sm text-slate-500">None selected yet.</p>
+                  ) : (
+                    skills.map((skill) => (
                       <button
                         key={skill}
                         type="button"
                         aria-label={`Remove ${skill}`}
-                        onClick={() => setSkills((current) => current.filter((item) => item !== skill))}
+                        onClick={() => {
+                          setError(null)
+                          setSkills((current) =>
+                            current.filter((item) => item.toLowerCase() !== skill.toLowerCase()),
+                          )
+                        }}
                         className={pillClass(true)}
                       >
                         {skill} ×
                       </button>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {QUICK_SKILLS.some(
+                (skill) => !skills.some((item) => item.toLowerCase() === skill.toLowerCase()),
+              ) ? (
+                <div className="mt-4">
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                    Suggested — tap to add
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {QUICK_SKILLS.filter(
+                      (skill) => !skills.some((item) => item.toLowerCase() === skill.toLowerCase()),
+                    ).map((skill) => (
+                      <button
+                        key={skill}
+                        type="button"
+                        onClick={() => {
+                          setError(null)
+                          setSkills((current) => dedupeSkills([...current, skill]))
+                        }}
+                        className={pillClass(false)}
+                      >
+                        + {skill}
+                      </button>
                     ))}
+                  </div>
                 </div>
               ) : null}
+
               <div className="mt-3 grid gap-2">
                 <input
                   ref={fileRef}
@@ -289,7 +306,7 @@ export function WelcomePage() {
                   onChange={setSkillDraft}
                   selected={skills}
                   onAdd={addSkills}
-                  placeholder="Python, SQL, System Design"
+                  placeholder="Type a skill, e.g. ABAP"
                   disabled={readingResume || saving}
                 />
                 <div className="mt-2">

@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { RequireCandidateAuth } from '../components/auth/RequireCandidateAuth.tsx'
 import { BookingCallListener } from '../components/interview/BookingCallListener.tsx'
 import { CandidateLayout } from '../components/layout/CandidateLayout.tsx'
+import { ScrollToTop } from '../components/routing/ScrollToTop.tsx'
 import { AuthCallbackPage } from '../pages/AuthCallbackPage.tsx'
 import { AuthPage } from '../pages/AuthPage.tsx'
 import { UpdatePasswordPage } from '../pages/UpdatePasswordPage.tsx'
@@ -45,6 +46,7 @@ import { AuthModalProvider } from '../state/authModal.tsx'
 export function AppRouter() {
   return (
     <BrowserRouter>
+      <ScrollToTop />
       <AuthModalProvider>
         <BookingCallListener />
         <Routes>
