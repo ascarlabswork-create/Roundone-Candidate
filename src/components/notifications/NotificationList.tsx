@@ -1,6 +1,11 @@
 import { CalendarCheck, CalendarClock, CalendarX, CheckCircle2, Clock, MessageSquare, Bell } from 'lucide-react'
 import type { CandidateNotification } from '../../services/notificationModel.ts'
-import { formatNotificationTime, isUnread } from '../../services/notificationModel.ts'
+import {
+  formatNotificationTime,
+  isUnread,
+  notificationDisplayBody,
+  notificationDisplayTitle,
+} from '../../services/notificationModel.ts'
 import { cn } from '../../lib/cn.ts'
 
 function KindIcon({ kind }: { kind: string }) {
@@ -38,22 +43,29 @@ export function NotificationList({
                 'flex w-full gap-3 text-left transition-colors',
                 compact
                   ? 'px-3 py-3 hover:bg-slate-50'
-                  : 'rounded-xl border border-slate-200 bg-white p-5 shadow-sm hover:border-slate-300',
+                  : 'rounded-xl border bg-white p-5 shadow-sm hover:border-slate-300',
+                item.kind === 'booking_rescheduled'
+                  ? compact
+                    ? 'bg-amber-50/70'
+                    : 'border-amber-200 bg-amber-50/50'
+                  : compact
+                    ? ''
+                    : 'border-slate-200',
               )}
             >
               <span
                 className={cn(
                   'mt-1.5 h-2 w-2 shrink-0 rounded-full',
-                  unread ? 'bg-blue-600' : 'bg-transparent ring-1 ring-slate-300',
+                  unread ? (item.kind === 'booking_rescheduled' ? 'bg-amber-500' : 'bg-blue-600') : 'bg-transparent ring-1 ring-slate-300',
                 )}
                 aria-hidden
               />
               <KindIcon kind={item.kind} />
               <span className="min-w-0 flex-1">
                 <span className={cn('block text-sm text-navy-950', unread ? 'font-semibold' : 'font-medium')}>
-                  {item.title}
+                  {notificationDisplayTitle(item)}
                 </span>
-                <span className="mt-0.5 block text-sm text-slate-600">{item.body}</span>
+                <span className="mt-0.5 block text-sm text-slate-600">{notificationDisplayBody(item)}</span>
                 <span className="mt-1 block text-[11px] text-slate-400">{formatNotificationTime(item.createdAt)}</span>
               </span>
             </button>

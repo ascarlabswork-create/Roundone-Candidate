@@ -105,7 +105,10 @@ export function runInterviewSessionChecks() {
   expect(interviewHistorySection('completed') === 'completed', 'Completed bookings are completed')
   expect(interviewHistorySection('rescheduled') === 'cancelled', 'Retired rescheduled bookings are not upcoming')
   expect(interviewHistorySection('cancelled') === 'cancelled', 'Cancelled bookings use the cancelled section')
-  expect(interviewStatusLabel('rescheduled') === 'Rescheduled', 'Rescheduled uses a candidate-facing label')
+  expect(
+    interviewStatusLabel('rescheduled') === 'Rescheduled by interviewer',
+    'Rescheduled uses a candidate-facing label',
+  )
 
   const grouped = groupInterviewHistory([
     { status: 'completed', startsAtUtc: '2026-09-10T13:00:00.000Z' },
