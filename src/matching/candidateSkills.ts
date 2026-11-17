@@ -3,12 +3,19 @@ import { getAcceptedResumeSkills } from '../services/resumeSkills.ts'
 import { dedupeSkills } from './skills.ts'
 
 /**
- * Final interview skill set for matching:
- * session/manual Find skills ∪ profile candidate_skills ∪ accepted resume skills.
- * Rejected / unreviewed resume skills are never loaded (getAcceptedResumeSkills).
+ * Skills used for Find → Matches (and browse scoring).
+ *
+ * When the user listed skills for this search, match only against those.
+ * Merging the full profile/resume dump used to return weak overlaps
+ * ("3% Skill Match" on 1 of 31 skills) that felt unrelated.
+ *
+ * When the search skill list is empty, fall back to profile ∪ accepted resume skills.
  */
 export async function resolveMatchingCandidateSkills(sessionSkills: string[]): Promise<string[]> {
-  const parts = [...sessionSkills]
+  const session = dedupeSkills(sessionSkills)
+  if (session.length > 0) return session
+
+  const parts: string[] = []
   try {
     const [profileSkills, acceptedResumeSkills] = await Promise.all([
       getCandidateSkills(),
@@ -16,7 +23,7 @@ export async function resolveMatchingCandidateSkills(sessionSkills: string[]): P
     ])
     parts.push(...profileSkills, ...acceptedResumeSkills)
   } catch {
-    // Not signed in or profile unavailable — use session skills only.
+    // Not signed in or profile unavailable — no fallback skills.
   }
   return dedupeSkills(parts)
 }
