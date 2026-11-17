@@ -24,7 +24,7 @@ export function emptyPracticeSession(): SavedPracticeSession {
     phase: 'setup',
     setup: {
       targetRole: '',
-      interviewType: '',
+      interviewType: 'Technical',
       skills: [],
       difficulty: 'intermediate',
       questionCount: 5,

@@ -11,8 +11,9 @@ import {
   SelectInput,
   TextInput,
 } from '../components/ui/primitives.tsx'
+import { Sparkles, Target, UserRound } from 'lucide-react'
 import { SkillMultiInput } from '../components/ui/SkillMultiInput.tsx'
-import { INTERVIEW_TYPES, SKILLS, TARGET_ROLES } from '../data/catalogs.ts'
+import { SKILLS, TARGET_ROLES } from '../data/catalogs.ts'
 import { useBodyScrollLock } from '../lib/bodyScrollLock.ts'
 import { dedupeSkills, uniqueCandidateSkillWording } from '../matching/skills.ts'
 import { isUuid } from '../lib/uuid.ts'
@@ -146,7 +147,7 @@ export function AiPracticePage() {
       next.setup = {
         ...next.setup,
         targetRole: (searchParams.get('role') ?? '').trim().slice(0, 80),
-        interviewType: (searchParams.get('type') ?? '').trim().slice(0, 60),
+        interviewType: (searchParams.get('type') ?? '').trim().slice(0, 60) || 'Technical',
         difficulty: isPracticeDifficulty(difficultyRaw) ? difficultyRaw : 'intermediate',
         skills: (searchParams.get('skills') ?? '')
           .split(',')
@@ -230,7 +231,7 @@ export function AiPracticePage() {
             setup: {
               ...current.setup,
               targetRole: current.setup.targetRole || account.candidate.target_role || '',
-              interviewType: current.setup.interviewType || preferences?.interview_type || '',
+              interviewType: current.setup.interviewType || preferences?.interview_type || 'Technical',
               skills: current.setup.skills.length > 0 ? current.setup.skills : nextSkills,
               difficulty:
                 current.setup.difficulty !== 'intermediate' || !account.candidate.candidate_level
@@ -776,7 +777,7 @@ export function AiPracticePage() {
   const question = session.questions[session.index]
   const waitingForJob = Boolean(session.setup.jobTargetId && !session.setup.jobContext)
   const canStart =
-    Boolean(session.setup.targetRole.trim() && session.setup.interviewType.trim()) &&
+    Boolean(session.setup.targetRole.trim()) &&
     session.setup.skills.length > 0 &&
     !waitingForJob
   const totalQuestions = session.setup.questionCount
@@ -1154,13 +1155,16 @@ export function AiPracticePage() {
         </Link>
       </div>
       <form
-        className="mt-5 space-y-6 rounded-xl border border-slate-200 bg-white p-5 sm:p-8"
+        className="practice-setup-stagger mt-5 space-y-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8"
         onSubmit={goToIntro}
       >
-        <fieldset className="space-y-4">
-          <legend className="text-sm font-semibold text-navy-950">What this interview is for</legend>
+        <fieldset className="practice-setup-card space-y-4 rounded-xl border border-slate-100 bg-gradient-to-br from-slate-50/80 to-white p-4 transition hover:border-coral-100 sm:p-5">
+          <legend className="flex items-center gap-2 px-1 text-sm font-semibold text-navy-950">
+            <Target className="h-4 w-4 text-coral-600" aria-hidden />
+            What this interview is for
+          </legend>
           <p className="text-xs text-slate-500">
-            The AI will interview you as a candidate for this role, using only the skills you list below.
+            The AI interviews you for this role and asks about the skills you list — grounded in your answers, projects, and experience.
           </p>
           <div className="grid gap-5 sm:grid-cols-2">
             <div className="sm:col-span-2">
@@ -1181,22 +1185,6 @@ export function AiPracticePage() {
               </datalist>
             </div>
             <div>
-              <FieldLabel htmlFor="practice-type">Interview round</FieldLabel>
-              <SelectInput
-                id="practice-type"
-                required
-                value={session.setup.interviewType}
-                onChange={(event) => updateSetup({ interviewType: event.target.value })}
-              >
-                <option value="">Select a round</option>
-                {INTERVIEW_TYPES.map((type) => (
-                  <option key={type} value={type}>
-                    {type}
-                  </option>
-                ))}
-              </SelectInput>
-            </div>
-            <div>
               <FieldLabel htmlFor="practice-difficulty">Difficulty</FieldLabel>
               <SelectInput
                 id="practice-difficulty"
@@ -1212,7 +1200,7 @@ export function AiPracticePage() {
                 ))}
               </SelectInput>
             </div>
-            <div className="sm:col-span-2">
+            <div>
               <FieldLabel htmlFor="practice-count">Questions</FieldLabel>
               <SelectInput
                 id="practice-count"
@@ -1233,38 +1221,57 @@ export function AiPracticePage() {
           </div>
         </fieldset>
 
-        <fieldset>
-          <legend className="text-sm font-semibold text-navy-950">Skills they will ask about</legend>
-          <p className="mt-1 text-xs text-slate-500">
-            Add the technologies and topics this interview should cover. Keep it focused — up to 6.
-          </p>
-          <div className="mt-3">
-            <SkillMultiInput
-              id="practice-skills"
-              value={skillDraft}
-              onChange={setSkillDraft}
-              selected={session.setup.skills}
-              onAdd={addSkills}
-              max={6}
-              placeholder="Python, SQL, System Design"
-            />
+        <fieldset className="practice-setup-card space-y-3 rounded-xl border border-slate-100 bg-gradient-to-br from-slate-50/80 to-white p-4 transition hover:border-violet-100 sm:p-5">
+          <legend className="flex items-center gap-2 px-1 text-sm font-semibold text-navy-950">
+            <Sparkles className="h-4 w-4 text-violet-600" aria-hidden />
+            Skills they will ask about
+          </legend>
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs text-slate-500">
+              Add several at once — type with commas or pick from the list. Keep it focused.
+            </p>
+            <span
+              className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                session.setup.skills.length >= 6
+                  ? 'bg-amber-100 text-amber-900'
+                  : 'bg-violet-100 text-violet-800'
+              }`}
+            >
+              {session.setup.skills.length}/6
+            </span>
           </div>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {SKILLS.filter((skill) => !session.setup.skills.includes(skill))
-              .slice(0, 10)
-              .map((skill) => (
-                <button
-                  key={skill}
-                  type="button"
-                  disabled={session.setup.skills.length >= 6}
-                  onClick={() => addSkills([skill])}
-                  className="rounded-full border border-dashed border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-600 hover:border-navy-700 hover:text-navy-900 disabled:opacity-40"
-                >
-                  + {skill}
-                </button>
-              ))}
-          </div>
-          <div className="mt-3 flex flex-wrap gap-2">
+          <SkillMultiInput
+            id="practice-skills"
+            value={skillDraft}
+            onChange={setSkillDraft}
+            selected={session.setup.skills}
+            onAdd={addSkills}
+            max={6}
+            placeholder="Python, SQL, System Design"
+          />
+          {session.setup.skills.length < 6 ? (
+            <div>
+              <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                Popular — tap to add
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {SKILLS.filter((skill) => !session.setup.skills.includes(skill))
+                  .slice(0, 10)
+                  .map((skill) => (
+                    <button
+                      key={skill}
+                      type="button"
+                      disabled={session.setup.skills.length >= 6}
+                      onClick={() => addSkills([skill])}
+                      className="rounded-full border border-dashed border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-600 transition hover:-translate-y-0.5 hover:border-violet-400 hover:text-violet-700 disabled:opacity-40"
+                    >
+                      + {skill}
+                    </button>
+                  ))}
+              </div>
+            </div>
+          ) : null}
+          <div className="practice-chip-stagger flex flex-wrap gap-2">
             {session.setup.skills.length === 0 ? (
               <p className="text-sm text-slate-500">Add at least one skill for the interviewer to ask about.</p>
             ) : (
@@ -1285,10 +1292,13 @@ export function AiPracticePage() {
           </div>
         </fieldset>
 
-        <fieldset>
-          <legend className="text-sm font-semibold text-navy-950">Your interviewer</legend>
-          <p className="mt-1 mb-3 text-xs text-slate-500">
-            One interviewer joins this call. Pick the voice and style you want for this practice round.
+        <fieldset className="practice-setup-card space-y-3 rounded-xl border border-slate-100 bg-gradient-to-br from-slate-50/80 to-white p-4 transition hover:border-coral-100 sm:p-5">
+          <legend className="flex items-center gap-2 px-1 text-sm font-semibold text-navy-950">
+            <UserRound className="h-4 w-4 text-coral-600" aria-hidden />
+            Your interviewer
+          </legend>
+          <p className="mb-1 text-xs text-slate-500">
+            One interviewer joins this call. Pick the voice and style you want.
           </p>
           <div className="grid gap-3 sm:grid-cols-2">
             {INTERVIEWER_PERSONAS.map((persona) => {

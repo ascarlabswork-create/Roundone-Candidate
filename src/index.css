@@ -572,6 +572,46 @@
   }
 }
 
+.practice-setup-stagger > * {
+  animation: practice-fade-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.practice-setup-stagger > *:nth-child(1) {
+  animation-delay: 0.05s;
+}
+.practice-setup-stagger > *:nth-child(2) {
+  animation-delay: 0.13s;
+}
+.practice-setup-stagger > *:nth-child(3) {
+  animation-delay: 0.21s;
+}
+.practice-setup-stagger > *:nth-child(4) {
+  animation-delay: 0.29s;
+}
+.practice-setup-stagger > *:nth-child(5) {
+  animation-delay: 0.37s;
+}
+
+.practice-setup-card {
+  transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
+}
+.practice-setup-card:hover {
+  box-shadow: 0 10px 30px -18px rgba(79, 70, 229, 0.35);
+}
+
+@keyframes practice-chip-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.practice-chip-stagger > * {
+  animation: practice-chip-pop 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 @keyframes prep-readiness-shine {
   0%,
   100% {
@@ -1227,6 +1267,8 @@
   .practice-eq-bar,
   .practice-think-dot,
   .practice-avatar-ring,
+  .practice-setup-stagger > *,
+  .practice-chip-stagger > *,
   .resource-enter,
   .resource-fade-up,
   .resource-stagger > *,
