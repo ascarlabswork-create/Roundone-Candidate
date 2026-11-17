@@ -93,8 +93,17 @@ export function ProfilePage() {
               {fromMatches && match ? <MatchScore score={match.score} /> : null}
             </div>
             <p className="mt-1 text-slate-600">
-              {interviewer.currentRole} @ {interviewer.company}
+              {interviewer.currentRole}
+              {interviewer.currentRole && interviewer.company ? ' @ ' : ''}
+              {interviewer.company}
             </p>
+            {interviewer.publicCode ? (
+              <p className="mt-1.5">
+                <span className="inline-flex items-center rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 font-mono text-[11px] font-semibold tracking-wide text-slate-600">
+                  {interviewer.publicCode}
+                </span>
+              </p>
+            ) : null}
             <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-600">
               <span>{interviewer.experienceYears}+ years experience</span>
               <span>{formatCount(interviewer.completedInterviews)} interviews</span>

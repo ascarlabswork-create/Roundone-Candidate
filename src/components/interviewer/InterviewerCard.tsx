@@ -6,6 +6,8 @@ import type { Interviewer } from '../../types.ts'
 import { Button } from '../ui/Button.tsx'
 import { Badge } from '../ui/primitives.tsx'
 import { Avatar, MatchScore, StarRating, VerifiedBadge } from '../ui/identity.tsx'
+import { interviewerIdentityLines } from './identityLines.ts'
+import { PublicCodeBadge } from './PublicCodeBadge.tsx'
 
 export function InterviewerCard({
   interviewer,
@@ -49,10 +51,14 @@ export function InterviewerCard({
                   </span>
                 ) : null}
               </div>
-              <p className="mt-0.5 text-sm text-slate-600">
-                {interviewer.currentRole}
-                {interviewer.company ? ` @ ${interviewer.company}` : ''}
-              </p>
+              {interviewerIdentityLines(interviewer).map((line, index) => (
+                <p key={`${index}-${line}`} className="mt-0.5 text-sm text-slate-600">
+                  {line}
+                </p>
+              ))}
+              <div className="mt-1.5">
+                <PublicCodeBadge code={interviewer.publicCode} />
+              </div>
             </div>
             {typeof matchScore === 'number' ? <MatchScore score={matchScore} /> : null}
           </div>

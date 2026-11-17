@@ -47,6 +47,7 @@ type BookingHeader = {
   photo: string
   currentRole: string
   company: string
+  publicCode: string | null
   timezone: string | null
   verified: boolean
   listPricePaise: number | null
@@ -60,6 +61,7 @@ function headerFromLive(interviewer: PublicInterviewer): BookingHeader {
     photo: interviewer.photo ?? '',
     currentRole: interviewer.currentRole ?? '',
     company: interviewer.company ?? '',
+    publicCode: interviewer.publicCode,
     timezone: interviewer.timezone,
     verified: interviewer.identityVerified && interviewer.employmentVerified,
     listPricePaise: interviewer.listPricePaise,
@@ -689,6 +691,13 @@ export function BookPage() {
                   {header.currentRole}
                   {header.currentRole && header.company ? ' @ ' : ''}
                   {header.company}
+                </p>
+              ) : null}
+              {header.publicCode ? (
+                <p className="mt-1">
+                  <span className="inline-flex items-center rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 font-mono text-[11px] font-semibold tracking-wide text-slate-600">
+                    {header.publicCode}
+                  </span>
                 </p>
               ) : null}
             </div>

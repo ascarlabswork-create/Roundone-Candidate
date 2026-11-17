@@ -5,6 +5,7 @@ import type { SkillMatchDetail } from '../../types.ts'
 import { Button } from '../ui/Button.tsx'
 import { Avatar } from '../ui/identity.tsx'
 import { interviewerIdentityLines } from './identityLines.ts'
+import { PublicCodeBadge } from './PublicCodeBadge.tsx'
 import { formatSkillPercentLabel, skillOverlapSummary } from './skillMatchFormat.ts'
 
 function SkillChip({
@@ -116,6 +117,9 @@ export function SkillMatchCard({
                   {line}
                 </p>
               ))}
+              <div className="mt-1.5">
+                <PublicCodeBadge code={interviewer.publicCode} />
+              </div>
             </div>
             {percentLabel ? (
               <span className="shrink-0 rounded-full bg-emerald-50 px-2.5 py-1 text-sm font-semibold text-emerald-800">

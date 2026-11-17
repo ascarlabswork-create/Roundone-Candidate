@@ -24,6 +24,8 @@ export type Interviewer = {
   photo: string
   currentRole: string
   company: string
+  /** Human account code (ID003001+). */
+  publicCode?: string | null
   experienceYears: number
   skills: string[]
   technologies: string[]
