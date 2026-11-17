@@ -336,25 +336,39 @@ export function AiPracticePage() {
       return
     }
 
+    const persona = getInterviewerPersona(session.setup.interviewerId)
+    const candContext = getCandidateContext()
+    const recent = getRecentAskedQuestions()
+    const focusDim = pickRandomFocusDimension()
+    const seed = `${Date.now()}-${Math.random().toString(36).substring(2, 7)}`
+
+    // Connect the live voice AND generate the first question at the same time so the
+    // interview starts as fast as possible instead of waiting on them one after another.
+    const client = createVoiceClient()
+    voiceClientRef.current = client
+    const connectPromise = client.start(session.setup, persona.voice, persona.name, micStream)
+
     let sessionId: string | null = null
     let handedOff = false
     try {
-      sessionId = await startPracticeSession(session.setup)
-      const candContext = getCandidateContext()
-      const persona = getInterviewerPersona(session.setup.interviewerId)
-      const recent = getRecentAskedQuestions()
-      const focusDim = pickRandomFocusDimension()
-      const seed = `${Date.now()}-${Math.random().toString(36).substring(2, 7)}`
-
-      const first = await requestNextPracticeQuestion(session.setup, 1, [], {
-        candidate: candContext,
-        interviewerName: persona.name,
-        excludeQuestions: recent,
-        focusDimension: focusDim,
-        sessionSeed: seed,
-      })
+      const [startedSessionId, first] = await Promise.all([
+        startPracticeSession(session.setup).catch(() => null),
+        requestNextPracticeQuestion(session.setup, 1, [], {
+          candidate: candContext,
+          interviewerName: persona.name,
+          excludeQuestions: recent,
+          focusDimension: focusDim,
+          sessionSeed: seed,
+        }),
+      ])
+      sessionId = startedSessionId
 
       if (!first) {
+        await connectPromise.catch(() => false)
+        if (client === voiceClientRef.current) {
+          client.close()
+          voiceClientRef.current = null
+        }
         micStream.getTracks().forEach((track) => track.stop())
         if (sessionId) await failPracticeSession(sessionId)
         setError(UNAVAILABLE)
@@ -376,11 +390,20 @@ export function AiPracticePage() {
         startedAt,
       })
 
-      // Initialize voice connection with the microphone already granted on this click.
-      await setupVoiceClient(first, micStream)
+      const started = await connectPromise
       handedOff = true
+      if (started) {
+        setError(null)
+        await client.speakQuestion(first.question, persona.voice)
+      }
     } catch (caught: unknown) {
-      if (!handedOff) micStream.getTracks().forEach((track) => track.stop())
+      if (!handedOff) {
+        if (client === voiceClientRef.current) {
+          client.close()
+          voiceClientRef.current = null
+        }
+        micStream.getTracks().forEach((track) => track.stop())
+      }
       if (sessionId) await failPracticeSession(sessionId)
       setError(caught instanceof Error ? caught.message : UNAVAILABLE)
     } finally {
@@ -419,14 +442,8 @@ export function AiPracticePage() {
     await setupVoiceClient(question, stream)
   }
 
-  async function setupVoiceClient(initialQuestion: PracticeAiQuestion, existingStream?: MediaStream | null) {
-    if (voiceClientRef.current) {
-      voiceClientRef.current.close()
-    }
-
-    const persona = getInterviewerPersona(sessionRef.current.setup.interviewerId)
-
-    const client = new VoiceClient({
+  function createVoiceClient(): VoiceClient {
+    return new VoiceClient({
       onStateChange: (state) => {
         setVoiceState(state)
       },
@@ -452,6 +469,15 @@ export function AiPracticePage() {
         void skipCurrentQuestion('no_speech')
       },
     })
+  }
+
+  async function setupVoiceClient(initialQuestion: PracticeAiQuestion, existingStream?: MediaStream | null) {
+    if (voiceClientRef.current) {
+      voiceClientRef.current.close()
+    }
+
+    const persona = getInterviewerPersona(sessionRef.current.setup.interviewerId)
+    const client = createVoiceClient()
 
     voiceClientRef.current = client
     const started = await client.start(sessionRef.current.setup, persona.voice, persona.name, existingStream)
@@ -487,41 +513,22 @@ export function AiPracticePage() {
     }
   }
 
-  async function advanceAfterTurn(
-    turns: PracticeTurn[],
-    bridgeLine: string | null,
-  ) {
-    const curSession = sessionRef.current
-    const nextIndex = curSession.index + 1
-    if (nextIndex >= curSession.setup.questionCount) {
-      if (voiceClientRef.current) {
-        voiceClientRef.current.close()
-        voiceClientRef.current = null
-      }
-      setSession({
-        ...curSession,
-        phase: 'complete',
-        turns,
-        currentAnswer: '',
-      })
-      submittingRef.current = false
-      setBusy(false)
-      return
-    }
-
-    setVoiceState('thinking')
-    const candContext = getCandidateContext()
-    const structured = buildStructuredContext(candContext, curSession.setup, turns)
-    const persona = getInterviewerPersona(curSession.setup.interviewerId)
-
-    const priorTurnsData = turns.map((t) => ({
+  function buildPriorTurns(turns: PracticeTurn[]) {
+    return turns.map((t) => ({
       question: t.question.question,
       topic: t.question.topic,
       answer: t.answer,
       score: t.feedback?.score ?? null,
       missingPoints: t.feedback?.missingPoints ?? [],
     }))
+  }
 
+  // Generate the next question grounded in the candidate's actual answers, skills, and projects.
+  async function generateNextQuestion(turns: PracticeTurn[], nextIndex: number) {
+    const curSession = sessionRef.current
+    const candContext = getCandidateContext()
+    const structured = buildStructuredContext(candContext, curSession.setup, turns)
+    const persona = getInterviewerPersona(curSession.setup.interviewerId)
     const recent = [
       ...curSession.questions.map((q) => q.question),
       ...getRecentAskedQuestions(),
@@ -529,27 +536,40 @@ export function AiPracticePage() {
     const focusDim = pickRandomFocusDimension(curSession.questions.map((q) => q.topic))
     const seed = `${Date.now()}-${Math.random().toString(36).substring(2, 7)}`
 
-    const nextQuestion = await requestNextPracticeQuestion(
-      curSession.setup,
-      nextIndex + 1,
-      priorTurnsData,
-      {
-        candidate: candContext,
-        structured,
-        interviewerName: persona.name,
-        excludeQuestions: recent,
-        focusDimension: focusDim,
-        sessionSeed: seed,
-      },
-    )
+    return requestNextPracticeQuestion(curSession.setup, nextIndex + 1, buildPriorTurns(turns), {
+      candidate: candContext,
+      structured,
+      interviewerName: persona.name,
+      excludeQuestions: recent,
+      focusDimension: focusDim,
+      sessionSeed: seed,
+    })
+  }
 
-    if (!nextQuestion) {
-      submittingRef.current = false
-      setBusy(false)
-      setError(UNAVAILABLE)
-      return
+  function completeInterview(turns: PracticeTurn[]) {
+    const curSession = sessionRef.current
+    if (voiceClientRef.current) {
+      voiceClientRef.current.close()
+      voiceClientRef.current = null
     }
+    setSession({
+      ...curSession,
+      phase: 'complete',
+      turns,
+      currentAnswer: '',
+    })
+    submittingRef.current = false
+    setBusy(false)
+  }
 
+  async function commitNextQuestion(
+    turns: PracticeTurn[],
+    nextIndex: number,
+    nextQuestion: PracticeAiQuestion,
+    bridgeLine: string | null,
+  ) {
+    const curSession = sessionRef.current
+    const persona = getInterviewerPersona(curSession.setup.interviewerId)
     recordAskedQuestion(nextQuestion.question)
     const nextQuestions = [...curSession.questions, nextQuestion]
     voiceClientRef.current?.resetTurnTranscript()
@@ -567,11 +587,29 @@ export function AiPracticePage() {
     setBusy(false)
 
     if (voiceClientRef.current) {
-      const spoken = bridgeLine
-        ? `${bridgeLine} ${nextQuestion.question}`
-        : nextQuestion.question
+      const spoken = bridgeLine ? `${bridgeLine} ${nextQuestion.question}` : nextQuestion.question
       await voiceClientRef.current.speakQuestion(spoken, persona.voice)
     }
+  }
+
+  // Used by skip / no-speech: the synthetic turn is already built, just move on.
+  async function advanceAfterTurn(turns: PracticeTurn[], bridgeLine: string | null) {
+    const curSession = sessionRef.current
+    const nextIndex = curSession.index + 1
+    if (nextIndex >= curSession.setup.questionCount) {
+      completeInterview(turns)
+      return
+    }
+
+    setVoiceState('thinking')
+    const nextQuestion = await generateNextQuestion(turns, nextIndex)
+    if (!nextQuestion) {
+      submittingRef.current = false
+      setBusy(false)
+      setError(UNAVAILABLE)
+      return
+    }
+    await commitNextQuestion(turns, nextIndex, nextQuestion, bridgeLine)
   }
 
   async function skipCurrentQuestion(reason: 'dont_know' | 'no_speech', spokenText?: string) {
@@ -662,18 +700,24 @@ export function AiPracticePage() {
     setPersistError(null)
     setVoiceState('evaluating')
 
+    const turnsWithout = curSession.turns.filter((item) => item.question.id !== question.id)
+    const nextIndex = curSession.index + 1
+    const willComplete = nextIndex >= curSession.setup.questionCount
+
     try {
-      const feedback = await requestPracticeFeedback(question, answerText)
-      if (!feedback) {
-        submittingRef.current = false
-        setBusy(false)
-        setVoiceState('listening')
-        setError('Answer evaluation was interrupted. You can retry submitting.')
-        return
-      }
+      // Analyse the spoken answer AND prepare the follow-up at the same time, so the
+      // interviewer reacts quickly like a real back-and-forth conversation.
+      const provisionalTurns: PracticeTurn[] = [
+        ...turnsWithout,
+        { question, answer: answerText, feedback: null },
+      ]
+      const [feedback, nextQuestion] = await Promise.all([
+        requestPracticeFeedback(question, answerText).catch(() => null),
+        willComplete ? Promise.resolve(null) : generateNextQuestion(provisionalTurns, nextIndex),
+      ])
 
       const turn: PracticeTurn = { question, answer: answerText, feedback }
-      const turns = [...curSession.turns.filter((item) => item.question.id !== question.id), turn]
+      const turns = [...turnsWithout, turn]
 
       if (curSession.savedSessionId) {
         try {
@@ -683,7 +727,18 @@ export function AiPracticePage() {
         }
       }
 
-      await advanceAfterTurn(turns, null)
+      if (willComplete) {
+        completeInterview(turns)
+        return
+      }
+      if (!nextQuestion) {
+        submittingRef.current = false
+        setBusy(false)
+        setVoiceState('listening')
+        setError(UNAVAILABLE)
+        return
+      }
+      await commitNextQuestion(turns, nextIndex, nextQuestion, null)
     } catch (err: unknown) {
       submittingRef.current = false
       setBusy(false)
