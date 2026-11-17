@@ -4,6 +4,7 @@ import type { MatchingCatalogPerson } from '../../matching/catalog.ts'
 import type { SkillMatchDetail } from '../../types.ts'
 import { Button } from '../ui/Button.tsx'
 import { Avatar } from '../ui/identity.tsx'
+import { interviewerIdentityLines } from './identityLines.ts'
 import { formatSkillPercentLabel, skillOverlapSummary } from './skillMatchFormat.ts'
 
 function SkillChip({
@@ -99,7 +100,7 @@ export function SkillMatchCard({
   booking: BookingReadiness
 }) {
   const percentLabel = formatSkillPercentLabel(skillMatch.percent)
-  const roleLine = [interviewer.currentRole, interviewer.company].filter(Boolean).join(' @ ')
+  const identityLines = interviewerIdentityLines(interviewer)
   const profileTo = `/candidate/interviewers/${interviewer.id}?from=matches`
 
   return (
@@ -110,10 +111,11 @@ export function SkillMatchCard({
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div className="min-w-0">
               <h3 className="truncate text-lg font-semibold text-navy-950">{interviewer.name}</h3>
-              {interviewer.headline ? (
-                <p className="mt-0.5 line-clamp-2 text-sm text-slate-600">{interviewer.headline}</p>
-              ) : null}
-              {roleLine ? <p className="mt-0.5 text-sm text-slate-600">{roleLine}</p> : null}
+              {identityLines.map((line, index) => (
+                <p key={`${index}-${line}`} className="mt-0.5 line-clamp-2 text-sm text-slate-600">
+                  {line}
+                </p>
+              ))}
             </div>
             {percentLabel ? (
               <span className="shrink-0 rounded-full bg-emerald-50 px-2.5 py-1 text-sm font-semibold text-emerald-800">
