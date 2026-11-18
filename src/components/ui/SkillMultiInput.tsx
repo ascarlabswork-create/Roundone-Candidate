@@ -20,6 +20,8 @@ type SkillMultiInputProps = {
   className?: string
   /** Override the helper line under the input. Pass empty string to hide it. */
   hint?: string
+  /** Tighter dropdown rows and chips for compact forms (e.g. welcome). */
+  compact?: boolean
 }
 
 function selectedKeySet(selected: string[]) {
@@ -44,6 +46,7 @@ export function SkillMultiInput({
   addLabel = 'Add',
   className,
   hint = 'Type several at once with commas (e.g. Python, SQL), or open the list and pick multiple.',
+  compact = false,
 }: SkillMultiInputProps) {
   const rootRef = useRef<HTMLDivElement | null>(null)
   const [open, setOpen] = useState(false)
@@ -57,7 +60,7 @@ export function SkillMultiInput({
     if (!filter) return available
     const matched = available.filter((skill) => skill.toLowerCase().includes(filter))
     // Prefer prefix hits so "py" surfaces Python ahead of deeper substring matches.
-    return matched.sort((a, b) => {
+    const ranked = matched.sort((a, b) => {
       const aName = a.toLowerCase()
       const bName = b.toLowerCase()
       const aPrefix = aName.startsWith(filter) ? 0 : 1
@@ -65,7 +68,8 @@ export function SkillMultiInput({
       if (aPrefix !== bPrefix) return aPrefix - bPrefix
       return aName.localeCompare(bName)
     })
-  }, [options, selectedKeys, filter])
+    return compact ? ranked.slice(0, 8) : ranked
+  }, [options, selectedKeys, filter, compact])
 
   useEffect(() => {
     if (!open) return
@@ -186,10 +190,13 @@ export function SkillMultiInput({
               role="listbox"
               aria-multiselectable="true"
               aria-label="Skill suggestions"
-              className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg"
+              className={cn(
+                'absolute z-20 mt-1 w-full overflow-auto border border-slate-200 bg-white shadow-lg',
+                compact ? 'max-h-48 rounded-lg py-0.5' : 'max-h-56 rounded-xl py-1',
+              )}
             >
               {suggestions.length === 0 ? (
-                <p className="px-3 py-2 text-sm text-slate-500">
+                <p className={cn('text-slate-500', compact ? 'px-2.5 py-1.5 text-xs' : 'px-3 py-2 text-sm')}>
                   {filter ? `No matches for “${filter}”. Press Add to use it.` : 'All listed skills are already added.'}
                 </p>
               ) : (
@@ -199,26 +206,34 @@ export function SkillMultiInput({
                     type="button"
                     role="option"
                     aria-selected={false}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-navy-950 hover:bg-slate-50"
+                    className={cn(
+                      'flex w-full items-center gap-2 text-left text-navy-950 hover:bg-slate-50',
+                      compact ? 'px-2.5 py-1 text-xs' : 'px-3 py-2 text-sm',
+                    )}
                     onMouseDown={(event) => {
                       event.preventDefault()
                       pickSuggestion(skill)
                     }}
                   >
-                    <Plus className="h-3.5 w-3.5 shrink-0 text-slate-400" aria-hidden />
+                    <Plus
+                      className={cn('shrink-0 text-slate-400', compact ? 'h-3 w-3' : 'h-3.5 w-3.5')}
+                      aria-hidden
+                    />
                     {skill}
                   </button>
                 ))
               )}
-              {typeof max === 'number' ? (
-                <p className="border-t border-slate-100 px-3 py-1.5 text-[11px] text-slate-500">
-                  Select multiple from this list · {remaining} left
-                </p>
-              ) : (
-                <p className="border-t border-slate-100 px-3 py-1.5 text-[11px] text-slate-500">
-                  Select multiple from this list. Type commas to add several at once.
-                </p>
-              )}
+              {!compact ? (
+                typeof max === 'number' ? (
+                  <p className="border-t border-slate-100 px-3 py-1.5 text-[11px] text-slate-500">
+                    Select multiple from this list · {remaining} left
+                  </p>
+                ) : (
+                  <p className="border-t border-slate-100 px-3 py-1.5 text-[11px] text-slate-500">
+                    Select multiple from this list. Type commas to add several at once.
+                  </p>
+                )
+              ) : null}
             </div>
           ) : null}
         </div>

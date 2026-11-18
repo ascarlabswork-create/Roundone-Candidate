@@ -338,11 +338,8 @@ export function FindPage() {
             selected={form.skills}
             onAdd={addSkills}
             placeholder="Java, AWS, Microservices"
+            hint=""
           />
-          <p className="mt-1 text-xs text-slate-500">
-            Type several at once with commas (e.g. Python, SQL), or open the list and pick multiple. Matching uses
-            only these chips — remove any you do not want covered.
-          </p>
           <div className="mt-3 flex flex-wrap gap-2">
             {form.skills.map((skill) => (
               <Chip
