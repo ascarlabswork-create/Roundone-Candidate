@@ -3,6 +3,7 @@ import { asRecord, readBoolean, readNullableString, readNumber, readString } fro
 import { paiseToMajorUnits } from '../lib/format.ts'
 import type { MatchingCatalogPerson } from '../matching/catalog.ts'
 import type { SkillMatchDetail } from '../types.ts'
+import { getOwnInterviewerProfileId } from './ownInterviewer.ts'
 
 export const MATCH_INTERVIEWERS_FOR_JOB_RPC = 'match_interviewers_for_job'
 
@@ -163,8 +164,13 @@ export async function matchInterviewersForJob(input: {
   if (error) throw new Error(error.message || 'Unable to find interviewers for this job.')
   const parsed = parseJobMatchPage(data)
   if (!parsed) throw new Error('Unable to find interviewers for this job.')
-  // Safety net if an older RPC still returns zero-overlap rows.
-  const results = parsed.results.filter((row) => row.matchedJobSkills.length > 0)
+  const ownInterviewerId = await getOwnInterviewerProfileId().catch(() => null)
+  // Safety net: drop zero-overlap rows and the signed-in user's own interviewer persona.
+  const results = parsed.results.filter(
+    (row) =>
+      row.matchedJobSkills.length > 0 &&
+      (!ownInterviewerId || row.interviewerProfileId !== ownInterviewerId),
+  )
   if (results.length === parsed.results.length) return parsed
   return {
     ...parsed,

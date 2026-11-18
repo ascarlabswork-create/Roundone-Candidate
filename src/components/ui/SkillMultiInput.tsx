@@ -18,6 +18,8 @@ type SkillMultiInputProps = {
   disabled?: boolean
   addLabel?: string
   className?: string
+  /** Override the helper line under the input. Pass empty string to hide it. */
+  hint?: string
 }
 
 function selectedKeySet(selected: string[]) {
@@ -41,6 +43,7 @@ export function SkillMultiInput({
   disabled = false,
   addLabel = 'Add',
   className,
+  hint = 'Type several at once with commas (e.g. Python, SQL), or open the list and pick multiple.',
 }: SkillMultiInputProps) {
   const rootRef = useRef<HTMLDivElement | null>(null)
   const [open, setOpen] = useState(false)
@@ -52,7 +55,16 @@ export function SkillMultiInput({
   const suggestions = useMemo(() => {
     const available = options.filter((skill) => !selectedKeys.has(skill.trim().toLowerCase()))
     if (!filter) return available
-    return available.filter((skill) => skill.toLowerCase().includes(filter))
+    const matched = available.filter((skill) => skill.toLowerCase().includes(filter))
+    // Prefer prefix hits so "py" surfaces Python ahead of deeper substring matches.
+    return matched.sort((a, b) => {
+      const aName = a.toLowerCase()
+      const bName = b.toLowerCase()
+      const aPrefix = aName.startsWith(filter) ? 0 : 1
+      const bPrefix = bName.startsWith(filter) ? 0 : 1
+      if (aPrefix !== bPrefix) return aPrefix - bPrefix
+      return aName.localeCompare(bName)
+    })
   }, [options, selectedKeys, filter])
 
   useEffect(() => {
@@ -215,10 +227,16 @@ export function SkillMultiInput({
           {addLabel}
         </Button>
       </div>
-      <p id={`${id}-hint`} className="mt-1.5 text-xs text-slate-500">
-        Type several at once with commas (e.g. Python, SQL), or open the list and pick multiple.
-        {typeof max === 'number' ? ` Up to ${max}.` : ''}
-      </p>
+      {hint || typeof max === 'number' ? (
+        <p id={`${id}-hint`} className="mt-1.5 text-xs text-slate-500">
+          {hint}
+          {typeof max === 'number' ? `${hint ? ' ' : ''}Up to ${max}.` : ''}
+        </p>
+      ) : (
+        <span id={`${id}-hint`} className="sr-only">
+          Skill suggestions appear as you type.
+        </span>
+      )}
     </div>
   )
 }

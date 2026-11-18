@@ -3,11 +3,16 @@ function norm(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, ' ')
 }
 
+function headlineLead(headline: string): string {
+  const h = norm(headline)
+  return (h.split(/\s*[·•|/\\,@]\s*|\s+[–—-]\s+/)[0] ?? h).trim()
+}
+
 function headlineCoversRole(headline: string, role: string): boolean {
   const h = norm(headline)
   const r = norm(role)
   if (!h || !r) return false
-  if (h === r) return true
+  if (h === r || headlineLead(headline) === r) return true
   // "software Engineer · System Design" / "software Engineer at asc"
   return h.startsWith(`${r} `) || h.startsWith(`${r}·`) || h.startsWith(`${r} ·`)
 }
