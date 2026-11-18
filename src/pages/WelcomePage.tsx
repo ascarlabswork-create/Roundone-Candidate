@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { Button } from '../components/ui/Button.tsx'
+import { RoleSuggestInput } from '../components/ui/RoleSuggestInput.tsx'
 import { SkillMultiInput } from '../components/ui/SkillMultiInput.tsx'
-import { Card, FieldLabel, TextInput } from '../components/ui/primitives.tsx'
+import { Card, FieldLabel } from '../components/ui/primitives.tsx'
+import { TARGET_ROLES } from '../data/catalogs.ts'
 import { dedupeSkills } from '../matching/skills.ts'
 import { localResumeSkillPlan } from '../resume/localSkillPlan.ts'
 import { extractResumeText } from '../resume/resumeText.ts'
@@ -16,26 +18,12 @@ import {
 import { useMatching } from '../state/matching.tsx'
 
 const INTENT_READY_KEY = 'roundone.intentReady'
-const QUICK_ROLES = [
-  'Software Engineer',
-  'Backend Engineer',
-  'Frontend Engineer',
-  'Full Stack Engineer',
-  'Data Scientist',
-  'ML Engineer',
-  'DevOps Engineer',
-  'Product Manager',
-] as const
 const QUICK_SKILLS = ['Python', 'Java', 'SQL', 'React', 'Machine Learning', 'System Design'] as const
 
 function suggestionChipClass(selected: boolean) {
   return selected
-    ? 'inline-flex h-7 items-center rounded-full bg-navy-950 px-2.5 text-xs font-medium text-white'
-    : 'inline-flex h-7 items-center rounded-full border border-slate-300 bg-white px-2.5 text-xs font-medium text-slate-700 hover:border-navy-700'
-}
-
-function rolesMatch(left: string, right: string) {
-  return left.trim().toLowerCase() === right.trim().toLowerCase()
+    ? 'inline-flex h-6 max-w-full items-center truncate rounded-md bg-navy-950 px-2 text-[11px] font-medium text-white'
+    : 'inline-flex h-6 max-w-full items-center truncate rounded-md border border-slate-300 bg-white px-2 text-[11px] font-medium text-slate-700 hover:border-navy-700'
 }
 
 export function WelcomePage() {
@@ -175,44 +163,19 @@ export function WelcomePage() {
               <legend className="text-sm font-semibold text-navy-950">Role you want</legend>
               <div className="mt-3">
                 <FieldLabel htmlFor="welcome-role">Type your role</FieldLabel>
-                <TextInput
+                <RoleSuggestInput
                   id="welcome-role"
                   required
-                  list="welcome-role-options"
-                  autoComplete="organization-title"
-                  enterKeyHint="next"
-                  placeholder="Software Engineer, ML Engineer…"
-                  className="text-base"
+                  disabled={saving}
+                  placeholder="Start typing, e.g. soft → Software Engineer"
+                  options={TARGET_ROLES}
                   value={role}
-                  onChange={(event) => {
+                  onChange={(next) => {
                     setError(null)
-                    setRole(event.target.value)
+                    setRole(next)
                   }}
                 />
-                <datalist id="welcome-role-options">
-                  {QUICK_ROLES.map((option) => (
-                    <option key={option} value={option} />
-                  ))}
-                </datalist>
-              </div>
-              <div className="mt-3 flex flex-wrap gap-1.5">
-                {QUICK_ROLES.map((option) => {
-                  const selected = rolesMatch(role, option)
-                  return (
-                    <button
-                      key={option}
-                      type="button"
-                      aria-pressed={selected}
-                      onClick={() => {
-                        setError(null)
-                        setRole(selected ? '' : option)
-                      }}
-                      className={suggestionChipClass(selected)}
-                    >
-                      {option}
-                    </button>
-                  )
-                })}
+                <p className="mt-1.5 text-xs text-slate-500">Suggestions appear as you type.</p>
               </div>
             </fieldset>
 
@@ -233,15 +196,19 @@ export function WelcomePage() {
                 <SkillMultiInput
                   id="welcome-skill"
                   value={skillDraft}
-                  onChange={setSkillDraft}
+                  onChange={(next) => {
+                    setError(null)
+                    setSkillDraft(next)
+                  }}
                   selected={skills}
                   onAdd={addSkills}
-                  placeholder="Type a skill, e.g. py → Python"
+                  placeholder="Type a skill, e.g. py"
                   disabled={readingResume || saving}
-                  hint="Suggestions appear as you type. Tap one or press Add."
+                  hint=""
+                  compact
                 />
                 {skills.length > 0 ? (
-                  <div className="flex flex-wrap gap-1.5">
+                  <div className="flex flex-wrap gap-1">
                     {skills.map((skill) => (
                       <button
                         key={skill}
@@ -263,22 +230,25 @@ export function WelcomePage() {
                 {QUICK_SKILLS.some(
                   (skill) => !skills.some((item) => item.toLowerCase() === skill.toLowerCase()),
                 ) ? (
-                  <div className="flex flex-wrap gap-1.5 pt-1">
-                    {QUICK_SKILLS.filter(
-                      (skill) => !skills.some((item) => item.toLowerCase() === skill.toLowerCase()),
-                    ).map((skill) => (
-                      <button
-                        key={skill}
-                        type="button"
-                        onClick={() => {
-                          setError(null)
-                          setSkills((current) => dedupeSkills([...current, skill]))
-                        }}
-                        className={suggestionChipClass(false)}
-                      >
-                        + {skill}
-                      </button>
-                    ))}
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Suggestions</p>
+                    <div className="mt-1.5 flex flex-wrap gap-1">
+                      {QUICK_SKILLS.filter(
+                        (skill) => !skills.some((item) => item.toLowerCase() === skill.toLowerCase()),
+                      ).map((skill) => (
+                        <button
+                          key={skill}
+                          type="button"
+                          onClick={() => {
+                            setError(null)
+                            setSkills((current) => dedupeSkills([...current, skill]))
+                          }}
+                          className={suggestionChipClass(false)}
+                        >
+                          + {skill}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 ) : null}
                 <div className="mt-1">
