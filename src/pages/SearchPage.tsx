@@ -13,6 +13,7 @@ import { filterInterviewersForCandidateBrowse } from '../matching/browseFilter.t
 import { resolveMatchingCandidateSkills } from '../matching/candidateSkills.ts'
 import { loadMatchingCatalog } from '../matching/catalog.ts'
 import { hasMatchingSkills, looksLikeNaturalLanguage, scoreInterviewer } from '../matching/index.ts'
+import { getOwnInterviewerProfileId } from '../services/ownInterviewer.ts'
 import { emptyPreferences, useMatching } from '../state/matching.tsx'
 import { useToast } from '../state/toast.tsx'
 import type { Interviewer, InterviewerFilters, MatchingPreferences } from '../types.ts'
@@ -116,9 +117,15 @@ export function SearchPage() {
     if (candidateSkills.length === 0) {
       return { people: [], candidateSkills }
     }
-    const catalog = await loadMatchingCatalog()
+    const [catalog, ownInterviewerId] = await Promise.all([
+      loadMatchingCatalog(),
+      getOwnInterviewerProfileId().catch(() => null),
+    ])
+    const withoutSelf = ownInterviewerId
+      ? catalog.filter((person) => person.id !== ownInterviewerId)
+      : catalog
     return {
-      people: filterInterviewersForCandidateBrowse(catalog, candidateSkills, filters),
+      people: filterInterviewersForCandidateBrowse(withoutSelf, candidateSkills, filters),
       candidateSkills,
     }
   }, [params.toString(), sessionSkillsKey])

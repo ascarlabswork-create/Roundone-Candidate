@@ -28,10 +28,10 @@ const QUICK_ROLES = [
 ] as const
 const QUICK_SKILLS = ['Python', 'Java', 'SQL', 'React', 'Machine Learning', 'System Design'] as const
 
-function pillClass(selected: boolean) {
+function suggestionChipClass(selected: boolean) {
   return selected
-    ? 'inline-flex min-h-11 items-center rounded-full bg-navy-950 px-3.5 py-2 text-sm text-white'
-    : 'inline-flex min-h-11 items-center rounded-full border border-slate-300 bg-white px-3.5 py-2 text-sm text-slate-700 hover:border-navy-700'
+    ? 'inline-flex h-7 items-center rounded-full bg-navy-950 px-2.5 text-xs font-medium text-white'
+    : 'inline-flex h-7 items-center rounded-full border border-slate-300 bg-white px-2.5 text-xs font-medium text-slate-700 hover:border-navy-700'
 }
 
 function rolesMatch(left: string, right: string) {
@@ -173,40 +173,8 @@ export function WelcomePage() {
           <form className="grid gap-6" onSubmit={(event) => void save(event)}>
             <fieldset>
               <legend className="text-sm font-semibold text-navy-950">Role you want</legend>
-              <p className="mt-1 text-xs text-slate-500">Pick one below, or type a custom role.</p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {QUICK_ROLES.map((option) => {
-                  const selected = rolesMatch(role, option)
-                  return (
-                    <button
-                      key={option}
-                      type="button"
-                      aria-pressed={selected}
-                      onClick={() => {
-                        setError(null)
-                        setRole(selected ? '' : option)
-                      }}
-                      className={pillClass(selected)}
-                    >
-                      {option}
-                    </button>
-                  )
-                })}
-              </div>
-              {role.trim() && !QUICK_ROLES.some((option) => rolesMatch(role, option)) ? (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    aria-label={`Clear ${role.trim()}`}
-                    onClick={() => setRole('')}
-                    className={pillClass(true)}
-                  >
-                    {role.trim()} ×
-                  </button>
-                </div>
-              ) : null}
               <div className="mt-3">
-                <FieldLabel htmlFor="welcome-role">Or type your role</FieldLabel>
+                <FieldLabel htmlFor="welcome-role">Type your role</FieldLabel>
                 <TextInput
                   id="welcome-role"
                   required
@@ -227,67 +195,29 @@ export function WelcomePage() {
                   ))}
                 </datalist>
               </div>
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {QUICK_ROLES.map((option) => {
+                  const selected = rolesMatch(role, option)
+                  return (
+                    <button
+                      key={option}
+                      type="button"
+                      aria-pressed={selected}
+                      onClick={() => {
+                        setError(null)
+                        setRole(selected ? '' : option)
+                      }}
+                      className={suggestionChipClass(selected)}
+                    >
+                      {option}
+                    </button>
+                  )
+                })}
+              </div>
             </fieldset>
 
             <fieldset>
               <legend className="text-sm font-semibold text-navy-950">Skills</legend>
-              <p className="mt-1 text-xs text-slate-500">
-                Selected skills show below with × to remove. Suggestions are only for adding.
-              </p>
-
-              <div className="mt-3">
-                <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">Your skills</p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {skills.length === 0 ? (
-                    <p className="text-sm text-slate-500">None selected yet.</p>
-                  ) : (
-                    skills.map((skill) => (
-                      <button
-                        key={skill}
-                        type="button"
-                        aria-label={`Remove ${skill}`}
-                        onClick={() => {
-                          setError(null)
-                          setSkills((current) =>
-                            current.filter((item) => item.toLowerCase() !== skill.toLowerCase()),
-                          )
-                        }}
-                        className={pillClass(true)}
-                      >
-                        {skill} ×
-                      </button>
-                    ))
-                  )}
-                </div>
-              </div>
-
-              {QUICK_SKILLS.some(
-                (skill) => !skills.some((item) => item.toLowerCase() === skill.toLowerCase()),
-              ) ? (
-                <div className="mt-4">
-                  <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
-                    Suggested — tap to add
-                  </p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {QUICK_SKILLS.filter(
-                      (skill) => !skills.some((item) => item.toLowerCase() === skill.toLowerCase()),
-                    ).map((skill) => (
-                      <button
-                        key={skill}
-                        type="button"
-                        onClick={() => {
-                          setError(null)
-                          setSkills((current) => dedupeSkills([...current, skill]))
-                        }}
-                        className={pillClass(false)}
-                      >
-                        + {skill}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-
               <div className="mt-3 grid gap-2">
                 <input
                   ref={fileRef}
@@ -306,10 +236,52 @@ export function WelcomePage() {
                   onChange={setSkillDraft}
                   selected={skills}
                   onAdd={addSkills}
-                  placeholder="Type a skill, e.g. ABAP"
+                  placeholder="Type a skill, e.g. py → Python"
                   disabled={readingResume || saving}
+                  hint="Suggestions appear as you type. Tap one or press Add."
                 />
-                <div className="mt-2">
+                {skills.length > 0 ? (
+                  <div className="flex flex-wrap gap-1.5">
+                    {skills.map((skill) => (
+                      <button
+                        key={skill}
+                        type="button"
+                        aria-label={`Remove ${skill}`}
+                        onClick={() => {
+                          setError(null)
+                          setSkills((current) =>
+                            current.filter((item) => item.toLowerCase() !== skill.toLowerCase()),
+                          )
+                        }}
+                        className={suggestionChipClass(true)}
+                      >
+                        {skill} ×
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+                {QUICK_SKILLS.some(
+                  (skill) => !skills.some((item) => item.toLowerCase() === skill.toLowerCase()),
+                ) ? (
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {QUICK_SKILLS.filter(
+                      (skill) => !skills.some((item) => item.toLowerCase() === skill.toLowerCase()),
+                    ).map((skill) => (
+                      <button
+                        key={skill}
+                        type="button"
+                        onClick={() => {
+                          setError(null)
+                          setSkills((current) => dedupeSkills([...current, skill]))
+                        }}
+                        className={suggestionChipClass(false)}
+                      >
+                        + {skill}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+                <div className="mt-1">
                   <Button type="button" variant="outline" fullWidth disabled={readingResume} onClick={() => fileRef.current?.click()}>
                     {readingResume ? 'Reading…' : 'Upload resume'}
                   </Button>

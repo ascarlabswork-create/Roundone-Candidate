@@ -5,6 +5,7 @@ import { applyPublicServices, type MatchingCatalogPerson } from './catalog.ts'
 import type { MatchResult } from '../types.ts'
 import type { BookingReadiness } from './bookingReadiness.ts'
 import { describeBookingReadiness } from './liveAvailability.ts'
+import { getOwnInterviewerProfileId } from '../services/ownInterviewer.ts'
 import {
   matchInterviewersBySkills,
   skillMatchRowToCatalogPerson,
@@ -40,6 +41,12 @@ export async function recommendMatchedInterviewers(
   } catch (error) {
     console.error('skill match RPC failed', error)
     throw new Error('Unable to load interviewers. Please try again.')
+  }
+
+  // Dual-persona safety net: never recommend the signed-in user's own interviewer profile.
+  const ownInterviewerId = await getOwnInterviewerProfileId().catch(() => null)
+  if (ownInterviewerId) {
+    rows = rows.filter((row) => row.interviewerProfileId !== ownInterviewerId)
   }
 
   const limited = rows.slice(0, MATCHING_RESULT_LIMIT)
