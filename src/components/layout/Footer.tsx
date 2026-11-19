@@ -4,6 +4,24 @@ import { useAuthModal } from '../../state/authModal.tsx'
 import { useSession } from '../../state/session.tsx'
 import { Logo } from './Logo.tsx'
 
+const signedInFeatureLinks = [
+  { to: '/candidate/find', label: 'Find interviewers' },
+  { to: '/candidate/job-match', label: 'Match to a job' },
+  { to: '/candidate/practice', label: 'AI practice' },
+  { to: '/candidate/preparation', label: 'AI prep' },
+  { to: '/candidate/ats-check', label: 'ATS check' },
+  { to: '/candidate/resources', label: 'Resources' },
+  { to: '/candidate/how-it-works', label: 'How it works' },
+] as const
+
+const signedInAccountLinks = [
+  { to: '/', label: 'Home' },
+  { to: '/candidate/interviews', label: 'My interviews' },
+  { to: '/candidate/progress', label: 'Progress' },
+  { to: '/candidate/notifications', label: 'Notifications' },
+  { to: '/candidate/profile', label: 'Profile' },
+] as const
+
 export function Footer() {
   const { openAuth } = useAuthModal()
   const { status, account } = useSession()
@@ -13,24 +31,30 @@ export function Footer() {
     return (
       <footer className="mt-auto border-t border-black/[0.06] bg-white text-slate-500">
         <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 sm:px-6 md:grid-cols-4">
-          <div className="md:col-span-2">
+          <div>
             <Logo />
             <p className="mt-3 max-w-sm text-sm leading-6">
               Mock interviews with people who have sat on the other side of the table.
             </p>
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Product</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Features</p>
             <div className="mt-3 flex flex-col gap-2 text-sm">
-              <Link className="hover:text-navy-950" to="/candidate/how-it-works">
-                How it works
-              </Link>
-              <Link className="hover:text-navy-950" to="/candidate/find">
-                Find interviewers
-              </Link>
-              <Link className="hover:text-navy-950" to="/candidate/practice">
-                AI practice
-              </Link>
+              {signedInFeatureLinks.map((link) => (
+                <Link key={link.to} className="hover:text-navy-950" to={link.to}>
+                  {link.label}
+                </Link>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Account</p>
+            <div className="mt-3 flex flex-col gap-2 text-sm">
+              {signedInAccountLinks.map((link) => (
+                <Link key={link.to} className="hover:text-navy-950" to={link.to}>
+                  {link.label}
+                </Link>
+              ))}
             </div>
           </div>
           <div>
@@ -109,4 +133,3 @@ export function Footer() {
     </footer>
   )
 }
-

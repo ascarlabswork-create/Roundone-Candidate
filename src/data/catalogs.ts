@@ -5,6 +5,7 @@ export const INTERVIEW_TYPES = [
   'Machine Learning',
   'Product',
   'Data Science',
+  'Technical Round',
 ] as const
 
 export type InterviewType = (typeof INTERVIEW_TYPES)[number]
