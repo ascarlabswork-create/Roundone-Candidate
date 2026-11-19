@@ -346,4 +346,55 @@ export const PRACTICE_DRILLS: Record<InterviewType, PracticeDrill> = {
       },
     ],
   },
+  'Technical Round': {
+    type: 'Technical Round',
+    durationMin: 15,
+    summary: 'Mixed technical screen: fundamentals, debugging, and how you reason under time pressure.',
+    checklist: ['Clarify the problem', 'State assumptions', 'Walk through an example', 'Call out trade-offs'],
+    questions: [
+      {
+        id: 'tech-1',
+        title: 'API failure modes',
+        kind: 'written',
+        prompt:
+          'Your checkout API occasionally returns 500s under load. How would you diagnose it in production, and what mitigations would you ship first?',
+        expectedPoints: [
+          { label: 'Observability', keywords: ['log', 'metric', 'trace', 'apm', 'monitor'] },
+          { label: 'Load / bottleneck', keywords: ['load', 'cpu', 'db', 'timeout', 'pool', 'latency'] },
+          { label: 'Mitigation', keywords: ['retry', 'circuit', 'cache', 'rate', 'scale', 'queue'] },
+        ],
+        followUp: 'How do you decide between fixing the root cause and shipping a quick mitigation?',
+        modelOutline:
+          'Pull error rate, latency, and dependency health; isolate hot paths; ship retries/limits or scale while fixing the root cause.',
+      },
+      {
+        id: 'tech-2',
+        title: 'Data structure choice',
+        kind: 'written',
+        prompt:
+          'You need an in-memory store for recent user sessions with fast lookup by session id and eviction of idle sessions after 30 minutes. Which structure would you use and why?',
+        expectedPoints: [
+          { label: 'Hash map for lookup', keywords: ['hash', 'map', 'dict', 'o(1)'] },
+          { label: 'TTL / eviction', keywords: ['ttl', 'expire', 'evict', 'lru', 'timer', 'heap'] },
+          { label: 'Complexity trade-off', keywords: ['time', 'space', 'complexity', 'trade'] },
+        ],
+        followUp: 'What changes if sessions must survive a process restart?',
+        modelOutline: 'Map for O(1) get/set plus an expiry structure (TTL wheel, heap, or LRU). Persist or use Redis if durability is required.',
+      },
+      {
+        id: 'tech-3',
+        title: 'Debug a flaky test',
+        kind: 'written',
+        prompt:
+          'A CI integration test fails ~10% of the time only on the pipeline. How do you find the root cause and make the suite trustworthy again?',
+        expectedPoints: [
+          { label: 'Repro and isolate', keywords: ['repro', 'isolate', 'local', 'flake', 'seed'] },
+          { label: 'Race / timing', keywords: ['race', 'async', 'timing', 'sleep', 'wait', 'order'] },
+          { label: 'Harden the test', keywords: ['assert', 'wait', 'mock', 'determin', 'quarantine'] },
+        ],
+        followUp: 'When is quarantining a flaky test acceptable?',
+        modelOutline: 'Capture logs and seeds, look for races and shared state, replace sleeps with conditions, then re-enable with a stable assert.',
+      },
+    ],
+  },
 }
