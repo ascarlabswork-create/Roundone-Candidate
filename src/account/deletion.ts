@@ -1,3 +1,5 @@
+import { clearIntentReadyFlags } from '../lib/intentReady.ts'
+
 const SESSION_KEYS = [
   'roundone.matchingPreferences',
   'roundone.bookingDraft',
@@ -17,6 +19,7 @@ export function accountDeletionConfirmed(phrase: string) {
 }
 
 export function clearCandidateLocalState() {
+  clearIntentReadyFlags()
   for (const key of SESSION_KEYS) {
     try {
       sessionStorage.removeItem(key)

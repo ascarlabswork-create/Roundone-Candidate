@@ -2,20 +2,22 @@ import { useEffect, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { CandidateDashboard } from '../components/dashboard/CandidateDashboard.tsx'
 import { Skeleton } from '../components/ui/primitives.tsx'
+import { isIntentReadyCached, markIntentReady } from '../lib/intentReady.ts'
 import { CANDIDATE_WELCOME_PATH } from '../lib/postAuthPath.ts'
 import { getCandidateProfile, getCandidateSkills } from '../services/candidateProfile.ts'
 import { useSession } from '../state/session.tsx'
 import { PublicHomePage } from './PublicHomePage.tsx'
-
-const INTENT_READY_KEY = 'roundone.intentReady'
 
 export function HomePage() {
   const { status, user } = useSession()
   const [intent, setIntent] = useState<'unknown' | 'ready' | 'needed'>('unknown')
 
   useEffect(() => {
-    if (!user) return
-    if (sessionStorage.getItem(INTENT_READY_KEY) === '1') {
+    if (!user) {
+      setIntent('unknown')
+      return
+    }
+    if (isIntentReadyCached(user.id)) {
       setIntent('ready')
       return
     }
@@ -24,7 +26,7 @@ export function HomePage() {
       try {
         const [account, skills] = await Promise.all([getCandidateProfile(), getCandidateSkills()])
         const ready = Boolean(account.candidate.target_role?.trim()) && skills.length > 0
-        if (ready) sessionStorage.setItem(INTENT_READY_KEY, '1')
+        if (ready) markIntentReady(user.id)
         if (!cancelled) setIntent(ready ? 'ready' : 'needed')
       } catch {
         if (!cancelled) setIntent('needed')

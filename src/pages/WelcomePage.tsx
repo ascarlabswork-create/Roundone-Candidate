@@ -15,9 +15,10 @@ import {
   updateCandidateProfile,
   updateCandidateSkills,
 } from '../services/candidateProfile.ts'
+import { markIntentReady } from '../lib/intentReady.ts'
 import { useMatching } from '../state/matching.tsx'
+import { useSession } from '../state/session.tsx'
 
-const INTENT_READY_KEY = 'roundone.intentReady'
 const QUICK_ROLES = [
   'Software Engineer',
   'Backend Engineer',
@@ -44,6 +45,7 @@ export function WelcomePage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const emailConfirmed = searchParams.get('confirmed') === '1'
+  const { user } = useSession()
   const { setPreferences } = useMatching()
   const fileRef = useRef<HTMLInputElement>(null)
   const [loading, setLoading] = useState(true)
@@ -64,7 +66,7 @@ export function WelcomePage() {
         const roleValue = account.candidate.target_role?.trim() ?? ''
         const saved = dedupeSkills(savedSkills)
         if (roleValue && saved.length > 0) {
-          sessionStorage.setItem(INTENT_READY_KEY, '1')
+          markIntentReady(account.userId)
           setAlreadySet(true)
           return
         }
@@ -142,7 +144,7 @@ export function WelcomePage() {
         language: '',
         naturalLanguageQuery: '',
       })
-      sessionStorage.setItem(INTENT_READY_KEY, '1')
+      markIntentReady(user?.id)
       navigate('/')
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Could not save. Please try again.')

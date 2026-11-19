@@ -3,11 +3,14 @@ export const CANDIDATE_WELCOME_PATH = '/candidate/welcome'
 
 /**
  * Booking and other deep links stay as-is.
- * A plain home/dashboard destination goes through the candidate setup page first.
+ * Bare home (`/`) goes to welcome; Home then sends ready accounts to the dashboard.
  */
 export function postAuthPath(value: string | null) {
   if (!value || !value.startsWith('/') || value.startsWith('//') || value.includes('\\')) {
-    return '/'
+    return CANDIDATE_WELCOME_PATH
+  }
+  if (value === '/' || value === '/candidate' || value === '/candidate/') {
+    return CANDIDATE_WELCOME_PATH
   }
   return value
 }
