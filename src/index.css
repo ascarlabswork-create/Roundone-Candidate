@@ -188,6 +188,58 @@
   animation: demo-scene-enter 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+@keyframes welcome-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes welcome-chip-in {
+  0% {
+    opacity: 0;
+    transform: translateY(6px) scale(0.92);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes welcome-orb {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(8px, -10px, 0) scale(1.06);
+  }
+}
+
+.welcome-rise {
+  animation: welcome-rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.welcome-chip-in {
+  animation: welcome-chip-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.welcome-orb {
+  animation: welcome-orb 9s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .welcome-rise,
+  .welcome-chip-in,
+  .welcome-orb {
+    animation: none !important;
+  }
+}
+
 @keyframes demo-progress-pulse {
   0%,
   100% {

@@ -7,6 +7,10 @@ type RoleSuggestInputProps = {
   id: string
   value: string
   onChange: (value: string) => void
+  /** When set, Enter / picking a suggestion commits a role instead of only filling the field. */
+  onCommit?: (role: string) => void
+  /** Already-selected roles are hidden from the typeahead list. */
+  exclude?: readonly string[]
   options?: readonly string[]
   placeholder?: string
   disabled?: boolean
@@ -26,11 +30,13 @@ function rankRoles(options: readonly string[], filter: string) {
   })
 }
 
-/** Single-value role field: suggestions only appear while typing. */
+/** Role typeahead. With `onCommit`, supports adding multiple roles from one field. */
 export function RoleSuggestInput({
   id,
   value,
   onChange,
+  onCommit,
+  exclude = [],
   options = TARGET_ROLES,
   placeholder = 'Software Engineer, ML Engineer…',
   disabled = false,
@@ -40,14 +46,18 @@ export function RoleSuggestInput({
   const rootRef = useRef<HTMLDivElement | null>(null)
   const [open, setOpen] = useState(false)
   const filter = value.trim().toLowerCase()
+  const excluded = useMemo(
+    () => new Set(exclude.map((role) => role.trim().toLowerCase()).filter(Boolean)),
+    [exclude],
+  )
 
   const suggestions = useMemo(() => {
     if (!filter) return []
-    const exact = options.some((role) => role.toLowerCase() === filter)
-    const ranked = rankRoles(options, filter)
-    // Hide the panel once the typed value exactly matches a role.
+    const available = options.filter((role) => !excluded.has(role.trim().toLowerCase()))
+    const exact = available.some((role) => role.toLowerCase() === filter)
+    const ranked = rankRoles(available, filter)
     return exact ? [] : ranked.slice(0, 8)
-  }, [filter, options])
+  }, [filter, options, excluded])
 
   useEffect(() => {
     if (!open) return
@@ -66,7 +76,21 @@ export function RoleSuggestInput({
   }, [open])
 
   function pick(role: string) {
+    if (onCommit) {
+      onCommit(role)
+      onChange('')
+      setOpen(false)
+      return
+    }
     onChange(role)
+    setOpen(false)
+  }
+
+  function commitDraft() {
+    const next = value.trim()
+    if (!next || !onCommit) return
+    onCommit(next)
+    onChange('')
     setOpen(false)
   }
 
@@ -76,7 +100,7 @@ export function RoleSuggestInput({
     <div ref={rootRef} className={cn('relative', className)}>
       <TextInput
         id={id}
-        required={required}
+        required={required && !onCommit}
         disabled={disabled}
         placeholder={placeholder}
         className="text-base"
@@ -94,9 +118,13 @@ export function RoleSuggestInput({
           setOpen(true)
         }}
         onKeyDown={(event) => {
-          if (event.key === 'Enter' && suggestions.length === 1) {
+          if (event.key === 'Enter') {
             event.preventDefault()
-            pick(suggestions[0]!)
+            if (suggestions.length === 1) {
+              pick(suggestions[0]!)
+              return
+            }
+            if (onCommit && value.trim()) commitDraft()
           }
           if (event.key === 'ArrowDown' && suggestions.length > 0) {
             event.preventDefault()
