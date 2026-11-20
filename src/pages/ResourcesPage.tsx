@@ -184,16 +184,18 @@ export function ResourcesPage() {
           <Library className="h-4 w-4" aria-hidden />
           Prep library
         </p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight text-navy-950 sm:text-4xl">Resources that match your loop</h1>
+        <h1 className="mt-2 text-3xl font-semibold tracking-tight text-navy-950 sm:text-4xl">
+          Interview prep resources for your role
+        </h1>
         <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 sm:text-base">
-          Practical guides tied to your role and skills — not generic blog filler. Pair this with{' '}
+          Practical guides matched to your role and skills. Use{' '}
           <Link
             to="/candidate/preparation"
             className="font-medium text-emerald-800 underline decoration-emerald-300 underline-offset-2"
           >
             AI Prep
           </Link>{' '}
-          for priorities, then use these playbooks when you study.
+          to set priorities, then study with these playbooks.
         </p>
       </section>
 
