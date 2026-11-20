@@ -245,7 +245,7 @@ export function FindPage() {
       <PageHeader
         eyebrow="Match"
         title="Tell us about your interview"
-        subtitle="We’ll rank interviewers by overlap with the skills you list below — not your full profile."
+        subtitle="Interviewers are ranked by how closely their skills match the ones you add below."
         actions={
           <div className="flex flex-wrap gap-2">
             <Link
