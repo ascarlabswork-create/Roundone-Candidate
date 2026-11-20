@@ -25,6 +25,19 @@ export function markIntentReady(userId?: string | null) {
   }
 }
 
+/** Clear the welcome-complete flag for one user (or all when userId is omitted). */
+export function clearIntentReady(userId?: string | null) {
+  try {
+    if (userId) {
+      sessionStorage.removeItem(storageKey(userId))
+      return
+    }
+    clearIntentReadyFlags()
+  } catch {
+    // Storage can be unavailable in private browsing.
+  }
+}
+
 /** Clear every welcome-complete flag (sign-out / account deletion). */
 export function clearIntentReadyFlags() {
   try {

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { CandidateDashboard } from '../components/dashboard/CandidateDashboard.tsx'
 import { Skeleton } from '../components/ui/primitives.tsx'
-import { isIntentReadyCached, markIntentReady } from '../lib/intentReady.ts'
+import { clearIntentReady, markIntentReady } from '../lib/intentReady.ts'
 import { CANDIDATE_WELCOME_PATH } from '../lib/postAuthPath.ts'
 import { getCandidateProfile, getCandidateSkills } from '../services/candidateProfile.ts'
 import { useSession } from '../state/session.tsx'
@@ -17,16 +17,16 @@ export function HomePage() {
       setIntent('unknown')
       return
     }
-    if (isIntentReadyCached(user.id)) {
-      setIntent('ready')
-      return
-    }
+    // Always confirm against the DB. Trusting sessionStorage alone flashes the
+    // dashboard after delete/re-signin before welcome can open.
     let cancelled = false
+    setIntent('unknown')
     void (async () => {
       try {
         const [account, skills] = await Promise.all([getCandidateProfile(), getCandidateSkills()])
         const ready = Boolean(account.candidate.target_role?.trim()) && skills.length > 0
         if (ready) markIntentReady(user.id)
+        else clearIntentReady(user.id)
         if (!cancelled) setIntent(ready ? 'ready' : 'needed')
       } catch {
         if (!cancelled) setIntent('needed')
