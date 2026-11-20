@@ -69,24 +69,55 @@ async function sleep(ms: number) {
   await new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+function isTombstoneFullName(value: string | null | undefined) {
+  const name = value?.trim() ?? ''
+  return name === 'Deleted interviewer' || name === 'Deleted' || name === 'Deleted candidate'
+}
+
+function displayNameFromUser(user: { email?: string | null; user_metadata?: Record<string, unknown> }) {
+  const meta = user.user_metadata?.full_name
+  if (typeof meta === 'string' && meta.trim()) return meta.trim()
+  const local = (user.email ?? '').split('@')[0]?.trim()
+  return local || 'Candidate'
+}
+
 export async function getCandidateProfile(options?: { retries?: number }): Promise<CandidateAccount> {
   const user = await requireUser()
   const retries = options?.retries ?? 0
   let lastError: Error | null = null
 
   for (let attempt = 0; attempt <= retries; attempt += 1) {
-    const { data: profile, error: profileError } = await supabase
+    // Claim every load so soft-delete tombstones on shared profiles are restored.
+    const claimed = await claimCandidatePersona()
+    if (!claimed) {
+      // Still try to load; claim can return false for admins / missing JWT edge cases.
+    }
+
+    const { data: profileRow, error: profileError } = await supabase
       .from('profiles')
       .select('id, role, full_name, avatar_url, timezone, is_active')
       .eq('id', user.id)
       .maybeSingle()
     fail(profileError)
 
-    if (!profile) {
+    if (!profileRow) {
       lastError = new Error('Your account profile is not ready yet. Try again in a moment.')
-    } else if (profile.role === 'admin') {
+    } else if (profileRow.role === 'admin') {
       throw new Error('This Candidate app only supports candidate accounts.')
     } else {
+      let profile = profileRow
+      if (isTombstoneFullName(profile.full_name) || profile.is_active === false) {
+        const nextName = isTombstoneFullName(profile.full_name)
+          ? displayNameFromUser(user)
+          : profile.full_name
+        const { error: reviveError } = await supabase
+          .from('profiles')
+          .update({ full_name: nextName, is_active: true })
+          .eq('id', user.id)
+        fail(reviveError)
+        profile = { ...profile, full_name: nextName, is_active: true }
+      }
+
       let { data: candidate, error: candidateError } = await supabase
         .from('candidate_profiles')
         .select(
@@ -97,8 +128,8 @@ export async function getCandidateProfile(options?: { retries?: number }): Promi
       fail(candidateError)
 
       if (!candidate) {
-        const claimed = await claimCandidatePersona()
-        if (!claimed) throw new Error('This Candidate app only supports candidate accounts.')
+        const retryClaim = await claimCandidatePersona()
+        if (!retryClaim) throw new Error('This Candidate app only supports candidate accounts.')
         const retry = await supabase
           .from('candidate_profiles')
           .select(

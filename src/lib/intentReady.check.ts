@@ -1,4 +1,4 @@
-import { clearIntentReadyFlags, INTENT_READY_KEY, isIntentReadyCached, markIntentReady } from './intentReady.ts'
+import { clearIntentReady, clearIntentReadyFlags, INTENT_READY_KEY, isIntentReadyCached, markIntentReady } from './intentReady.ts'
 
 function expect(condition: boolean, message: string) {
   if (!condition) throw new Error(message)
@@ -38,6 +38,10 @@ try {
   expect(store.get(INTENT_READY_KEY) == null, 'TEST 2 legacy flag cleared when marking per-user')
   clearIntentReadyFlags()
   expect(!isIntentReadyCached('user-b'), 'TEST 3 clear removes per-user flags')
+  markIntentReady('user-c')
+  expect(isIntentReadyCached('user-c'), 'TEST 4 per-user flag set again')
+  clearIntentReady('user-c')
+  expect(!isIntentReadyCached('user-c'), 'TEST 5 clearIntentReady removes one user')
   console.log('intent ready checks passed')
 } finally {
   Object.defineProperty(globalThis, 'sessionStorage', { configurable: true, value: original })
