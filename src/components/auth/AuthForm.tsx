@@ -1,4 +1,4 @@
-import { useCallback, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { Button } from '../ui/Button.tsx'
 import { FieldLabel, PasswordInput, TextInput } from '../ui/primitives.tsx'
@@ -19,6 +19,7 @@ import { EmailOtpInputs } from './EmailOtpInputs.tsx'
 import { GoogleContinueButton } from './GoogleContinueButton.tsx'
 
 type LoginStep = 'email' | 'code' | 'password'
+type RegisterStep = 'details' | 'password'
 
 export function AuthForm({
   mode,
@@ -38,6 +39,7 @@ export function AuthForm({
   const { status, error: sessionError, refreshAccount } = useSession()
   const isRegister = mode === 'register'
   const [loginStep, setLoginStep] = useState<LoginStep>('email')
+  const [registerStep, setRegisterStep] = useState<RegisterStep>('details')
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -49,6 +51,12 @@ export function AuthForm({
   const [info, setInfo] = useState<string | null>(null)
   const [needsConfirmation, setNeedsConfirmation] = useState(false)
   const [resetWait, setResetWait] = useState(0)
+
+  useEffect(() => {
+    setRegisterStep('details')
+    setError(null)
+    setInfo(null)
+  }, [mode])
 
   const busy = submitting || emailBusy || status === 'loading'
   const handleGoogleError = useCallback((message: string) => {
@@ -128,6 +136,21 @@ export function AuthForm({
     } finally {
       setSubmitting(false)
     }
+  }
+
+  function continueRegisterDetails(event: FormEvent) {
+    event.preventDefault()
+    setError(null)
+    setInfo(null)
+    if (!fullName.trim()) {
+      setError('Enter your full name.')
+      return
+    }
+    if (!email.trim()) {
+      setError('Enter your email.')
+      return
+    }
+    setRegisterStep('password')
   }
 
   async function submitRegister(event: FormEvent) {
@@ -255,9 +278,73 @@ export function AuthForm({
   }
 
   if (isRegister) {
+    if (registerStep === 'password') {
+      return (
+        <div>
+          <form className="space-y-4" onSubmit={(event) => void submitRegister(event)}>
+            <div>
+              <p className="text-sm text-slate-600">
+                Creating account for <span className="font-medium text-navy-950">{email.trim() || 'your email'}</span>
+              </p>
+            </div>
+            <div>
+              <FieldLabel htmlFor={`${idPrefix}-password`}>Password</FieldLabel>
+              <PasswordInput
+                id={`${idPrefix}-password`}
+                required
+                minLength={6}
+                autoComplete="new-password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+              />
+            </div>
+            <div>
+              <FieldLabel htmlFor={`${idPrefix}-confirmPassword`}>Confirm password</FieldLabel>
+              <PasswordInput
+                id={`${idPrefix}-confirmPassword`}
+                required
+                minLength={6}
+                autoComplete="new-password"
+                value={confirmPassword}
+                onChange={(event) => setConfirmPassword(event.target.value)}
+              />
+            </div>
+            {error || sessionError ? <p className="text-sm text-red-700">{error || sessionError}</p> : null}
+            {info ? <p className="text-sm text-emerald-700">{info}</p> : null}
+            {needsConfirmation ? (
+              <button
+                type="button"
+                onClick={() => void resendConfirmation()}
+                disabled={busy || resetWait > 0}
+                className="text-sm font-medium text-coral-700 hover:underline disabled:text-slate-400"
+              >
+                {resetWait > 0 ? `Resend available in ${resetWait}s` : 'Resend confirmation email'}
+              </button>
+            ) : null}
+            <Button type="submit" fullWidth disabled={busy}>
+              {submitting ? 'Please wait…' : 'Create account'}
+            </Button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => {
+                setError(null)
+                setInfo(null)
+                setRegisterStep('details')
+              }}
+              className="w-full text-sm font-medium text-slate-600 hover:text-navy-950 hover:underline disabled:text-slate-400"
+            >
+              Back
+            </button>
+          </form>
+          {modeLinks()}
+        </div>
+      )
+    }
+
     return (
       <div>
-        <form className="space-y-4" onSubmit={(event) => void submitRegister(event)}>
+        <form className="space-y-4" onSubmit={continueRegisterDetails}>
           <div>
             <FieldLabel htmlFor={`${idPrefix}-fullName`}>Full name</FieldLabel>
             <TextInput
@@ -279,42 +366,10 @@ export function AuthForm({
               onChange={(event) => setEmail(event.target.value)}
             />
           </div>
-          <div>
-            <FieldLabel htmlFor={`${idPrefix}-password`}>Password</FieldLabel>
-            <PasswordInput
-              id={`${idPrefix}-password`}
-              required
-              minLength={6}
-              autoComplete="new-password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-            />
-          </div>
-          <div>
-            <FieldLabel htmlFor={`${idPrefix}-confirmPassword`}>Confirm password</FieldLabel>
-            <PasswordInput
-              id={`${idPrefix}-confirmPassword`}
-              required
-              minLength={6}
-              autoComplete="new-password"
-              value={confirmPassword}
-              onChange={(event) => setConfirmPassword(event.target.value)}
-            />
-          </div>
           {error || sessionError ? <p className="text-sm text-red-700">{error || sessionError}</p> : null}
           {info ? <p className="text-sm text-emerald-700">{info}</p> : null}
-          {needsConfirmation ? (
-            <button
-              type="button"
-              onClick={() => void resendConfirmation()}
-              disabled={busy || resetWait > 0}
-              className="text-sm font-medium text-coral-700 hover:underline disabled:text-slate-400"
-            >
-              {resetWait > 0 ? `Resend available in ${resetWait}s` : 'Resend confirmation email'}
-            </button>
-          ) : null}
           <Button type="submit" fullWidth disabled={busy}>
-            {submitting ? 'Please wait…' : 'Create account'}
+            Continue
           </Button>
         </form>
         {googleBlock()}
