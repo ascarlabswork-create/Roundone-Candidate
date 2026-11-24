@@ -848,7 +848,10 @@ const RESUME_BANNED =
   /\b(guaranteed|job-ready|hiring probability|employability|will get (you )?hired|recruiter score|ats score)\b/i;
 
 function normalizeResumeHaystack(resumeText: string) {
-  const rawLower = ` ${resumeText.toLowerCase().replace(/\s+/g, " ")} `;
+  const cleaned = resumeText
+    .replace(/(\w)\s*-\s+(\w)/g, "$1-$2")
+    .replace(/([A-Za-z0-9])\s*\/\s*([A-Za-z0-9])/g, "$1/$2");
+  const rawLower = ` ${cleaned.toLowerCase().replace(/\s+/g, " ")} `;
   const alnumHaystack = rawLower.replace(/[^a-z0-9]+/g, "");
   return { rawLower, alnumHaystack };
 }
@@ -864,10 +867,18 @@ function groundedInResume(
   const lower = term.trim().toLowerCase();
   if (lower.length < 2) return false;
   const escaped = lower.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const boundary = new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`);
-  if (boundary.test(rawLower)) return true;
-  const alnumTerm = lower.replace(/[^a-z0-9]+/g, "");
-  if (alnumTerm.length >= 4 && alnumHaystack.includes(alnumTerm)) return true;
+  if (new RegExp(`(^|[^a-z0-9+#./])${escaped}(s)?([^a-z0-9+#./]|$)`).test(rawLower)) return true;
+  const tokens = lower.split(/[\s/]+/).filter(Boolean);
+  const tail = tokens.at(-1) ?? "";
+  if (tail.length >= 3 && tokens.length > 1) {
+    const escTail = tail.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    if (new RegExp(`/(${escTail})(s)?([^a-z0-9+#./]|$)`).test(rawLower)) return true;
+  }
+  // Only collapse punctuation for terms like Node.js / C++ / CI/CD.
+  if (/[^a-z0-9]/i.test(lower)) {
+    const alnumTerm = lower.replace(/[^a-z0-9]+/g, "");
+    if (alnumTerm.length >= 4 && alnumHaystack.includes(alnumTerm)) return true;
+  }
   return false;
 }
 
@@ -1041,13 +1052,33 @@ async function handleResumeSkillPlan(
     if (interviewTopics.length >= 12) break;
   }
 
+  // Merge local phrase matches so niche stacks (e.g. SAP ABAP) are not lost
+  // when the model returns a sparse grounded list.
+  const local = localResumeSkillPlan(resumeText);
+  if (local && Array.isArray(local.extracted_skills)) {
+    for (const item of local.extracted_skills) {
+      const row = asRecord(item);
+      if (!row) continue;
+      const skill = readString(row.skill, 40);
+      if (skill.length < 2 || RESUME_BANNED.test(skill)) continue;
+      const key = skill.toLowerCase();
+      if (seenSkill.has(key)) continue;
+      seenSkill.add(key);
+      extractedSkills.push({
+        skill,
+        evidence_type: readEvidenceType(row.evidence_type ?? row.evidenceType) || "skills_section",
+        evidence_detail: readString(row.evidence_detail ?? row.evidenceDetail, 160),
+      });
+      if (extractedSkills.length >= 28) break;
+    }
+  }
+
   if (
     extractedSkills.length === 0 &&
     inferredSkills.length === 0 &&
     projects.length === 0 &&
     experiences.length === 0
   ) {
-    const local = localResumeSkillPlan(resumeText);
     if (local) {
       console.log(JSON.stringify({ event: "resume_skill_plan_local" }));
       return json(200, local);
@@ -1080,15 +1111,56 @@ const PREPARE_BANNED =
   /\b(guaranteed|job-ready|hiring probability|employability|will get (you )?hired|definitely be asked|resume is ready|recruiter score)\b/i;
 
 function groundPrepareTopic(value: string, skills: string[], interviewType: string, role: string) {
-  const canonical = matchVocab(value, skills);
+  const trimmed = value.trim().slice(0, 60);
+  const lowered = trimmed.toLowerCase();
+  if (!lowered) return "";
+  const canonical = matchVocab(trimmed, skills);
   if (canonical) return canonical;
-  const lowered = value.trim().toLowerCase();
-  if (lowered && lowered === interviewType.trim().toLowerCase()) return interviewType;
-  if (lowered && lowered === role.trim().toLowerCase()) return role;
-  // Allow short grounded phrases that clearly reference supplied skills/role/type substrings.
+  if (lowered === interviewType.trim().toLowerCase()) return interviewType;
+  if (lowered === role.trim().toLowerCase()) return role;
+  // Keep phrases that clearly reference supplied skills/role/type. Never remap to an unrelated skill.
   const pool = [...skills, interviewType, role].filter(Boolean);
   const hit = pool.find((item) => lowered.includes(item.toLowerCase()) || item.toLowerCase().includes(lowered));
-  return hit ? value.trim().slice(0, 60) : (skills[0] || interviewType || role);
+  return hit ? trimmed : "";
+}
+
+function prepareReasonForTopic(
+  reason: string,
+  topic: string,
+  interviewType: string,
+  role: string,
+) {
+  const cleaned = reason.trim().slice(0, 180);
+  const lowered = cleaned.toLowerCase();
+  const topicTokens = topic
+    .toLowerCase()
+    .split(/[^a-z0-9+#.]+/)
+    .filter((token) => token.length > 2);
+  const mentionsTopic = topicTokens.some((token) => lowered.includes(token));
+  if (cleaned.length >= 8 && mentionsTopic && !PREPARE_BANNED.test(cleaned)) return cleaned;
+  const context = interviewType || role || "interview";
+  return `Practice ${topic} with clear examples tied to your ${context} goals.`.slice(0, 180);
+}
+
+function seedPrepareTopics(skills: string[], interviewType: string, role: string) {
+  const seeded = [];
+  for (const skill of skills.slice(0, 4)) {
+    seeded.push({
+      topic: skill,
+      reason: prepareReasonForTopic("", skill, interviewType, role),
+      priority: seeded.length === 0 ? "high" : "medium",
+    });
+    if (seeded.length >= 4) break;
+  }
+  if (seeded.length === 0 && (interviewType || role)) {
+    const topic = interviewType || role;
+    seeded.push({
+      topic,
+      reason: prepareReasonForTopic("", topic, interviewType, role),
+      priority: "high",
+    });
+  }
+  return seeded;
 }
 
 async function handlePrepare(
@@ -1118,6 +1190,8 @@ async function handlePrepare(
     "Return JSON only: { profile_summary, priority_topics: [{ topic, reason, priority }], interview_focus_areas: string[], practice_recommendations: [{ topic, question_count, difficulty }] }.",
     "priority must be high, medium, or low. difficulty must be beginner, intermediate, or advanced.",
     "question_count must be 3, 5, or 8. Keep arrays short (at most 6 items). Topics should be practiceable.",
+    "Each priority topic must come from the supplied skills when possible, or a short phrase that clearly includes a supplied skill, role, or interview type.",
+    "Each reason must name that same topic and explain why it matters for this candidate's role or interview type. Never use a generic backend or frontend boilerplate that does not fit the topic.",
   ].join(" ");
 
   const completed = await completeJson(apiKey, model, baseUrl, system, { input }, 12000, 0.2);
@@ -1139,15 +1213,20 @@ async function handlePrepare(
     const row = asRecord(item);
     if (!row) continue;
     const topicRaw = readString(row.topic, 60);
-    const reason = readString(row.reason, 180);
+    const reasonRaw = readString(row.reason, 180);
     const priority = readString(row.priority, 16).toLowerCase();
-    if (topicRaw.length < 2 || reason.length < 8 || PREPARE_BANNED.test(reason)) continue;
-    if (!PREPARE_PRIORITIES.includes(priority)) continue;
+    if (topicRaw.length < 2 || !PREPARE_PRIORITIES.includes(priority)) continue;
     const topic = groundPrepareTopic(topicRaw, input.skills, input.interviewType, input.targetRole);
     if (!topic) continue;
+    const reason = prepareReasonForTopic(reasonRaw, topic, input.interviewType, input.targetRole);
+    if (reason.length < 8 || PREPARE_BANNED.test(reason)) continue;
     if (priorityTopics.some((existing) => existing.topic.toLowerCase() === topic.toLowerCase())) continue;
     priorityTopics.push({ topic, reason, priority });
     if (priorityTopics.length >= 6) break;
+  }
+
+  if (priorityTopics.length === 0) {
+    priorityTopics.push(...seedPrepareTopics(input.skills, input.interviewType, input.targetRole));
   }
 
   const focusAreas = readStringList(

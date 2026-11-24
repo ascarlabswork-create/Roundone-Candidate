@@ -14,7 +14,7 @@ function projectTitle(chunk: string) {
 /** Reviewable technical skills copied from the resume when AI analysis is unavailable. */
 export function localResumeSkillPlan(resumeText: string): ResumeSkillPlan | null {
   const rawLower = ` ${resumeText.toLowerCase().replace(/\s+/g, ' ')} `
-  const extractedSkills: ResumeSkillPlan['extractedSkills'] = extractTechnicalSkillsFromText(resumeText, 20).map(
+  const extractedSkills: ResumeSkillPlan['extractedSkills'] = extractTechnicalSkillsFromText(resumeText, 36).map(
     (skill) => {
       const key = skill.toLowerCase()
       const at = rawLower.indexOf(key)

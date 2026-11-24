@@ -24,6 +24,7 @@ import {
 } from '../components/ui/primitives.tsx'
 import { parseSkillDraft } from '../matching/skillInput.ts'
 import { requestResumeSkillPlan } from '../resume/aiAssist.ts'
+import { mergeLocalSkillsIntoPlan } from '../resume/extractResumeSkills.ts'
 import { keepTechnicalSkillsOnly, localResumeSkillPlan } from '../resume/localSkillPlan.ts'
 import {
   canAnalyzeResume,
@@ -237,7 +238,8 @@ export function ResumeSkillsPage() {
       setError(outcome.reason === 'insufficient_evidence' ? INSUFFICIENT : UNAVAILABLE)
       return
     }
-    applyPlan(outcome.plan)
+    // Keep niche / domain skills from local phrase matching even when AI returns a sparse list.
+    applyPlan(mergeLocalSkillsIntoPlan(outcome.plan, resumeText))
     setLoadedExisting(false)
     setPhase('review')
   }

@@ -62,28 +62,83 @@ function prepReadinessPercent(input: PreparationInput) {
   return Math.min(100, score)
 }
 
+function uniqueTopics(values: string[]) {
+  const seen = new Set<string>()
+  const result: string[] = []
+  for (const value of values) {
+    const key = value.trim().toLowerCase()
+    if (!key || seen.has(key)) continue
+    seen.add(key)
+    result.push(value.trim())
+  }
+  return result
+}
+
+function alignPriorityReason(topic: string, reason: string, interviewType: string, role: string) {
+  const lowered = reason.toLowerCase()
+  const tokens = topic
+    .toLowerCase()
+    .split(/[^a-z0-9+#.]+/)
+    .filter((token) => token.length > 2)
+  if (tokens.some((token) => lowered.includes(token))) return reason
+  const context = interviewType.trim() || role.trim() || 'interview'
+  return `Practice ${topic} with clear examples tied to your ${context} goals.`
+}
+
+function withAlignedPriorityReasons(result: PreparationResult, prepInput: PreparationInput): PreparationResult {
+  return {
+    ...result,
+    priorityTopics: result.priorityTopics.map((item) => ({
+      ...item,
+      reason: alignPriorityReason(item.topic, item.reason, prepInput.interviewType, prepInput.targetRole),
+    })),
+  }
+}
+
 function buildStudyPlan(topics: PreparationPriorityTopic[]): StudyDay[] {
-  const names = topics.map((item) => item.topic)
-  const high = topics.filter((item) => item.priority === 'high').map((item) => item.topic)
-  const rest = topics.filter((item) => item.priority !== 'high').map((item) => item.topic)
-  const day1 = high.length > 0 ? high.slice(0, 3) : names.slice(0, 2)
-  const day2 = rest.length > 0 ? rest.slice(0, 3) : names.slice(2, 5)
-  const day3 = [...new Set([...names.slice(0, 6)])].filter((item) => !day1.includes(item) && !day2.includes(item)).slice(0, 3)
+  const names = uniqueTopics(topics.map((item) => item.topic))
+  const high = uniqueTopics(topics.filter((item) => item.priority === 'high').map((item) => item.topic))
+  const rest = uniqueTopics(topics.filter((item) => item.priority !== 'high').map((item) => item.topic))
+
+  let day1: string[]
+  let day2: string[]
+  let day3: string[]
+
+  if (names.length === 0) {
+    day1 = ['Core role fundamentals']
+    day2 = ['Storytelling with trade-offs']
+    day3 = ['Timed AI Practice on your top topic']
+  } else if (names.length === 1) {
+    day1 = [names[0]]
+    day2 = [names[0]]
+    day3 = [names[0]]
+  } else if (names.length === 2) {
+    day1 = [names[0]]
+    day2 = [names[1]]
+    day3 = names
+  } else {
+    day1 = (high.length > 0 ? high : names).slice(0, 3)
+    day2 = (rest.length > 0 ? rest : names.filter((item) => !day1.includes(item))).slice(0, 3)
+    if (day2.length === 0) day2 = day1.slice(0, 2)
+    day3 = names.filter((item) => !day1.includes(item) && !day2.includes(item)).slice(0, 3)
+    if (day3.length === 0) day3 = uniqueTopics([...day1.slice(0, 1), ...day2.slice(0, 1)])
+  }
+
   return [
     {
-      label: 'Day 1 — Anchor',
+      label: 'Day 1: Anchor',
       focus: 'Highest-impact topics and crisp narratives',
-      topics: day1.length ? day1 : ['Core role fundamentals'],
+      topics: day1,
     },
     {
-      label: 'Day 2 — Depth',
+      label: 'Day 2: Depth',
       focus: 'Trade-offs, examples, and follow-up angles',
-      topics: day2.length ? day2 : day1.slice(0, 2),
+      topics: day2,
     },
     {
-      label: 'Day 3 — Pressure test',
-      focus: 'Mixed recall + one timed AI practice block',
-      topics: day3.length ? day3 : ['Run AI Practice on your weakest topic'],
+      label: 'Day 3: Pressure test',
+      focus: 'Mixed recall and one timed AI Practice block',
+      topics: day3,
     },
   ]
 }
@@ -138,7 +193,14 @@ export function PreparationPage() {
   const submittingRef = useRef(false)
 
   const readiness = prepReadinessPercent(input)
-  const studyPlan = useMemo(() => buildStudyPlan(result?.priorityTopics ?? []), [result?.priorityTopics])
+  const displayResult = useMemo(
+    () => (result ? withAlignedPriorityReasons(result, input) : null),
+    [result, input],
+  )
+  const studyPlan = useMemo(
+    () => buildStudyPlan(displayResult?.priorityTopics ?? []),
+    [displayResult?.priorityTopics],
+  )
 
   useEffect(() => {
     if (prefilled || !account) return
@@ -241,7 +303,7 @@ export function PreparationPage() {
             </p>
             <h1 className="mt-2 text-3xl font-semibold tracking-tight text-navy-950 sm:text-4xl">Plan before you practice</h1>
             <p className="mt-3 text-sm leading-6 text-slate-600 sm:text-base">
-              Build a focused study map from your role, level, and background. This page plans and prioritizes — it does not run a mock
+              Build a focused study map from your role, level, and background. This page plans and prioritizes; it does not run a mock
               interview. When you are ready to be questioned, switch to{' '}
               <Link to="/candidate/practice" className="font-medium text-emerald-800 underline decoration-emerald-300 underline-offset-2">
                 AI Practice
@@ -366,7 +428,7 @@ export function PreparationPage() {
           </DataUseConsent>
 
           {error ? <p className="text-sm text-red-700">{error}</p> : null}
-          {stale ? <p className="text-sm text-amber-800">Your brief changed — regenerate to refresh the study plan.</p> : null}
+          {stale ? <p className="text-sm text-amber-800">Your brief changed. Regenerate to refresh the study plan.</p> : null}
 
           <div className="flex flex-col gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:justify-end">
             {result ? (
@@ -425,7 +487,7 @@ export function PreparationPage() {
           <Card className="prep-aside-card border-violet-100/70 bg-gradient-to-br from-white to-violet-50/25 p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-violet-800">Study playbooks</p>
             <p className="mt-2 text-sm leading-5 text-slate-600">
-              Guides and checklists ranked for your role — open{' '}
+              Guides and checklists ranked for your role. Open{' '}
               <Link to="/candidate/resources" className="font-medium text-violet-900 underline decoration-violet-200">
                 Resources
               </Link>{' '}
@@ -473,11 +535,11 @@ export function PreparationPage() {
         </aside>
       </FadeIn>
 
-      {!result ? (
+      {!displayResult ? (
         <div className="mx-auto mt-10 max-w-6xl px-4 sm:px-6 prep-fade-up">
           <EmptyState
             title="No study plan yet"
-            body="Fill in your brief and generate a plan. We only use what you provide — no invented experience."
+            body="Fill in your brief and generate a plan. We only use what you provide, with no invented experience."
           />
         </div>
       ) : (
@@ -485,7 +547,7 @@ export function PreparationPage() {
           <Card className="prep-result-card border-emerald-100/80 p-5 sm:p-6">
             <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">Profile brief</p>
             <h2 className="mt-1 font-semibold text-navy-950">How you show up on paper</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-700">{result.profileSummary}</p>
+            <p className="mt-2 text-sm leading-6 text-slate-700">{displayResult.profileSummary}</p>
           </Card>
 
           <div className="grid gap-6 lg:grid-cols-2">
@@ -494,7 +556,7 @@ export function PreparationPage() {
                 <CalendarDays className="h-5 w-5 text-emerald-700" aria-hidden />
                 Suggested 3-day rhythm
               </h2>
-              <p className="mt-1 text-sm text-slate-600">A lightweight schedule — adjust to your calendar.</p>
+              <p className="mt-1 text-sm text-slate-600">A lightweight schedule you can adjust to your calendar.</p>
               <ol className="mt-4 space-y-4">
                 {studyPlan.map((day) => (
                   <li
@@ -505,8 +567,17 @@ export function PreparationPage() {
                     <p className="mt-0.5 text-xs text-slate-500">{day.focus}</p>
                     <ul className="mt-2 flex flex-wrap gap-2">
                       {day.topics.map((topic) => (
-                        <li key={topic}>
-                          <Badge tone="blue">{topic}</Badge>
+                        <li key={`${day.label}-${topic}`}>
+                          <Link
+                            to={practiceHrefFromPreparation(input, displayResult, {
+                              topic,
+                              questionCount: 5,
+                              difficulty: 'intermediate',
+                            })}
+                            className="inline-flex"
+                          >
+                            <Badge tone="blue">{topic}</Badge>
+                          </Link>
                         </li>
                       ))}
                     </ul>
@@ -517,11 +588,11 @@ export function PreparationPage() {
 
             <Card className="prep-result-card p-5 sm:p-6">
               <h2 className="font-semibold text-navy-950">Priority topics</h2>
-              {result.priorityTopics.length === 0 ? (
+              {displayResult.priorityTopics.length === 0 ? (
                 <p className="mt-2 text-sm text-slate-600">No priority topics returned for this input.</p>
               ) : (
                 <ol className="mt-3 space-y-3">
-                  {result.priorityTopics.map((item, index) => (
+                  {displayResult.priorityTopics.map((item, index) => (
                     <li key={item.topic} className="rounded-lg border border-slate-100 p-3">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="text-sm font-semibold text-navy-950">
@@ -539,11 +610,11 @@ export function PreparationPage() {
 
           <Card className="prep-result-card p-5 sm:p-6">
             <h2 className="font-semibold text-navy-950">Interview focus</h2>
-            {result.interviewFocusAreas.length === 0 ? (
+            {displayResult.interviewFocusAreas.length === 0 ? (
               <p className="mt-2 text-sm text-slate-600">No focus areas returned.</p>
             ) : (
               <ul className="mt-3 flex flex-wrap gap-2">
-                {result.interviewFocusAreas.map((item) => (
+                {displayResult.interviewFocusAreas.map((item) => (
                   <li key={item}>
                     <Badge tone="violet">{item}</Badge>
                   </li>
@@ -560,15 +631,15 @@ export function PreparationPage() {
                   Jump into AI Practice with topics pre-filled from this plan. Sessions start only when you choose.
                 </p>
               </div>
-              <Link to={practiceHrefFromPreparation(input, result)} className="shrink-0">
+              <Link to={practiceHrefFromPreparation(input, displayResult)} className="shrink-0">
                 <Button>Start AI Practice with these topics</Button>
               </Link>
             </div>
-            {result.practiceRecommendations.length === 0 ? (
+            {displayResult.practiceRecommendations.length === 0 ? (
               <p className="mt-4 text-sm text-slate-600">No practice recommendations returned.</p>
             ) : (
               <ul className="mt-4 space-y-3">
-                {result.practiceRecommendations.map((item) => (
+                {displayResult.practiceRecommendations.map((item) => (
                   <li
                     key={item.topic}
                     className="flex flex-col gap-2 rounded-lg border border-white/80 bg-white/70 p-3 sm:flex-row sm:items-center sm:justify-between"
@@ -579,7 +650,7 @@ export function PreparationPage() {
                         {item.questionCount} questions · {item.difficulty}
                       </p>
                     </div>
-                    <Link to={practiceHrefFromPreparation(input, result, item)}>
+                    <Link to={practiceHrefFromPreparation(input, displayResult, item)}>
                       <Button size="sm" variant="outline">
                         Practice this topic
                       </Button>
