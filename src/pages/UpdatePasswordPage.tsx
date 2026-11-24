@@ -12,7 +12,7 @@ import { authErrorMessage, updatePassword } from '../services/auth.ts'
 import { useSession } from '../state/session.tsx'
 
 export function UpdatePasswordPage() {
-  const { status } = useSession()
+  const { status, signOut } = useSession()
   const navigate = useNavigate()
   const [recoveryReady, setRecoveryReady] = useState(false)
   const [password, setPassword] = useState('')
@@ -56,8 +56,9 @@ export function UpdatePasswordPage() {
     try {
       await updatePassword(password)
       clearPasswordRecoveryPending()
+      await signOut()
       setDone(true)
-      window.setTimeout(() => navigate('/', { replace: true }), 1200)
+      window.setTimeout(() => navigate('/candidate/login', { replace: true }), 1200)
     } catch (caught) {
       setError(authErrorMessage(caught))
     } finally {
@@ -90,7 +91,7 @@ export function UpdatePasswordPage() {
             </Link>
           </div>
         ) : done ? (
-          <p className="text-sm text-emerald-700">Password updated. Redirecting you to the app…</p>
+          <p className="text-sm text-emerald-700">Password updated. Redirecting you to sign in…</p>
         ) : (
           <form className="space-y-4" onSubmit={submit}>
             <div>
