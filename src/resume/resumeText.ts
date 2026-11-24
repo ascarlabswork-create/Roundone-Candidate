@@ -86,6 +86,9 @@ function looksBinary(text: string) {
 function normalize(text: string) {
   return text
     .replace(/\r\n?/g, '\n')
+    // PDF extractions often insert spaces around hyphens/slashes ("S / 4HANA", "Hands - on").
+    .replace(/(\w)\s*-\s+(\w)/g, '$1-$2')
+    .replace(/([A-Za-z0-9])\s*\/\s*([A-Za-z0-9])/g, '$1/$2')
     .replace(/[ \t]+/g, ' ')
     .replace(/\n{3,}/g, '\n\n')
     .trim()
@@ -141,11 +144,18 @@ async function extractPdfText(file: File): Promise<string> {
     for (let pageNumber = 1; pageNumber <= maxPages; pageNumber += 1) {
       const page = await pdf.getPage(pageNumber)
       const content = await page.getTextContent()
-      const pageText = content.items
-        .map((item) => (typeof (item as { str?: unknown }).str === 'string' ? (item as { str: string }).str : ''))
-        .join(' ')
+      let pageText = ''
+      for (const raw of content.items) {
+        const item = raw as { str?: unknown; hasEOL?: unknown }
+        if (typeof item.str === 'string' && item.str) {
+          pageText += item.str
+        }
+        // Preserve line breaks so skills-section headings stay detectable.
+        if (item.hasEOL) pageText += '\n'
+        else if (typeof item.str === 'string' && item.str && !item.str.endsWith(' ')) pageText += ' '
+      }
       parts.push(pageText)
-      if (parts.join(' ').length > MAX_TEXT_CHARS * 2) break
+      if (parts.join('\n').length > MAX_TEXT_CHARS * 2) break
     }
 
     const text = normalize(parts.join('\n'))

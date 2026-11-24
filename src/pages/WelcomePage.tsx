@@ -7,7 +7,7 @@ import { Card, FieldLabel } from '../components/ui/primitives.tsx'
 import { TARGET_ROLES } from '../data/catalogs.ts'
 import { markIntentReady } from '../lib/intentReady.ts'
 import { dedupeSkills } from '../matching/skills.ts'
-import { localResumeSkillPlan } from '../resume/localSkillPlan.ts'
+import { extractSkillsFromResumeText } from '../resume/extractResumeSkills.ts'
 import { extractResumeText } from '../resume/resumeText.ts'
 import {
   getCandidateProfile,
@@ -148,7 +148,7 @@ export function WelcomePage() {
     setReadingResume(true)
     try {
       const text = await extractResumeText(file)
-      const found = localResumeSkillPlan(text)?.extractedSkills.map((item) => item.skill) ?? []
+      const found = extractSkillsFromResumeText(text, { limit: 36 })
       if (found.length === 0) {
         setError('No skills stood out in that resume. Pick a few below.')
         return

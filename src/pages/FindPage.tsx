@@ -19,10 +19,9 @@ import {
 } from '../services/candidateProfile.ts'
 import { usePreferenceNormalization } from '../matching/usePreferenceNormalization.ts'
 import { requestResumeSkillPlan } from '../resume/aiAssist.ts'
-import { canAnalyzeResume, type ResumeSkillPlan } from '../resume/aiModel.ts'
-import { keepTechnicalSkillsOnly } from '../resume/localSkillPlan.ts'
+import { canAnalyzeResume } from '../resume/aiModel.ts'
+import { extractSkillsFromResumeText } from '../resume/extractResumeSkills.ts'
 import { extractResumeText, RESUME_ACCEPT } from '../resume/resumeText.ts'
-import { extractTechnicalSkillsFromText, filterTechnicalResumeSkills } from '../resume/technicalSkills.ts'
 import { emptyPreferences, useMatching } from '../state/matching.tsx'
 import type { TimeWindow } from '../data/catalogs.ts'
 import type { MatchingPreferences } from '../types.ts'
@@ -36,22 +35,6 @@ function mergeUniqueSkills(existing: string[], incoming: string[]) {
     next.push(value)
   }
   return uniqueCandidateSkillWording(next)
-}
-
-/** Collect every technical skill/technology grounded in the resume skill plan. */
-function skillsFromResumePlan(plan: ResumeSkillPlan, existing: string[]) {
-  const technical = keepTechnicalSkillsOnly(plan)
-  const incoming: string[] = []
-  for (const item of technical.extractedSkills) incoming.push(item.skill)
-  for (const item of technical.inferredSkills) incoming.push(item.skill)
-  for (const project of technical.projects) incoming.push(...project.technologies)
-  for (const experience of technical.experiences) incoming.push(...experience.technologies)
-  return mergeUniqueSkills(existing, filterTechnicalResumeSkills(incoming))
-}
-
-/** Fallback when AI is unavailable: match technical skills found in the resume text. */
-function skillsFromResumeText(text: string, existing: string[]) {
-  return mergeUniqueSkills(existing, extractTechnicalSkillsFromText(text))
 }
 
 export function FindPage() {
@@ -144,21 +127,21 @@ export function FindPage() {
       const outcome = await requestResumeSkillPlan(text)
       setForm((prev) => {
         const usedAi = outcome.ok
-        const skills = usedAi
-          ? skillsFromResumePlan(outcome.plan, prev.skills)
-          : skillsFromResumeText(text, prev.skills)
+        const skills = extractSkillsFromResumeText(text, {
+          existing: prev.skills,
+          aiPlan: usedAi ? outcome.plan : null,
+          limit: 36,
+        })
         const added = Math.max(0, skills.length - prev.skills.length)
         // Defer status so we never set state synchronously inside another updater.
-        queueMicrotask(() => {
-          setResumeStatus(
-            usedAi
-              ? added > 0
-                ? `Added ${added} skill${added === 1 ? '' : 's'} from your resume`
-                : 'Resume attached · no new skills found beyond what you already added'
-              : added > 0
-                ? `Added ${added} catalog skill${added === 1 ? '' : 's'} (full AI extract unavailable)`
-                : 'Resume attached · skill extract unavailable — add skills manually',
-          )
+        voidMicrotask(() => {
+          const label =
+            added > 0
+              ? `Added ${added} skill${added === 1 ? '' : 's'} from your resume`
+              : usedAi
+                ? 'Resume attached · no new skills found beyond what you already added'
+                : 'Resume attached · skill extract unavailable. Add skills manually'
+          setResumeStatus(label)
         })
         return { ...prev, skills }
       })
