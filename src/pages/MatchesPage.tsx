@@ -68,8 +68,8 @@ export function MatchesPage() {
       {ready && state.status === 'success' && state.data.length === 0 ? (
         <div className="mt-8">
           <EmptyState
-            title="No skill matches found yet"
-            body="We couldn't find interviewers who share your current skills."
+            title="No bookable skill matches yet"
+            body="We couldn't find interviewers who share your skills and have open booking times right now."
             action={
               <Link to="/candidate/find">
                 <Button>Edit skills</Button>
