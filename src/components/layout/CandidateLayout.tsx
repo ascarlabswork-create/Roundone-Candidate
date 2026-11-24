@@ -1,5 +1,10 @@
 import { useEffect } from 'react'
-import { Outlet, useLocation } from 'react-router-dom'
+import { Navigate, Outlet, useLocation } from 'react-router-dom'
+import {
+  isAuthRecoveryUrl,
+  isInPasswordRecoveryFlow,
+  markPasswordRecoveryPending,
+} from '../../lib/authRecovery.ts'
 import { syncBodyScrollLock } from '../../lib/bodyScrollLock.ts'
 import { useNotifications } from '../../state/notifications.tsx'
 import { useSession } from '../../state/session.tsx'
@@ -19,17 +24,27 @@ export function CandidateLayout() {
   const unreadBadge = unreadCount != null && unreadCount > 0 ? (unreadCount > 99 ? '99+' : String(unreadCount)) : null
   const location = useLocation()
   const onWelcome = location.pathname === '/candidate/welcome'
+  const onUpdatePassword = location.pathname === '/candidate/update-password'
+  const passwordRecovery = isInPasswordRecoveryFlow()
+
+  useEffect(() => {
+    if (isAuthRecoveryUrl()) markPasswordRecoveryPending()
+  }, [location.pathname, location.search, location.hash])
 
   useEffect(() => {
     syncBodyScrollLock()
   }, [location.pathname])
 
-  if (onWelcome) {
+  if (passwordRecovery && !onUpdatePassword) {
+    return <Navigate to="/candidate/update-password" replace />
+  }
+
+  if (onWelcome || onUpdatePassword) {
     return (
       <div className="flex min-h-svh flex-col">
         <header className="sticky top-0 z-40 border-b border-navy-950/8 bg-white/80 pt-[env(safe-area-inset-top)] backdrop-blur-xl">
           <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:h-16 sm:px-6">
-            <Logo to="/candidate/welcome" />
+            <Logo to={onUpdatePassword ? '/candidate/update-password' : '/candidate/welcome'} />
             {signedIn ? (
               <Button size="sm" variant="ghost" className="min-h-11 px-3" onClick={() => void signOut()}>
                 Logout
@@ -40,7 +55,7 @@ export function CandidateLayout() {
         <main className="studio-grid min-w-0 flex-1 overflow-x-hidden">
           <Outlet />
         </main>
-        <AuthModal />
+        {onWelcome ? <AuthModal /> : null}
       </div>
     )
   }
