@@ -1,4 +1,5 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
+import { isInPasswordRecoveryFlow, passwordUpdatePath } from '../../lib/authRecovery.ts'
 import { useSession } from '../../state/session.tsx'
 import { ErrorState, Skeleton } from '../ui/primitives.tsx'
 
@@ -27,6 +28,11 @@ export function RequireCandidateAuth() {
     const next = `${location.pathname}${location.search}`
     const params = new URLSearchParams({ auth: 'login', next })
     return <Navigate to={`/?${params.toString()}`} replace />
+  }
+
+  // Recovery session is authenticated, but the app stays locked until a new password is set.
+  if (isInPasswordRecoveryFlow() && location.pathname !== passwordUpdatePath()) {
+    return <Navigate to={passwordUpdatePath()} replace />
   }
 
   return <Outlet />

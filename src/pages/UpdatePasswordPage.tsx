@@ -1,18 +1,45 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '../components/ui/Button.tsx'
 import { Card, FieldLabel, PageHeader, PasswordInput } from '../components/ui/primitives.tsx'
+import {
+  clearPasswordRecoveryPending,
+  isAuthRecoveryUrl,
+  markPasswordRecoveryPending,
+} from '../lib/authRecovery.ts'
+import { supabase } from '../lib/supabase.ts'
 import { authErrorMessage, updatePassword } from '../services/auth.ts'
 import { useSession } from '../state/session.tsx'
 
 export function UpdatePasswordPage() {
   const { status } = useSession()
   const navigate = useNavigate()
+  const [recoveryReady, setRecoveryReady] = useState(false)
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState(false)
+
+  useEffect(() => {
+    if (isAuthRecoveryUrl()) markPasswordRecoveryPending()
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    void supabase.auth.getSession().then(({ data }) => {
+      if (cancelled) return
+      if (data.session) setRecoveryReady(true)
+    })
+    const { data: subscription } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') markPasswordRecoveryPending()
+      if (event === 'PASSWORD_RECOVERY' || Boolean(session)) setRecoveryReady(true)
+    })
+    return () => {
+      cancelled = true
+      subscription.subscription.unsubscribe()
+    }
+  }, [])
 
   async function submit(event: FormEvent) {
     event.preventDefault()
@@ -28,6 +55,7 @@ export function UpdatePasswordPage() {
     setSubmitting(true)
     try {
       await updatePassword(password)
+      clearPasswordRecoveryPending()
       setDone(true)
       window.setTimeout(() => navigate('/', { replace: true }), 1200)
     } catch (caught) {
@@ -37,6 +65,8 @@ export function UpdatePasswordPage() {
     }
   }
 
+  const canUpdate = recoveryReady || status === 'authenticated'
+
   return (
     <div className="mx-auto max-w-md px-4 py-10 sm:px-6">
       <PageHeader
@@ -45,12 +75,13 @@ export function UpdatePasswordPage() {
       />
 
       <Card className="mt-8 p-6 sm:p-8">
-        {status === 'loading' ? (
+        {status === 'loading' && !recoveryReady ? (
           <p className="text-sm text-slate-600">Verifying your reset link…</p>
-        ) : status !== 'authenticated' ? (
+        ) : !canUpdate ? (
           <div className="space-y-4">
             <p className="text-sm text-slate-600">
-              Open this page from the password reset link we emailed you. If the link expired, request a new one.
+              Open this page from the password reset link we emailed you. If the link expired, request a new one
+              from sign in.
             </p>
             <Link to="/candidate/login">
               <Button variant="outline" fullWidth>
