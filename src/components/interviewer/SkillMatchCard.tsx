@@ -147,11 +147,13 @@ export function SkillMatchCard({
             View Profile
           </Button>
         </Link>
-        <Link to={`/candidate/interviewers/${interviewer.id}/book`} className="sm:w-auto">
-          <Button size="sm" fullWidth>
-            Book
-          </Button>
-        </Link>
+        {booking === 'ready' ? (
+          <Link to={`/candidate/interviewers/${interviewer.id}/book`} className="sm:w-auto">
+            <Button size="sm" fullWidth>
+              Book
+            </Button>
+          </Link>
+        ) : null}
       </div>
     </article>
   )

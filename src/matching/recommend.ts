@@ -15,18 +15,22 @@ import {
 /** Top skill-compatible matches shown on Find → Matches. */
 export const MATCHING_RESULT_LIMIT = 5
 
+/** How many skill-ranked rows to availability-check before filling the result list. */
+const MATCHING_AVAILABILITY_SCAN_LIMIT = 30
+
 export type RecommendedMatch = {
   interviewer: MatchingCatalogPerson
   match: MatchResult
   /** Final candidate skill set used for this recommendation. */
   candidateSkills: string[]
-  /** Separate from the skill score. Missing service or slots does not remove the match. */
+  /** Always `ready` for returned matches — unbookable profiles are omitted. */
   booking: BookingReadiness
 }
 
 /**
- * Skill-only recommendations via secure match_interviewers_by_skills RPC.
- * Does not use is_listed, availability, services, or other non-skill factors.
+ * Skill-ranked recommendations via match_interviewers_by_skills, then keep only
+ * interviewers who currently have a bookable open slot (so Find → Matches never
+ * offers a Book path that ends in an empty calendar).
  */
 export async function recommendMatchedInterviewers(
   prefs: MatchingPreferences,
@@ -49,15 +53,17 @@ export async function recommendMatchedInterviewers(
     rows = rows.filter((row) => row.interviewerProfileId !== ownInterviewerId)
   }
 
-  const limited = rows.slice(0, MATCHING_RESULT_LIMIT)
+  const scan = rows.slice(0, MATCHING_AVAILABILITY_SCAN_LIMIT)
+  if (scan.length === 0) return []
+
   let services: Awaited<ReturnType<typeof listPublicServicesFor>> = []
   try {
-    services = await listPublicServicesFor(limited.map((row) => row.interviewerProfileId))
+    services = await listPublicServicesFor(scan.map((row) => row.interviewerProfileId))
   } catch (error) {
     console.error('match service lookup failed', error)
   }
 
-  const recommended = limited.map((row) => {
+  const recommended = scan.map((row) => {
     const interviewer = applyPublicServices(
       skillMatchRowToCatalogPerson(row),
       services.filter((service) => service.interviewerProfileId === row.interviewerProfileId),
@@ -69,7 +75,6 @@ export async function recommendMatchedInterviewers(
     }
   })
 
-  // Booking readiness is additive — never fail the skill-match page if slots lookup errors.
   const booking = await Promise.all(
     recommended.map(async (item) => {
       try {
@@ -81,8 +86,11 @@ export async function recommendMatchedInterviewers(
     }),
   )
 
-  return recommended.map((item, index) => ({
-    ...item,
-    booking: booking[index] ?? 'no_availability',
-  }))
+  return recommended
+    .map((item, index) => ({
+      ...item,
+      booking: booking[index] ?? 'no_availability',
+    }))
+    .filter((item) => item.booking === 'ready')
+    .slice(0, MATCHING_RESULT_LIMIT)
 }

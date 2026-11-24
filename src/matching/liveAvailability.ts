@@ -75,11 +75,12 @@ export async function flagInterviewersWithBookableSlots(
   return flags
 }
 
-/** @deprecated Prefer flagInterviewersWithBookableSlots — availability is no longer a hard pre-rank gate. */
+/** Keep only interviewers with a live bookable slot in the default matching window. */
 export async function keepInterviewersWithBookableSlots(
   catalog: MatchingCatalogPerson[],
   prefs: MatchingPreferences,
+  displayTimezone?: string | null,
 ) {
-  const flags = await flagInterviewersWithBookableSlots(catalog, prefs)
+  const flags = await flagInterviewersWithBookableSlots(catalog, prefs, displayTimezone)
   return catalog.filter((person) => flags.get(person.id))
 }
