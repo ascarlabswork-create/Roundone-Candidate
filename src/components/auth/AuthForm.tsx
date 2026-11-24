@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { Button } from '../ui/Button.tsx'
 import { FieldLabel, PasswordInput, TextInput } from '../ui/primitives.tsx'
 import { candidateDisplayTimezone } from '../../lib/candidateTimezone.ts'
+import { cn } from '../../lib/cn.ts'
 import {
   authErrorMessage,
   parseAuthRateLimitSeconds,
@@ -267,15 +268,19 @@ export function AuthForm({
     )
   }
 
-  function googleBlock() {
+  function googleBlock(placement: 'above' | 'below' = 'below') {
+    const divider = (
+      <div className={cn('flex items-center gap-3', placement === 'above' ? 'mb-4 mt-1' : 'my-4')} aria-hidden="true">
+        <span className="h-px flex-1 bg-slate-200" />
+        <span className="text-xs font-medium uppercase tracking-wide text-slate-400">or</span>
+        <span className="h-px flex-1 bg-slate-200" />
+      </div>
+    )
     return (
       <>
-        <div className="my-5 flex items-center gap-3" aria-hidden="true">
-          <span className="h-px flex-1 bg-slate-200" />
-          <span className="text-xs font-medium uppercase tracking-wide text-slate-400">or</span>
-          <span className="h-px flex-1 bg-slate-200" />
-        </div>
+        {placement === 'below' ? divider : null}
         <GoogleContinueButton mode={mode} disabled={busy} onSuccess={onSuccess} onError={handleGoogleError} />
+        {placement === 'above' ? divider : null}
       </>
     )
   }
@@ -347,7 +352,8 @@ export function AuthForm({
 
     return (
       <div>
-        <form className="space-y-4" onSubmit={continueRegisterDetails}>
+        {googleBlock('above')}
+        <form className="space-y-3" onSubmit={continueRegisterDetails}>
           <div>
             <FieldLabel htmlFor={`${idPrefix}-fullName`}>Full name</FieldLabel>
             <TextInput
@@ -375,7 +381,6 @@ export function AuthForm({
             Continue
           </Button>
         </form>
-        {googleBlock()}
         {modeLinks()}
       </div>
     )
@@ -495,7 +500,8 @@ export function AuthForm({
 
   return (
     <div>
-      <form className="space-y-4" onSubmit={(event) => void submitPassword(event)}>
+      {googleBlock('above')}
+      <form className="space-y-3" onSubmit={(event) => void submitPassword(event)}>
         <div>
           <FieldLabel htmlFor={`${idPrefix}-email`}>Email</FieldLabel>
           <TextInput
@@ -508,7 +514,16 @@ export function AuthForm({
           />
         </div>
         <div>
-          <FieldLabel htmlFor={`${idPrefix}-password`}>Password</FieldLabel>
+          <div className="flex items-center justify-between gap-2">
+            <FieldLabel htmlFor={`${idPrefix}-password`}>Password</FieldLabel>
+            <button
+              type="button"
+              className="text-xs font-medium text-coral-700 hover:underline"
+              onClick={openForgotPassword}
+            >
+              Forgot password?
+            </button>
+          </div>
           <PasswordInput
             id={`${idPrefix}-password`}
             required
@@ -518,9 +533,6 @@ export function AuthForm({
             onChange={(event) => setPassword(event.target.value)}
           />
         </div>
-        <p className="text-xs text-slate-500">
-          Accounts created with Google have no password. Use Continue with Google, or Forgot password to set one.
-        </p>
         {error || sessionError ? <p className="text-sm text-red-700">{error || sessionError}</p> : null}
         {info ? <p className="text-sm text-emerald-700">{info}</p> : null}
         {needsConfirmation ? (
@@ -537,14 +549,7 @@ export function AuthForm({
           {submitting ? 'Please wait…' : 'Sign In'}
         </Button>
       </form>
-      <p className="mt-4 flex flex-col items-center gap-2 text-center sm:flex-row sm:justify-center sm:gap-4">
-        <button
-          type="button"
-          className="text-sm font-medium text-coral-700 hover:underline"
-          onClick={openForgotPassword}
-        >
-          Forgot password?
-        </button>
+      <p className="mt-3 text-center">
         <button
           type="button"
           className="text-sm font-medium text-navy-950 hover:underline"
@@ -554,7 +559,6 @@ export function AuthForm({
           {resetWait > 0 ? `Send code in ${resetWait}s` : 'Sign in with a code'}
         </button>
       </p>
-      {googleBlock()}
       {modeLinks()}
     </div>
   )
