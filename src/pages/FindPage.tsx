@@ -134,7 +134,7 @@ export function FindPage() {
         })
         const added = Math.max(0, skills.length - prev.skills.length)
         // Defer status so we never set state synchronously inside another updater.
-        voidMicrotask(() => {
+        queueMicrotask(() => {
           const label =
             added > 0
               ? `Added ${added} skill${added === 1 ? '' : 's'} from your resume`
