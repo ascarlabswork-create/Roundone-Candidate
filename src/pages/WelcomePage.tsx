@@ -148,7 +148,8 @@ export function WelcomePage() {
     setReadingResume(true)
     try {
       const text = await extractResumeText(file)
-      const found = extractSkillsFromResumeText(text, { limit: 36 })
+      // Welcome keeps this light: only the top few skills from the resume.
+      const found = extractSkillsFromResumeText(text, { limit: 5 }).slice(0, 5)
       if (found.length === 0) {
         setError('No skills stood out in that resume. Pick a few below.')
         return
@@ -337,6 +338,29 @@ export function WelcomePage() {
                     if (file) void readResume(file)
                   }}
                 />
+                <div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    fullWidth
+                    disabled={readingResume || saving}
+                    onClick={() => fileRef.current?.click()}
+                  >
+                    {readingResume ? 'Reading…' : 'Upload resume'}
+                  </Button>
+                  <p className="mt-1 text-[11px] text-slate-500">
+                    We pull your top 5 skills from the resume. You can edit them below.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-3 py-0.5">
+                  <span className="h-px flex-1 bg-slate-200" />
+                  <span className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                    or add manually
+                  </span>
+                  <span className="h-px flex-1 bg-slate-200" />
+                </div>
+
                 <SkillMultiInput
                   id="welcome-skill"
                   value={skillDraft}
@@ -390,18 +414,6 @@ export function WelcomePage() {
                     </div>
                   </div>
                 ) : null}
-
-                <div className="mt-1">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    fullWidth
-                    disabled={readingResume}
-                    onClick={() => fileRef.current?.click()}
-                  >
-                    {readingResume ? 'Reading…' : 'Upload resume'}
-                  </Button>
-                </div>
               </div>
             </fieldset>
 
