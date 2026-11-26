@@ -1,5 +1,7 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
+import { isAccountDeletedFlag } from '../../lib/accountDeletedBanner.ts'
 import { isInPasswordRecoveryFlow, passwordUpdatePath } from '../../lib/authRecovery.ts'
+import { ACCOUNT_DELETED_LOGIN_PATH } from '../../services/deleteCandidateAccount.ts'
 import { useSession } from '../../state/session.tsx'
 import { ErrorState, Skeleton } from '../ui/primitives.tsx'
 
@@ -25,6 +27,9 @@ export function RequireCandidateAuth() {
   }
 
   if (!user) {
+    if (isAccountDeletedFlag(null)) {
+      return <Navigate to={ACCOUNT_DELETED_LOGIN_PATH} replace />
+    }
     const next = `${location.pathname}${location.search}`
     const params = new URLSearchParams({ auth: 'login', next })
     return <Navigate to={`/?${params.toString()}`} replace />
