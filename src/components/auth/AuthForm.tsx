@@ -47,7 +47,6 @@ export function AuthForm({
   const isRegister = mode === 'register'
   const [loginStep, setLoginStep] = useState<LoginStep>('email')
   const [registerStep, setRegisterStep] = useState<RegisterStep>('details')
-  const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -154,10 +153,6 @@ export function AuthForm({
     event.preventDefault()
     setError(null)
     setInfo(null)
-    if (!fullName.trim()) {
-      setError('Enter your full name.')
-      return
-    }
     if (!email.trim()) {
       setError('Enter your email.')
       return
@@ -178,7 +173,6 @@ export function AuthForm({
       const result = await signUpCandidate({
         email,
         password,
-        fullName,
         timezone: candidateDisplayTimezone(),
       })
       if (result.needsEmailConfirmation) {
@@ -369,16 +363,6 @@ export function AuthForm({
       <div>
         {googleBlock('above')}
         <form className="space-y-3" onSubmit={continueRegisterDetails}>
-          <div>
-            <FieldLabel htmlFor={`${idPrefix}-fullName`}>Full name</FieldLabel>
-            <TextInput
-              id={`${idPrefix}-fullName`}
-              required
-              autoComplete="name"
-              value={fullName}
-              onChange={(event) => setFullName(event.target.value)}
-            />
-          </div>
           <div>
             <FieldLabel htmlFor={`${idPrefix}-email`}>Email</FieldLabel>
             <TextInput
