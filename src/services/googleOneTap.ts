@@ -140,11 +140,11 @@ export async function mountGoogleContinueButton(options: MountGoogleButtonOption
     })
 
     options.parent.innerHTML = ''
-    const width = Math.min(400, Math.max(240, Math.floor(options.parent.clientWidth || 320)))
+    const width = Math.min(360, Math.max(220, Math.floor(options.parent.clientWidth || 280)))
     google.renderButton(options.parent, {
       type: 'standard',
       theme: 'outline',
-      size: 'large',
+      size: 'medium',
       text: options.text ?? 'continue_with',
       shape: 'rectangular',
       logo_alignment: 'left',
