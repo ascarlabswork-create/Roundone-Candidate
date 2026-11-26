@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import {
   Bookmark,
   CalendarDays,
@@ -45,7 +45,7 @@ import {
   updateCandidateProfile,
   updateCandidateSkills,
 } from '../services/candidateProfile.ts'
-import { deleteMyCandidateAccount } from '../services/deleteCandidateAccount.ts'
+import { deleteMyCandidateAccount, goToAccountDeletedLogin } from '../services/deleteCandidateAccount.ts'
 import { useSavedInterviewers } from '../state/saved.tsx'
 import { useSession } from '../state/session.tsx'
 import { useToast } from '../state/toast.tsx'
@@ -180,8 +180,7 @@ function CompletenessRing({ percent }: { percent: number }) {
 }
 
 export function CandidateProfilePage() {
-  const navigate = useNavigate()
-  const { status, account, error, refreshAccount, signOut } = useSession()
+  const { status, account, error, refreshAccount } = useSession()
   const { savedIds } = useSavedInterviewers()
   const { pushToast } = useToast()
   const savedState = useAsync(async () => {
@@ -397,9 +396,10 @@ export function CandidateProfilePage() {
     setDeleting(true)
     setDeleteError(null)
     try {
+      // Delete first, then hard-redirect. Signing out here lets RequireCandidateAuth
+      // send users to `/?auth=login` and the deleted banner never appears.
       await deleteMyCandidateAccount()
-      await signOut()
-      navigate('/candidate/login?deleted=1', { replace: true })
+      goToAccountDeletedLogin()
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : 'Could not delete your account.'
       setDeleteError(message)
@@ -867,7 +867,7 @@ export function CandidateProfilePage() {
                 aria-label="Type DELETE to confirm account deletion"
                 value={deletePhrase}
                 onChange={(event) => setDeletePhrase(event.target.value)}
-                placeholder="DELETE"
+                placeholder="Type DELETE here"
                 className="text-base"
                 autoCapitalize="characters"
                 autoCorrect="off"
