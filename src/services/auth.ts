@@ -8,7 +8,7 @@ export { authErrorMessage, isDuplicateSignup, parseAuthRateLimitSeconds } from '
 export type SignUpInput = {
   email: string
   password: string
-  fullName?: string
+  fullName: string
   timezone?: string
 }
 
@@ -60,7 +60,7 @@ export async function signUpCandidate(input: SignUpInput): Promise<SignUpResult>
       // Where the email-confirmation link returns to. Dynamic origin, never hardcoded.
       emailRedirectTo: new URL(OAUTH_CALLBACK_PATH, window.location.origin).toString(),
       data: {
-        ...(input.fullName?.trim() ? { full_name: input.fullName.trim() } : {}),
+        full_name: input.fullName.trim(),
         role: 'candidate',
         timezone: input.timezone?.trim() || candidateDisplayTimezone(),
       },
