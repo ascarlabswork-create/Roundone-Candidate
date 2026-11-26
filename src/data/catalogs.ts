@@ -93,8 +93,6 @@ export const SOFTWARE_ROLE_GROUPS = [
   },
 ] as const
 
-export const SOFTWARE_FUNCTION_LABEL = 'Software / Internet / AI'
-
 export const COMPANIES = [
   'Google',
   'Amazon',
