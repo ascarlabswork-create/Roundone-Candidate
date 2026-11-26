@@ -69,7 +69,9 @@ export async function signUpCandidate(input: SignUpInput): Promise<SignUpResult>
   if (error) throw new Error(authErrorMessage(error))
   const duplicate = isDuplicateSignup(data.user)
   if (duplicate) {
-    throw new Error('An account with this email already exists. Try signing in instead.')
+    throw new Error(
+      'An account with this email already exists. Sign in instead — use Continue with Google if you signed up with Google, or Forgot password to set an email password.',
+    )
   }
 
   return {

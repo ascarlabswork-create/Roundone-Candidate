@@ -28,7 +28,8 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
         />
         {accountDeleted ? (
           <p className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-            Your candidate account has been deleted. You can create a new account anytime.
+            Your candidate account has been deleted. If this email still signs in, use Continue with Google or Forgot
+            password — Google accounts do not have a password until you set one.
           </p>
         ) : null}
         {sessionError && status !== 'loading' ? (
