@@ -41,7 +41,6 @@ export function AuthForm({
   const isRegister = mode === 'register'
   const [loginStep, setLoginStep] = useState<LoginStep>('email')
   const [registerStep, setRegisterStep] = useState<RegisterStep>('details')
-  const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -61,6 +60,7 @@ export function AuthForm({
   }, [mode])
 
   const busy = submitting || emailBusy || status === 'loading'
+  const emailReady = email.trim().includes('@')
   const handleGoogleError = useCallback((message: string) => {
     setError(message || null)
   }, [])
@@ -121,6 +121,14 @@ export function AuthForm({
     event.preventDefault()
     setError(null)
     setInfo(null)
+    if (!email.trim().includes('@')) {
+      setError('Enter your email first.')
+      return
+    }
+    if (!password) {
+      setError('Enter your password.')
+      return
+    }
     setSubmitting(true)
     try {
       await signInCandidate({ email, password })
@@ -139,10 +147,6 @@ export function AuthForm({
     event.preventDefault()
     setError(null)
     setInfo(null)
-    if (!fullName.trim()) {
-      setError('Enter your full name.')
-      return
-    }
     if (!email.trim()) {
       setError('Enter your email.')
       return
@@ -163,7 +167,6 @@ export function AuthForm({
       const result = await signUpCandidate({
         email,
         password,
-        fullName,
         timezone: candidateDisplayTimezone(),
       })
       if (result.needsEmailConfirmation) {
@@ -355,16 +358,6 @@ export function AuthForm({
         {googleBlock('above')}
         <form className="space-y-3" onSubmit={continueRegisterDetails}>
           <div>
-            <FieldLabel htmlFor={`${idPrefix}-fullName`}>Full name</FieldLabel>
-            <TextInput
-              id={`${idPrefix}-fullName`}
-              required
-              autoComplete="name"
-              value={fullName}
-              onChange={(event) => setFullName(event.target.value)}
-            />
-          </div>
-          <div>
             <FieldLabel htmlFor={`${idPrefix}-email`}>Email</FieldLabel>
             <TextInput
               id={`${idPrefix}-email`}
@@ -510,29 +503,35 @@ export function AuthForm({
             required
             autoComplete="email"
             value={email}
-            onChange={(event) => setEmail(event.target.value)}
+            onChange={(event) => {
+              const next = event.target.value
+              setEmail(next)
+              if (!next.trim().includes('@')) setPassword('')
+            }}
           />
         </div>
-        <div>
-          <div className="flex items-center justify-between gap-2">
-            <FieldLabel htmlFor={`${idPrefix}-password`}>Password</FieldLabel>
-            <button
-              type="button"
-              className="text-xs font-medium text-coral-700 hover:underline"
-              onClick={openForgotPassword}
-            >
-              Forgot password?
-            </button>
+        {emailReady ? (
+          <div>
+            <div className="flex items-center justify-between gap-2">
+              <FieldLabel htmlFor={`${idPrefix}-password`}>Password</FieldLabel>
+              <button
+                type="button"
+                className="text-xs font-medium text-coral-700 hover:underline"
+                onClick={openForgotPassword}
+              >
+                Forgot password?
+              </button>
+            </div>
+            <PasswordInput
+              id={`${idPrefix}-password`}
+              required
+              minLength={6}
+              autoComplete="current-password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+            />
           </div>
-          <PasswordInput
-            id={`${idPrefix}-password`}
-            required
-            minLength={6}
-            autoComplete="current-password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-          />
-        </div>
+        ) : null}
         {error || sessionError ? <p className="text-sm text-red-700">{error || sessionError}</p> : null}
         {info ? <p className="text-sm text-emerald-700">{info}</p> : null}
         {needsConfirmation ? (
@@ -545,7 +544,7 @@ export function AuthForm({
             {resetWait > 0 ? `Resend available in ${resetWait}s` : 'Resend confirmation email'}
           </button>
         ) : null}
-        <Button type="submit" fullWidth disabled={busy}>
+        <Button type="submit" fullWidth disabled={busy || !emailReady}>
           {submitting ? 'Please wait…' : 'Sign In'}
         </Button>
       </form>
