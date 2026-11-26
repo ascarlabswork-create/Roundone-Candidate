@@ -47,7 +47,8 @@ export function AuthModal() {
     }
   }, [showDialog, closeAuth])
 
-  if (accountDeleted) {
+  // AuthPage owns the deleted confirmation on login/register routes.
+  if (accountDeleted && !pathname.startsWith('/candidate/login') && !pathname.startsWith('/candidate/register')) {
     return (
       <AccountDeletedDialog
         open
