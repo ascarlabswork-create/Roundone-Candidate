@@ -54,6 +54,47 @@ export const TARGET_ROLES = [
   'UX Designer',
 ] as const
 
+/** Software / Internet / AI browse groups for the welcome role picker. */
+export const SOFTWARE_ROLE_GROUPS = [
+  {
+    title: 'Software Engineering',
+    roles: [
+      'Software Engineer',
+      'Backend Engineer',
+      'Frontend Engineer',
+      'Full Stack Engineer',
+      'Mobile Engineer',
+      'iOS Engineer',
+      'Android Engineer',
+      'QA Engineer',
+    ],
+  },
+  {
+    title: 'Data & Analytics',
+    roles: ['Data Analyst', 'Data Scientist', 'Data Engineer'],
+  },
+  {
+    title: 'Machine Learning & AI',
+    roles: ['ML Engineer', 'AI Engineer'],
+  },
+  {
+    title: 'Infrastructure & Cloud',
+    roles: [
+      'DevOps Engineer',
+      'Site Reliability Engineer',
+      'Cloud Engineer',
+      'Security Engineer',
+      'Solutions Architect',
+    ],
+  },
+  {
+    title: 'Product & Leadership',
+    roles: ['Product Manager', 'Engineering Manager', 'Technical Program Manager'],
+  },
+] as const
+
+export const SOFTWARE_FUNCTION_LABEL = 'Software / Internet / AI'
+
 export const COMPANIES = [
   'Google',
   'Amazon',
