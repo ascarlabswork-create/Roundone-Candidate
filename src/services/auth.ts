@@ -40,7 +40,20 @@ export async function getCurrentUser(): Promise<User | null> {
   const { data, error } = await supabase.auth.getUser()
   if (error) {
     const message = error.message.toLowerCase()
-    if (message.includes('session') || error.name === 'AuthSessionMissingError') return null
+    // Stale JWT after auth.users row was deleted (account delete).
+    if (
+      message.includes('session') ||
+      message.includes('sub claim') ||
+      message.includes('does not exist') ||
+      error.name === 'AuthSessionMissingError'
+    ) {
+      try {
+        await supabase.auth.signOut({ scope: 'local' })
+      } catch {
+        // ignore
+      }
+      return null
+    }
     throw new Error(error.message)
   }
   return data.user ?? null

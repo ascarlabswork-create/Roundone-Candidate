@@ -41,6 +41,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setError(null)
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : 'Could not load your profile.'
+      const lower = message.toLowerCase()
+      // Dead JWT after account delete — treat as signed out, do not surface as a form error.
+      if (lower.includes('sub claim') || lower.includes('does not exist')) {
+        setUser(null)
+        setAccount(null)
+        setError(null)
+        setStatus('anonymous')
+        return
+      }
       if (message.includes('only supports candidate')) {
         setAccount(null)
         setError(message)
@@ -60,8 +69,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       })
       .catch((caught: unknown) => {
         if (cancelled) return
+        const message = caught instanceof Error ? caught.message : 'Could not restore your session.'
+        const lower = message.toLowerCase()
         setStatus('anonymous')
-        setError(caught instanceof Error ? caught.message : 'Could not restore your session.')
+        setUser(null)
+        setAccount(null)
+        setError(
+          lower.includes('sub claim') || lower.includes('does not exist') ? null : message,
+        )
       })
 
     const unsubscribe = onAuthStateChange((nextUser) => {

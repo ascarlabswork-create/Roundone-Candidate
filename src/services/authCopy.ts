@@ -69,6 +69,9 @@ export function authErrorMessage(error: unknown): string {
   if (message.includes('invalid email') || message.includes('unable to validate email')) {
     return 'Enter a valid email address.'
   }
+  if (message.includes('user is banned') || message.includes('banned')) {
+    return 'This login was closed after account deletion. Create a new account with the same email, or use Continue with Google.'
+  }
   if (message.includes('user already registered') || message.includes('already registered')) {
     return 'An account with this email already exists. Sign in instead — use Continue with Google if you signed up with Google, or Forgot password to set an email password.'
   }
