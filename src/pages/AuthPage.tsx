@@ -1,18 +1,37 @@
+import { useEffect } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { AuthForm } from '../components/auth/AuthForm.tsx'
 import { Card, PageHeader } from '../components/ui/primitives.tsx'
+import {
+  clearAccountDeleted,
+  isAccountDeletedFlag,
+} from '../lib/accountDeletedBanner.ts'
 import { postAuthPath } from '../lib/postAuthPath.ts'
+import { supabase } from '../lib/supabase.ts'
 import { useSession } from '../state/session.tsx'
 
 export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
   const { status, user, error: sessionError } = useSession()
-  const [params] = useSearchParams()
+  const [params, setParams] = useSearchParams()
   const nextPath = postAuthPath(params.get('next'))
   const isRegister = mode === 'register'
-  const accountDeleted = !isRegister && params.get('deleted') === '1'
+  const accountDeleted = !isRegister && isAccountDeletedFlag(params.get('deleted'))
 
-  if (status === 'authenticated' && user) {
+  useEffect(() => {
+    if (!accountDeleted) return
+    if (status !== 'authenticated') return
+    void supabase.auth.signOut({ scope: 'local' })
+  }, [accountDeleted, status])
+
+  if (!accountDeleted && status === 'authenticated' && user) {
     return <Navigate to={nextPath} replace />
+  }
+
+  function dismissDeletedBanner() {
+    clearAccountDeleted()
+    const next = new URLSearchParams(params)
+    next.delete('deleted')
+    setParams(next, { replace: true })
   }
 
   return (
@@ -27,10 +46,19 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
           }
         />
         {accountDeleted ? (
-          <p className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-            Your candidate account has been deleted. You can create a new candidate account with the
-            same email anytime. An interviewer account on this email is unchanged.
-          </p>
+          <div
+            className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900"
+            role="status"
+          >
+            <p className="font-semibold">Your account has been deleted.</p>
+            <button
+              type="button"
+              className="mt-2 text-xs font-medium text-emerald-800 underline"
+              onClick={dismissDeletedBanner}
+            >
+              Dismiss
+            </button>
+          </div>
         ) : null}
         {sessionError && status !== 'loading' ? (
           <p className="mt-4 text-sm text-red-700">{sessionError}</p>

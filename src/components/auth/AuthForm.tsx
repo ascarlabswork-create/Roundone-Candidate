@@ -41,6 +41,7 @@ export function AuthForm({
   const isRegister = mode === 'register'
   const [loginStep, setLoginStep] = useState<LoginStep>('email')
   const [registerStep, setRegisterStep] = useState<RegisterStep>('details')
+  const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -147,6 +148,10 @@ export function AuthForm({
     event.preventDefault()
     setError(null)
     setInfo(null)
+    if (!fullName.trim()) {
+      setError('Enter your full name.')
+      return
+    }
     if (!email.trim()) {
       setError('Enter your email.')
       return
@@ -167,6 +172,7 @@ export function AuthForm({
       const result = await signUpCandidate({
         email,
         password,
+        fullName,
         timezone: candidateDisplayTimezone(),
       })
       if (result.needsEmailConfirmation) {
@@ -273,9 +279,9 @@ export function AuthForm({
 
   function googleBlock(placement: 'above' | 'below' = 'below') {
     const divider = (
-      <div className={cn('flex items-center gap-3', placement === 'above' ? 'mb-3 mt-0.5' : 'my-3')} aria-hidden="true">
+      <div className={cn('flex items-center gap-3', placement === 'above' ? 'mb-4 mt-1' : 'my-4')} aria-hidden="true">
         <span className="h-px flex-1 bg-slate-200" />
-        <span className="text-[11px] font-medium uppercase tracking-wide text-slate-400">or</span>
+        <span className="text-xs font-medium uppercase tracking-wide text-slate-400">or</span>
         <span className="h-px flex-1 bg-slate-200" />
       </div>
     )
@@ -357,6 +363,16 @@ export function AuthForm({
       <div>
         {googleBlock('above')}
         <form className="space-y-3" onSubmit={continueRegisterDetails}>
+          <div>
+            <FieldLabel htmlFor={`${idPrefix}-fullName`}>Full name</FieldLabel>
+            <TextInput
+              id={`${idPrefix}-fullName`}
+              required
+              autoComplete="name"
+              value={fullName}
+              onChange={(event) => setFullName(event.target.value)}
+            />
+          </div>
           <div>
             <FieldLabel htmlFor={`${idPrefix}-email`}>Email</FieldLabel>
             <TextInput
@@ -548,7 +564,7 @@ export function AuthForm({
           {submitting ? 'Please wait…' : 'Sign In'}
         </Button>
       </form>
-      <p className="mt-2.5 text-center">
+      <p className="mt-3 text-center">
         <button
           type="button"
           className="text-sm font-medium text-navy-950 hover:underline"
