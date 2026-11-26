@@ -14,6 +14,7 @@ import {
   signUpCandidate,
   verifyEmailSignInCode,
 } from '../../services/auth.ts'
+import { clearPasswordSignIn, finishPasswordSignIn, markPasswordSignIn } from '../../lib/passwordSignIn.ts'
 import { maskEmailAddress } from '../../services/authCopy.ts'
 import { useSession } from '../../state/session.tsx'
 import { EmailOtpInputs } from './EmailOtpInputs.tsx'
@@ -136,11 +137,12 @@ export function AuthForm({
       return
     }
     setSubmitting(true)
+    markPasswordSignIn()
     try {
       await signInCandidate({ email, password })
-      await refreshAccount()
-      onSuccess?.()
+      finishPasswordSignIn(nextPath)
     } catch (caught) {
+      clearPasswordSignIn()
       const message = authErrorMessage(caught)
       setError(message)
       if (message.includes('confirm your email')) setNeedsConfirmation(true)
@@ -180,9 +182,10 @@ export function AuthForm({
         setInfo('We sent a confirmation link to your email. Check your inbox and spam folder, then sign in.')
         return
       }
-      await refreshAccount()
-      onSuccess?.()
+      markPasswordSignIn()
+      finishPasswordSignIn(nextPath)
     } catch (caught) {
+      clearPasswordSignIn()
       const message = authErrorMessage(caught)
       setError(message)
       if (message.includes('confirm your email')) setNeedsConfirmation(true)
@@ -298,16 +301,31 @@ export function AuthForm({
     if (registerStep === 'password') {
       return (
         <div>
-          <form className="space-y-4" onSubmit={(event) => void submitRegister(event)}>
+          <form
+            method="post"
+            action={nextPath}
+            autoComplete="on"
+            className="space-y-4"
+            onSubmit={(event) => void submitRegister(event)}
+          >
             <div>
-              <p className="text-sm text-slate-600">
-                Creating account for <span className="font-medium text-navy-950">{email.trim() || 'your email'}</span>
-              </p>
+              <FieldLabel htmlFor={`${idPrefix}-email`}>Email</FieldLabel>
+              <TextInput
+                id={`${idPrefix}-email`}
+                name="username"
+                type="email"
+                required
+                readOnly
+                autoComplete="username"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+              />
             </div>
             <div>
               <FieldLabel htmlFor={`${idPrefix}-password`}>Password</FieldLabel>
               <PasswordInput
                 id={`${idPrefix}-password`}
+                name="new-password"
                 required
                 minLength={6}
                 autoComplete="new-password"
@@ -500,14 +518,21 @@ export function AuthForm({
   return (
     <div>
       {googleBlock('above')}
-      <form className="space-y-3" onSubmit={(event) => void submitPassword(event)}>
+      <form
+        method="post"
+        action={nextPath}
+        autoComplete="on"
+        className="space-y-3"
+        onSubmit={(event) => void submitPassword(event)}
+      >
         <div>
           <FieldLabel htmlFor={`${idPrefix}-email`}>Email</FieldLabel>
           <TextInput
             id={`${idPrefix}-email`}
+            name="username"
             type="email"
             required
-            autoComplete="email"
+            autoComplete="username"
             value={email}
             onChange={(event) => {
               const next = event.target.value
@@ -530,6 +555,7 @@ export function AuthForm({
             </div>
             <PasswordInput
               id={`${idPrefix}-password`}
+              name="password"
               required
               minLength={6}
               autoComplete="current-password"

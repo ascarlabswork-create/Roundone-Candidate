@@ -4,6 +4,7 @@ import { X } from 'lucide-react'
 import { AuthForm } from './AuthForm.tsx'
 import { AccountDeletedDialog } from './AccountDeletedDialog.tsx'
 import { clearAccountDeleted, isAccountDeletedFlag } from '../../lib/accountDeletedBanner.ts'
+import { isPasswordSignInPending } from '../../lib/passwordSignIn.ts'
 import { useAuthModal } from '../../state/authModal.tsx'
 import { useSession } from '../../state/session.tsx'
 import { cn } from '../../lib/cn.ts'
@@ -64,6 +65,7 @@ export function AuthModal() {
   if (!open) return null
 
   if (status === 'authenticated' && user) {
+    if (isPasswordSignInPending()) return null
     if (pathname !== nextPath) {
       return <Navigate to={nextPath} replace />
     }
