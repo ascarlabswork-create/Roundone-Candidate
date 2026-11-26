@@ -250,11 +250,11 @@ export function WelcomePage() {
           <p className="text-sm text-slate-600">Loading your profile…</p>
         ) : (
           <form className="grid gap-7" onSubmit={(event) => void save(event)}>
-            <fieldset className="welcome-rise" style={{ animationDelay: '90ms' }}>
+            <fieldset className="welcome-rise relative z-20" style={{ animationDelay: '90ms' }}>
               <legend className="text-sm font-semibold text-navy-950">Roles you want</legend>
               <p className="mt-1 text-xs text-slate-500">Select multiple. Added roles appear below the field.</p>
               <div className="mt-3 flex gap-2">
-                <div className="min-w-0 flex-1">
+                <div className="relative z-20 min-w-0 flex-1">
                   <FieldLabel htmlFor="welcome-role">Type a role</FieldLabel>
                   <RoleSuggestInput
                     id="welcome-role"
@@ -322,7 +322,7 @@ export function WelcomePage() {
               ) : null}
             </fieldset>
 
-            <fieldset className="welcome-rise" style={{ animationDelay: '160ms' }}>
+            <fieldset className="welcome-rise relative z-0" style={{ animationDelay: '160ms' }}>
               <legend className="text-sm font-semibold text-navy-950">Skills</legend>
               <p className="mt-1 text-xs text-slate-500">Added skills stay separate from suggestions.</p>
               <div className="mt-3 grid gap-2">
