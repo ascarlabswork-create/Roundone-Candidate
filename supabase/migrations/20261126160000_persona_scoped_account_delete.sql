@@ -67,10 +67,7 @@ BEGIN
 
   IF v_has_interviewer THEN
     -- Keep shared auth + profile for the interviewer app.
-    UPDATE public.profiles
-    SET role = 'interviewer'::public.user_role
-    WHERE id = v_user
-      AND role = 'candidate'::public.user_role;
+    -- Do not change profiles.role (admin-only); persona tables decide access.
     RETURN;
   END IF;
 
@@ -231,12 +228,8 @@ BEGIN
         avatar_url = NULL,
         is_active = false
     WHERE id = p_profile_id;
-  ELSE
-    UPDATE public.profiles
-    SET role = 'candidate'::public.user_role
-    WHERE id = p_profile_id
-      AND role = 'interviewer'::public.user_role;
   END IF;
+  -- Dual-persona: keep profiles.role unchanged (admin-only column).
 
   v_hard := (NOT v_dual_candidate)
     AND v_profile_deleted
