@@ -65,7 +65,7 @@ export function GoogleContinueButton({
     <div className="relative w-full">
       <div
         ref={hostRef}
-        className={`flex min-h-11 w-full justify-center overflow-hidden rounded-xl ${disabled || busy ? 'pointer-events-none opacity-60' : ''}`}
+        className={`flex min-h-10 w-full justify-center overflow-hidden rounded-lg ${disabled || busy ? 'pointer-events-none opacity-60' : ''}`}
       />
       {busy ? <p className="mt-2 text-center text-xs text-slate-500">Signing in with Google…</p> : null}
       {loadError ? <p className="mt-2 text-center text-xs text-red-700">{loadError}</p> : null}

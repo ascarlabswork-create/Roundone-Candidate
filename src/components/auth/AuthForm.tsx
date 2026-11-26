@@ -273,9 +273,9 @@ export function AuthForm({
 
   function googleBlock(placement: 'above' | 'below' = 'below') {
     const divider = (
-      <div className={cn('flex items-center gap-3', placement === 'above' ? 'mb-4 mt-1' : 'my-4')} aria-hidden="true">
+      <div className={cn('flex items-center gap-3', placement === 'above' ? 'mb-3 mt-0.5' : 'my-3')} aria-hidden="true">
         <span className="h-px flex-1 bg-slate-200" />
-        <span className="text-xs font-medium uppercase tracking-wide text-slate-400">or</span>
+        <span className="text-[11px] font-medium uppercase tracking-wide text-slate-400">or</span>
         <span className="h-px flex-1 bg-slate-200" />
       </div>
     )
@@ -548,7 +548,7 @@ export function AuthForm({
           {submitting ? 'Please wait…' : 'Sign In'}
         </Button>
       </form>
-      <p className="mt-3 text-center">
+      <p className="mt-2.5 text-center">
         <button
           type="button"
           className="text-sm font-medium text-navy-950 hover:underline"
