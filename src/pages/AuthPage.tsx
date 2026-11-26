@@ -7,6 +7,7 @@ import {
   clearAccountDeleted,
   isAccountDeletedFlag,
 } from '../lib/accountDeletedBanner.ts'
+import { isPasswordSignInPending } from '../lib/passwordSignIn.ts'
 import { postAuthPath } from '../lib/postAuthPath.ts'
 import { supabase } from '../lib/supabase.ts'
 import { useSession } from '../state/session.tsx'
@@ -51,6 +52,14 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
   }, [params, setParams])
 
   if (!deletedFlag && !showDeletedDialog && status === 'authenticated' && user) {
+    if (isPasswordSignInPending()) {
+      return (
+        <div className="px-4 py-16 text-center sm:px-6">
+          <h1 className="text-xl font-semibold text-navy-950">Signing you in…</h1>
+          <p className="mt-2 text-sm text-slate-600">Your browser may ask to save this password.</p>
+        </div>
+      )
+    }
     return <Navigate to={nextPath} replace />
   }
 
