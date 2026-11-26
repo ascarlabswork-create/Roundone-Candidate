@@ -399,7 +399,7 @@ export function CandidateProfilePage() {
       // Delete first, then hard-redirect. Signing out here lets RequireCandidateAuth
       // send users to `/?auth=login` and the deleted banner never appears.
       await deleteMyCandidateAccount()
-      goToAccountDeletedLogin()
+      await goToAccountDeletedLogin()
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : 'Could not delete your account.'
       setDeleteError(message)

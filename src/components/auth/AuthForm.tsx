@@ -37,7 +37,13 @@ export function AuthForm({
   onSwitchMode?: (tab: 'login' | 'register') => void
   showModeLinks?: boolean
 }) {
-  const { status, error: sessionError, refreshAccount } = useSession()
+  const { status, error: sessionErrorRaw, refreshAccount } = useSession()
+  const sessionError =
+    sessionErrorRaw &&
+    !sessionErrorRaw.toLowerCase().includes('sub claim') &&
+    !sessionErrorRaw.toLowerCase().includes('does not exist')
+      ? sessionErrorRaw
+      : null
   const isRegister = mode === 'register'
   const [loginStep, setLoginStep] = useState<LoginStep>('email')
   const [registerStep, setRegisterStep] = useState<RegisterStep>('details')

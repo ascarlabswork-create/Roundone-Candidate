@@ -1,7 +1,8 @@
 import { useEffect, useId, useRef } from 'react'
-import { Navigate, useLocation } from 'react-router-dom'
+import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { X } from 'lucide-react'
 import { AuthForm } from './AuthForm.tsx'
+import { AccountDeletedDialog } from './AccountDeletedDialog.tsx'
 import { clearAccountDeleted, isAccountDeletedFlag } from '../../lib/accountDeletedBanner.ts'
 import { useAuthModal } from '../../state/authModal.tsx'
 import { useSession } from '../../state/session.tsx'
@@ -12,10 +13,11 @@ export function AuthModal() {
   const { open, tab, nextPath, closeAuth, setTab } = useAuthModal()
   const { status, user } = useSession()
   const { pathname } = useLocation()
+  const navigate = useNavigate()
   const titleId = useId()
   const panelRef = useRef<HTMLDivElement>(null)
   const accountDeleted = isAccountDeletedFlag(null)
-  const showDialog = open && !(status === 'authenticated' && user)
+  const showDialog = open && !accountDeleted && !(status === 'authenticated' && user)
 
   useBodyScrollLock(showDialog)
 
@@ -45,6 +47,19 @@ export function AuthModal() {
     }
   }, [showDialog, closeAuth])
 
+  if (accountDeleted) {
+    return (
+      <AccountDeletedDialog
+        open
+        onContinue={() => {
+          clearAccountDeleted()
+          closeAuth()
+          navigate('/candidate/login', { replace: true })
+        }}
+      />
+    )
+  }
+
   if (!open) return null
 
   if (status === 'authenticated' && user) {
@@ -73,20 +88,15 @@ export function AuthModal() {
         <div className="flex items-start justify-between gap-4 border-b border-violet-100 bg-gradient-to-r from-coral-50 via-violet-50 to-sky-50 px-5 py-4 sm:px-6">
           <div>
             <h2 id={titleId} className="text-xl font-semibold tracking-tight text-navy-950">
-              {accountDeleted ? 'Your account has been deleted' : 'Welcome to JobRound.ai'}
+              Welcome to JobRound.ai
             </h2>
             <p className="mt-1 text-sm text-slate-600">
-              {accountDeleted
-                ? 'You can create a new account with the same email anytime.'
-                : 'Prepare smarter. Practice better. Move forward with confidence.'}
+              Prepare smarter. Practice better. Move forward with confidence.
             </p>
           </div>
           <button
             type="button"
-            onClick={() => {
-              clearAccountDeleted()
-              closeAuth()
-            }}
+            onClick={closeAuth}
             className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-slate-500 hover:bg-black/[0.04] hover:text-navy-950"
             aria-label="Close"
           >
@@ -113,14 +123,6 @@ export function AuthModal() {
         </div>
 
         <div className="overflow-y-auto px-5 py-5 sm:px-6 sm:py-6">
-          {accountDeleted ? (
-            <p
-              className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900"
-              role="status"
-            >
-              Your account has been deleted.
-            </p>
-          ) : null}
           <AuthForm
             mode={tab}
             nextPath={nextPath}
