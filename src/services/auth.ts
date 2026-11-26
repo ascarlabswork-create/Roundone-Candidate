@@ -8,7 +8,7 @@ export { authErrorMessage, isDuplicateSignup, parseAuthRateLimitSeconds } from '
 export type SignUpInput = {
   email: string
   password: string
-  fullName: string
+  fullName?: string
   timezone?: string
 }
 
@@ -66,14 +66,19 @@ export async function requireUser(): Promise<User> {
 }
 
 export async function signUpCandidate(input: SignUpInput): Promise<SignUpResult> {
+  const email = input.email.trim()
+  const fullName =
+    input.fullName?.trim() ||
+    email.split('@')[0]?.replace(/[._-]+/g, ' ').trim() ||
+    'Candidate'
   const { data, error } = await supabase.auth.signUp({
-    email: input.email.trim(),
+    email,
     password: input.password,
     options: {
       // Where the email-confirmation link returns to. Dynamic origin, never hardcoded.
       emailRedirectTo: new URL(OAUTH_CALLBACK_PATH, window.location.origin).toString(),
       data: {
-        full_name: input.fullName.trim(),
+        full_name: fullName,
         role: 'candidate',
         timezone: input.timezone?.trim() || candidateDisplayTimezone(),
       },
