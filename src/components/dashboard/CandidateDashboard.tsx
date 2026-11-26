@@ -2,13 +2,15 @@ import { ArrowRight, CalendarDays, ClipboardCheck, Sparkles, Target } from 'luci
 import { useState, type ReactNode } from 'react'
 import { cn } from '../../lib/cn.ts'
 import { Link } from 'react-router-dom'
-import { InterviewSummaryCard } from '../interviews/InterviewSummaryCard.tsx'
 import { CandidateFeedbackAction } from '../interviews/CandidateFeedbackAction.tsx'
 import { CandidateReviewAction } from '../interviews/CandidateReviewAction.tsx'
+import { SkillMatchCard, SkillMatchCardSkeleton } from '../interviewer/SkillMatchCard.tsx'
 import { Button } from '../ui/Button.tsx'
 import { Card, EmptyState, ErrorState, Skeleton } from '../ui/primitives.tsx'
 import { formatBookingTime, formatCivilDateWithYear, isoDateInZone } from '../../availability/index.ts'
+import { candidateDisplayTimezone } from '../../lib/candidateTimezone.ts'
 import { useAsync } from '../../lib/useAsync.ts'
+import { recommendMatchedInterviewers } from '../../matching/index.ts'
 import { getCandidateDashboard, type CandidateDashboard } from '../../services/candidateDashboard.ts'
 import { interviewStatusLabel } from '../../services/interviewSessions.ts'
 import {
@@ -16,6 +18,7 @@ import {
   formatPracticeScore,
   getPracticeProgress,
 } from '../../services/practiceProgress.ts'
+import { emptyPreferences } from '../../state/matching.tsx'
 import { useNotifications } from '../../state/notifications.tsx'
 import { useSession } from '../../state/session.tsx'
 
@@ -130,6 +133,70 @@ function RecentInterviewRow({ dashboard }: { dashboard: CandidateDashboard }) {
   )
 }
 
+function AvailableMatches({ timezone, userId }: { timezone: string; userId: string | undefined }) {
+  const [retryNonce, setRetryNonce] = useState(0)
+  // Empty preferences → matching falls back to the candidate's saved + resume skills,
+  // and no date filter means "any open slot".
+  const state = useAsync(
+    () => recommendMatchedInterviewers(emptyPreferences, timezone),
+    [userId, timezone, retryNonce],
+  )
+
+  return (
+    <div>
+      <div className="mb-3 flex items-end justify-between gap-3">
+        <div>
+          <p className="text-xs font-medium text-coral-700">Available now</p>
+          <h2 className="mt-1 text-lg font-semibold text-navy-950">Interviewers for your skills</h2>
+        </div>
+        <Link to="/candidate/matches" className="text-sm font-semibold text-coral-700">
+          View all
+        </Link>
+      </div>
+
+      {state.status === 'loading' ? (
+        <div className="space-y-4">
+          <SkillMatchCardSkeleton />
+          <SkillMatchCardSkeleton />
+        </div>
+      ) : null}
+
+      {state.status === 'error' ? (
+        <ErrorState
+          title="Couldn't load interviewer matches"
+          body={state.error || 'Please try again.'}
+          onRetry={() => setRetryNonce((value) => value + 1)}
+        />
+      ) : null}
+
+      {state.status === 'success' && state.data.length === 0 ? (
+        <EmptyState
+          title="No available interviewers yet"
+          body="We show interviewers who share your skills and have open booking times. Add more skills to widen your matches."
+          action={
+            <Link to="/candidate/find">
+              <Button>Find an Interviewer</Button>
+            </Link>
+          }
+        />
+      ) : null}
+
+      {state.status === 'success' && state.data.length > 0 ? (
+        <div className="space-y-4">
+          {state.data.slice(0, 3).map(({ interviewer, match, booking }) => (
+            <SkillMatchCard
+              key={interviewer.id}
+              interviewer={interviewer}
+              skillMatch={match.skillMatch}
+              booking={booking}
+            />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 function PracticeDashboardCard({ userId }: { userId: string | undefined }) {
   const [retryNonce, setRetryNonce] = useState(0)
   const state = useAsync(() => getPracticeProgress(), [userId, retryNonce])
@@ -194,6 +261,7 @@ export function CandidateDashboard() {
   const state = useAsync(() => getCandidateDashboard(), [account?.userId, retryNonce])
   const unreadBadge = unreadCount != null && unreadCount > 0 ? (unreadCount > 99 ? '99+' : String(unreadCount)) : null
   const firstName = account?.profile.full_name?.trim().split(/\s+/)[0]
+  const displayTimezone = candidateDisplayTimezone(account?.profile.timezone)
 
   return (
     <section className="pb-12">
@@ -261,30 +329,7 @@ export function CandidateDashboard() {
             ) : null}
 
             <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-              <div>
-                <div className="mb-3 flex items-end justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-medium text-coral-700">Next up</p>
-                    <h2 className="mt-1 text-lg font-semibold text-navy-950">Upcoming interview</h2>
-                  </div>
-                  <Link to="/candidate/interviews" className="text-sm font-semibold text-coral-700">
-                    View all
-                  </Link>
-                </div>
-                {state.data.nextInterview ? (
-                  <InterviewSummaryCard interview={state.data.nextInterview} />
-                ) : (
-                  <EmptyState
-                    title="No upcoming interviews"
-                    body="Book a mock interview to see it here."
-                    action={
-                      <Link to="/candidate/find">
-                        <Button>Find an Interviewer</Button>
-                      </Link>
-                    }
-                  />
-                )}
-              </div>
+              <AvailableMatches timezone={displayTimezone} userId={account?.userId} />
               <PracticeDashboardCard userId={account?.userId} />
             </div>
 
