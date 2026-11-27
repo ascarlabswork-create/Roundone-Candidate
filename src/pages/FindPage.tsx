@@ -5,7 +5,6 @@ import {
   TIME_WINDOWS,
 } from '../data/catalogs.ts'
 import { NormalizationSuggestions } from '../components/matching/NormalizationSuggestions.tsx'
-import { ResumeExtractingBanner } from '../components/matching/ResumeExtractingBanner.tsx'
 import { Button } from '../components/ui/Button.tsx'
 import { SkillMultiInput } from '../components/ui/SkillMultiInput.tsx'
 import { Chip, FieldLabel, PageHeader, SelectInput, TextInput } from '../components/ui/primitives.tsx'
@@ -18,10 +17,6 @@ import {
   updateCandidateSkills,
 } from '../services/candidateProfile.ts'
 import { usePreferenceNormalization } from '../matching/usePreferenceNormalization.ts'
-import { requestResumeSkillPlan } from '../resume/aiAssist.ts'
-import { canAnalyzeResume } from '../resume/aiModel.ts'
-import { extractSkillsFromResumeText } from '../resume/extractResumeSkills.ts'
-import { extractResumeText, RESUME_ACCEPT } from '../resume/resumeText.ts'
 import { emptyPreferences, useMatching } from '../state/matching.tsx'
 import type { TimeWindow } from '../data/catalogs.ts'
 import type { MatchingPreferences } from '../types.ts'
@@ -44,7 +39,6 @@ export function FindPage() {
   const { status: suggestionStatus, suggestions, suggest, clear } = usePreferenceNormalization()
   const intentTimer = useRef<number>(0)
   const autoSuggested = useRef(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const initial = useMemo<MatchingPreferences>(
     () => ({
@@ -63,10 +57,6 @@ export function FindPage() {
 
   const [form, setForm] = useState<MatchingPreferences>(initial)
   const [skillDraft, setSkillDraft] = useState('')
-  const [resumeFileName, setResumeFileName] = useState<string | null>(null)
-  const [resumeExtracting, setResumeExtracting] = useState(false)
-  const [resumeStatus, setResumeStatus] = useState<string | null>(null)
-  const [resumeError, setResumeError] = useState<string | null>(null)
   const [dateError, setDateError] = useState<string | null>(null)
   const [optionalOpen, setOptionalOpen] = useState(() =>
     Boolean(initial.targetCompany || initial.naturalLanguageQuery?.trim()),
@@ -105,60 +95,6 @@ export function FindPage() {
     }
     setSkillDraft('')
     clear()
-  }
-
-  async function onResumeSelected(file: File | null) {
-    setResumeError(null)
-    setResumeStatus(null)
-    if (!file) return
-
-    setResumeExtracting(true)
-    setResumeFileName(file.name)
-    try {
-      setResumeStatus('Reading resume…')
-      const text = await extractResumeText(file)
-      if (!canAnalyzeResume(text)) {
-        throw new Error(
-          'That resume did not contain enough readable text. Please try another file, or paste a longer resume.',
-        )
-      }
-
-      setResumeStatus('Extracting skills from resume…')
-      const outcome = await requestResumeSkillPlan(text)
-      setForm((prev) => {
-        const usedAi = outcome.ok
-        const skills = extractSkillsFromResumeText(text, {
-          existing: prev.skills,
-          aiPlan: usedAi ? outcome.plan : null,
-          limit: 36,
-        })
-        const added = Math.max(0, skills.length - prev.skills.length)
-        // Defer status so we never set state synchronously inside another updater.
-        queueMicrotask(() => {
-          const label =
-            added > 0
-              ? `Added ${added} skill${added === 1 ? '' : 's'} from your resume`
-              : usedAi
-                ? 'Resume attached · no new skills found beyond what you already added'
-                : 'Resume attached · skill extract unavailable. Add skills manually'
-          setResumeStatus(label)
-        })
-        return { ...prev, skills }
-      })
-    } catch (error) {
-      setResumeError(error instanceof Error ? error.message : 'Could not read that resume file.')
-      setResumeStatus(null)
-    } finally {
-      setResumeExtracting(false)
-      if (fileInputRef.current) fileInputRef.current.value = ''
-    }
-  }
-
-  function clearResume() {
-    setResumeFileName(null)
-    setResumeError(null)
-    setResumeStatus(null)
-    if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
   useEffect(() => {
@@ -220,8 +156,7 @@ export function FindPage() {
   const canSubmit =
     form.skills.length > 0 ||
     Boolean(form.targetCompany) ||
-    Boolean(form.naturalLanguageQuery && form.naturalLanguageQuery.trim().length >= 12) ||
-    Boolean(resumeFileName)
+    Boolean(form.naturalLanguageQuery && form.naturalLanguageQuery.trim().length >= 12)
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
@@ -248,70 +183,6 @@ export function FindPage() {
       />
 
       <form onSubmit={submit} className="mt-8 space-y-5 rounded-2xl border border-navy-950/8 bg-white/90 p-5 shadow-[0_18px_40px_-28px_rgba(12,18,32,0.45)] sm:p-8">
-        <div>
-          <FieldLabel htmlFor="resume-file">Resume</FieldLabel>
-          <input
-            ref={fileInputRef}
-            id="resume-file"
-            type="file"
-            accept={RESUME_ACCEPT}
-            className="hidden"
-            onChange={(event) => void onResumeSelected(event.target.files?.[0] ?? null)}
-          />
-          <div
-            className={`rounded-2xl border p-3 transition-colors ${
-              resumeExtracting
-                ? 'border-violet-200 bg-gradient-to-br from-white via-violet-50/40 to-sky-50/50'
-                : 'border-slate-200 bg-slate-50/70'
-            }`}
-          >
-            <div className="flex flex-wrap items-center gap-3">
-              <Button
-                variant={resumeExtracting ? 'secondary' : 'outline'}
-                size="sm"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={resumeExtracting}
-                className={
-                  resumeExtracting
-                    ? 'bg-gradient-to-r from-coral-600 via-violet-600 to-sky-600 text-white disabled:from-coral-400 disabled:via-violet-400 disabled:to-sky-400 disabled:text-white'
-                    : undefined
-                }
-              >
-                {resumeExtracting ? 'Extracting…' : resumeFileName ? 'Replace file' : 'Upload resume'}
-              </Button>
-              {resumeFileName && !resumeExtracting ? (
-                <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-                  <span className="inline-flex max-w-full items-center gap-2 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-navy-950">
-                    <span className="truncate font-medium" title={resumeFileName}>
-                      {resumeFileName}
-                    </span>
-                    <button
-                      type="button"
-                      className="shrink-0 text-slate-500 hover:text-navy-900"
-                      onClick={clearResume}
-                      aria-label="Remove resume"
-                    >
-                      ×
-                    </button>
-                  </span>
-                  {resumeStatus ? (
-                    <span className="text-xs font-medium text-emerald-700">{resumeStatus}</span>
-                  ) : null}
-                </div>
-              ) : null}
-              {!resumeFileName && !resumeExtracting ? (
-                <span className="text-sm text-slate-500">
-                  Any file (PDF, Word, text, and more), up to 8 MB. We extract skills from readable resumes.
-                </span>
-              ) : null}
-            </div>
-            {resumeExtracting && resumeFileName ? (
-              <ResumeExtractingBanner fileName={resumeFileName} status={resumeStatus} />
-            ) : null}
-            {resumeError ? <p className="mt-2 text-sm text-red-700">{resumeError}</p> : null}
-          </div>
-        </div>
-
         <div>
           <FieldLabel htmlFor="skills">Skills / Technologies</FieldLabel>
           <SkillMultiInput
