@@ -10,10 +10,9 @@ function expect(condition: boolean, message: string) {
     currentRole: 'software Engineer',
     company: 'asc',
   })
-  expect(lines.length === 2, 'TEST 1 two lines')
+  expect(lines.length === 1, 'TEST 1 one line')
   expect(lines[0] === 'software Engineer · System Design', 'TEST 1 keep headline')
-  expect(lines[1] === 'asc', 'TEST 1 company only — do not repeat role')
-  expect(!lines.some((line) => line.includes('software Engineer @')), 'TEST 1 no double role')
+  expect(!lines.some((line) => line.toLowerCase().includes('asc')), 'TEST 1 hide company')
 }
 
 {
@@ -22,7 +21,7 @@ function expect(condition: boolean, message: string) {
     currentRole: 'Staff Backend Engineer',
     company: 'Stripe',
   })
-  expect(JSON.stringify(lines) === JSON.stringify(['Staff Backend Engineer', 'Stripe']), 'TEST 2 exact role headline')
+  expect(JSON.stringify(lines) === JSON.stringify(['Staff Backend Engineer']), 'TEST 2 exact role headline')
 }
 
 {
@@ -32,8 +31,8 @@ function expect(condition: boolean, message: string) {
     company: 'Meta',
   })
   expect(
-    JSON.stringify(lines) === JSON.stringify(['Hiring-loop coach for FAANG', 'Staff Engineer @ Meta']),
-    'TEST 3 distinct headline keeps role line',
+    JSON.stringify(lines) === JSON.stringify(['Hiring-loop coach for FAANG', 'Staff Engineer']),
+    'TEST 3 distinct headline keeps role line without company',
   )
 }
 
@@ -43,7 +42,7 @@ function expect(condition: boolean, message: string) {
     currentRole: 'Engineer',
     company: 'Acme',
   })
-  expect(lines.length === 1 && lines[0] === 'Engineer @ Acme', 'TEST 4 no headline → role @ company')
+  expect(lines.length === 1 && lines[0] === 'Engineer', 'TEST 4 no headline → role only')
 }
 
 console.log('interviewer identity lines checks passed')

@@ -62,7 +62,7 @@ export function JobMatchCard({
 }) {
   const percentLabel = formatSkillPercentLabel(skillMatch.percent)
   const percentValue = Math.max(0, Math.min(100, skillMatch.percent ?? 0))
-  const roleLine = [interviewer.currentRole, interviewer.company].filter(Boolean).join(' @ ')
+  const roleLine = interviewer.currentRole?.trim() || ''
 
   return (
     <article className="flex h-full flex-col rounded-2xl border border-black/[0.06] bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.04)] sm:p-5">

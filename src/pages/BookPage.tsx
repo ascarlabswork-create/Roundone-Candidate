@@ -686,13 +686,7 @@ export function BookPage() {
             <div>
               <p className="font-semibold text-navy-950">{header.name}</p>
               {header.verified ? <VerifiedBadge /> : null}
-              {header.currentRole || header.company ? (
-                <p className="text-sm text-slate-600">
-                  {header.currentRole}
-                  {header.currentRole && header.company ? ' @ ' : ''}
-                  {header.company}
-                </p>
-              ) : null}
+              {header.currentRole ? <p className="text-sm text-slate-600">{header.currentRole}</p> : null}
               {header.publicCode ? (
                 <p className="mt-1">
                   <span className="inline-flex items-center rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 font-mono text-[11px] font-semibold tracking-wide text-slate-600">

@@ -92,11 +92,7 @@ export function ProfilePage() {
               {isVerified(interviewer) ? <VerifiedBadge /> : null}
               {fromMatches && match ? <MatchScore score={match.score} /> : null}
             </div>
-            <p className="mt-1 text-slate-600">
-              {interviewer.currentRole}
-              {interviewer.currentRole && interviewer.company ? ' @ ' : ''}
-              {interviewer.company}
-            </p>
+            {interviewer.currentRole ? <p className="mt-1 text-slate-600">{interviewer.currentRole}</p> : null}
             {interviewer.publicCode ? (
               <p className="mt-1.5">
                 <span className="inline-flex items-center rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 font-mono text-[11px] font-semibold tracking-wide text-slate-600">
@@ -250,8 +246,9 @@ function AboutTab({ interviewer }: { interviewer: Interviewer }) {
         </ul>
         <h3 className="mt-6 text-sm font-semibold text-navy-950">Work experience</h3>
         <p className="mt-2 text-sm text-slate-700">
-          {interviewer.company}
-          {interviewer.previousCompanies.length ? ` · ${interviewer.previousCompanies.join(' · ')}` : ''}
+          {interviewer.experienceYears > 0
+            ? `${interviewer.experienceYears}+ years experience`
+            : 'Experience details available after booking'}
         </p>
       </Card>
     </div>

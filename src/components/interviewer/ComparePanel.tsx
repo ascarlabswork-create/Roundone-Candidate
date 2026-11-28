@@ -26,14 +26,8 @@ function MatchCell({ score }: { score?: number }) {
 function CompanyCell({ person }: { person: Interviewer }) {
   return (
     <div className="space-y-1">
-      <p className="font-medium text-navy-950">
-        {person.currentRole} @ {person.company}
-      </p>
-      <p className="text-slate-500">
-        {person.previousCompanies.length > 0
-          ? `Previously: ${person.previousCompanies.join(', ')}`
-          : 'No previous companies listed'}
-      </p>
+      <p className="font-medium text-navy-950">{person.currentRole || '—'}</p>
+      <p className="text-slate-500">Company hidden for candidates</p>
     </div>
   )
 }
@@ -115,7 +109,7 @@ function compareRows(matchById: Map<string, number>): Array<{
     },
     {
       key: 'company',
-      label: 'Company experience',
+      label: 'Current role',
       cell: (person) => <CompanyCell person={person} />,
     },
     {
