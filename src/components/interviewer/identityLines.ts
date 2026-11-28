@@ -1,4 +1,4 @@
-/** Normalize for identity comparisons (role / headline / company). */
+/** Normalize for identity comparisons (role / headline). */
 function norm(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, ' ')
 }
@@ -19,8 +19,7 @@ function headlineCoversRole(headline: string, role: string): boolean {
 
 /**
  * One or two subtitle lines under an interviewer name.
- * Avoids repeating currentRole when headline already includes it
- * (e.g. "software Engineer · System Design" + "software Engineer @ asc").
+ * Company is never shown to candidates (kept off booking and match cards).
  */
 export function interviewerIdentityLines(person: {
   headline?: string | null
@@ -29,26 +28,21 @@ export function interviewerIdentityLines(person: {
 }): string[] {
   const headline = person.headline?.trim() ?? ''
   const role = person.currentRole?.trim() ?? ''
-  const company = person.company?.trim() ?? ''
-  const roleAtCompany = [role, company].filter(Boolean).join(' @ ')
+  void person.company
 
   if (!headline) {
-    return roleAtCompany ? [roleAtCompany] : []
+    return role ? [role] : []
   }
 
   if (headlineCoversRole(headline, role)) {
-    const lines = [headline]
-    if (company && !norm(headline).includes(norm(company))) {
-      lines.push(company)
-    }
-    return lines
+    return [headline]
   }
 
-  if (roleAtCompany && norm(headline) === norm(roleAtCompany)) {
+  if (role && norm(headline) === norm(role)) {
     return [headline]
   }
 
   const lines = [headline]
-  if (roleAtCompany) lines.push(roleAtCompany)
+  if (role) lines.push(role)
   return lines
 }
