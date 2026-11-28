@@ -5,7 +5,6 @@ import { Button } from '../components/ui/Button.tsx'
 import { Badge, Card, FieldLabel, PageHeader, TextArea } from '../components/ui/primitives.tsx'
 import { getPracticeProgress } from '../services/practiceProgress.ts'
 import {
-  PRACTICE_DRILLS,
   coverageForAnswer,
   isAttemptedAnswer,
   practiceTypeFromSlug,
@@ -13,8 +12,24 @@ import {
   type PracticeDrill,
   type PracticeQuestion,
 } from '../data/practiceDrills.ts'
-import { INTERVIEW_TYPES } from '../data/catalogs.ts'
+import type { InterviewType } from '../data/catalogs.ts'
+import {
+  personalizePracticeDrill,
+  practiceDrillMatchLabel,
+  rankInterviewTypesForSkills,
+} from '../practice/personalizeDrills.ts'
+import {
+  getCandidatePreferencesIfPresent,
+  getCandidateProfile,
+  getCandidateSkills,
+} from '../services/candidateProfile.ts'
 import { removeSession, readSessionJson, writeSessionJson } from '../lib/storage.ts'
+
+type PracticeProfile = {
+  skills: string[]
+  targetRole: string
+  preferredType: string | null
+}
 
 type SessionAnswer = {
   questionId: string
@@ -88,12 +103,67 @@ export function PracticePage() {
 
   if (!selectedType) return <PracticeHub />
 
-  return <PracticeSession key={selectedType} drill={PRACTICE_DRILLS[selectedType]} />
+  return <PracticeSessionLoader type={selectedType} />
+}
+
+async function loadPracticeProfile(): Promise<PracticeProfile> {
+  const [skills, preferences, account] = await Promise.all([
+    getCandidateSkills(),
+    getCandidatePreferencesIfPresent(),
+    getCandidateProfile(),
+  ])
+  const mergedSkills = (skills.length > 0 ? skills : preferences?.skills ?? [])
+    .map((skill) => skill.trim())
+    .filter(Boolean)
+  return {
+    skills: mergedSkills,
+    targetRole: (account.candidate.target_role ?? '').trim(),
+    preferredType: preferences?.interview_type?.trim() || null,
+  }
+}
+
+function mockInterviewPath(profile: PracticeProfile | null) {
+  if (!profile || profile.skills.length === 0) return '/candidate/practice/mock?fresh=1'
+  const params = new URLSearchParams({ fresh: '1' })
+  if (profile.targetRole) params.set('role', profile.targetRole.slice(0, 80))
+  if (profile.preferredType) params.set('type', profile.preferredType.slice(0, 60))
+  params.set('skills', profile.skills.slice(0, 6).join(','))
+  return `/candidate/practice/mock?${params.toString()}`
+}
+
+function PracticeSessionLoader({ type }: { type: InterviewType }) {
+  const [drill, setDrill] = useState<PracticeDrill | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    void loadPracticeProfile()
+      .then((profile) => {
+        if (cancelled) return
+        setDrill(personalizePracticeDrill(type, profile.skills, profile.targetRole))
+      })
+      .catch(() => {
+        if (!cancelled) setDrill(personalizePracticeDrill(type, [], ''))
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [type])
+
+  if (!drill) {
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
+        <PageHeader title="Preparing your drill" subtitle="Loading questions matched to your skills…" />
+      </div>
+    )
+  }
+
+  return <PracticeSession key={`${type}-${drill.summary}`} drill={drill} />
 }
 
 function PracticeHub() {
   const navigate = useNavigate()
   const [progress, setProgress] = useState<Awaited<ReturnType<typeof getPracticeProgress>> | null>(null)
+  const [profile, setProfile] = useState<PracticeProfile | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -104,10 +174,29 @@ function PracticeHub() {
       .catch(() => {
         /* hub still works without stats */
       })
+    void loadPracticeProfile()
+      .then((next) => {
+        if (!cancelled) setProfile(next)
+      })
+      .catch(() => {
+        if (!cancelled) setProfile({ skills: [], targetRole: '', preferredType: null })
+      })
     return () => {
       cancelled = true
     }
   }, [])
+
+  const rankedTypes = useMemo(() => {
+    const ranked = rankInterviewTypesForSkills(profile?.skills ?? [])
+    const preferred = profile?.preferredType
+    if (!preferred) return ranked
+    const preferredMatch = ranked.find((type) => type.toLowerCase() === preferred.toLowerCase())
+    if (!preferredMatch) return ranked
+    return [preferredMatch, ...ranked.filter((type) => type !== preferredMatch)]
+  }, [profile])
+
+  const skillPreview = (profile?.skills ?? []).slice(0, 4)
+  const hasSkills = skillPreview.length > 0
 
   const statLine =
     progress && progress.sessionCount > 0
@@ -142,6 +231,21 @@ function PracticeHub() {
           <TrendingUp className="h-4 w-4 text-coral-700" aria-hidden />
           {statLine}
         </p>
+        {hasSkills ? (
+          <p className="mt-3 text-sm text-slate-600">
+            Drills ranked for your skills:{' '}
+            <span className="font-medium text-navy-900">{skillPreview.join(' · ')}</span>
+            {(profile?.skills.length ?? 0) > skillPreview.length ? '…' : ''}
+          </p>
+        ) : profile ? (
+          <p className="mt-3 text-sm text-slate-600">
+            Add skills on{' '}
+            <Link to="/candidate/welcome" className="font-medium text-coral-800 underline underline-offset-2">
+              your profile
+            </Link>{' '}
+            to personalize drills and AI mocks.
+          </p>
+        ) : null}
       </section>
 
       <FadeIn className="mx-auto mt-10 grid max-w-5xl gap-5 px-4 sm:px-6 lg:grid-cols-3" stagger>
@@ -157,7 +261,7 @@ function PracticeHub() {
           <ul className="mt-4 space-y-2 text-sm text-slate-700">
             <li className="flex gap-2">
               <Target className="mt-0.5 h-4 w-4 shrink-0 text-coral-600" aria-hidden />
-              Role-specific questions only
+              {hasSkills ? `Questions grounded in ${skillPreview.slice(0, 2).join(', ')}` : 'Role-specific questions only'}
             </li>
             <li className="flex gap-2">
               <History className="mt-0.5 h-4 w-4 shrink-0 text-coral-600" aria-hidden />
@@ -165,7 +269,7 @@ function PracticeHub() {
             </li>
           </ul>
           <div className="mt-6 flex flex-col gap-2">
-            <Button onClick={() => navigate('/candidate/practice/mock?fresh=1')}>Start AI interview</Button>
+            <Button onClick={() => navigate(mockInterviewPath(profile))}>Start AI interview</Button>
             <Button variant="outline" onClick={() => navigate('/candidate/practice/history')}>
               View progress & history
             </Button>
@@ -177,27 +281,42 @@ function PracticeHub() {
             <Timer className="h-5 w-5 text-navy-900" aria-hidden />
             <h2 className="text-lg font-semibold text-navy-950">Timed drills</h2>
           </div>
-          <p className="mt-1 text-sm text-slate-600">Fast reps by interview type — notes, checklist, and recap included.</p>
+          <p className="mt-1 text-sm text-slate-600">
+            {hasSkills
+              ? 'Ordered for your skills — prompts ask you to use them in the answers.'
+              : 'Fast reps by interview type — notes, checklist, and recap included.'}
+          </p>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            {INTERVIEW_TYPES.map((type) => {
-              const drill = PRACTICE_DRILLS[type]
+            {rankedTypes.map((type, index) => {
+              const drill = personalizePracticeDrill(type, profile?.skills ?? [], profile?.targetRole ?? '')
+              const matchLabel = practiceDrillMatchLabel(type, profile?.skills ?? [])
               const saved = readSessionJson<SavedPractice | null>(storageKey(type), null)
               const inProgress = Boolean(saved?.started && !saved.done)
+              const recommended = hasSkills && index < 2 && Boolean(matchLabel)
               return (
                 <div
                   key={type}
-                  className="practice-drill-tile flex flex-col rounded-xl border border-slate-100 bg-slate-50/50 p-4 transition hover:border-coral-200 hover:bg-white"
+                  className={`practice-drill-tile flex flex-col rounded-xl border p-4 transition hover:border-coral-200 hover:bg-white ${
+                    recommended ? 'border-coral-200 bg-orange-50/40' : 'border-slate-100 bg-slate-50/50'
+                  }`}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <h3 className="font-semibold text-navy-950">{type}</h3>
-                    <Badge tone={inProgress ? 'violet' : 'blue'}>{inProgress ? 'Resume' : `${drill.durationMin} min`}</Badge>
+                    <Badge tone={inProgress || recommended ? 'violet' : 'blue'}>
+                      {inProgress ? 'Resume' : recommended ? 'For you' : `${drill.durationMin} min`}
+                    </Badge>
                   </div>
+                  {matchLabel ? (
+                    <p className="mt-1 text-[11px] font-medium uppercase tracking-wide text-coral-800">
+                      Matches {matchLabel}
+                    </p>
+                  ) : null}
                   <p className="mt-2 flex-1 text-xs leading-5 text-slate-600 line-clamp-2">{drill.summary}</p>
                   <Button
                     className="mt-3"
                     size="sm"
                     fullWidth
-                    variant={inProgress ? 'primary' : 'outline'}
+                    variant={inProgress || recommended ? 'primary' : 'outline'}
                     onClick={() => navigate(`/candidate/practice/${practiceTypeSlug(type)}?start=1`)}
                   >
                     {inProgress ? 'Resume drill' : 'Start drill'}

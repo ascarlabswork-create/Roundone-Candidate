@@ -142,18 +142,21 @@ export function AiPracticePage() {
     const jobTargetId = searchParams.get('job') ?? ''
     if (!again && !fresh) return
     const next = emptyPracticeSession()
-    if (again) {
-      const difficultyRaw = (searchParams.get('difficulty') ?? '').trim().toLowerCase()
+    const difficultyRaw = (searchParams.get('difficulty') ?? '').trim().toLowerCase()
+    const roleFromUrl = (searchParams.get('role') ?? '').trim().slice(0, 80)
+    const typeFromUrl = (searchParams.get('type') ?? '').trim().slice(0, 60)
+    const skillsFromUrl = (searchParams.get('skills') ?? '')
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .slice(0, 6)
+    if (again || skillsFromUrl.length > 0 || roleFromUrl || typeFromUrl) {
       next.setup = {
         ...next.setup,
-        targetRole: (searchParams.get('role') ?? '').trim().slice(0, 80),
-        interviewType: (searchParams.get('type') ?? '').trim().slice(0, 60) || 'Technical',
-        difficulty: isPracticeDifficulty(difficultyRaw) ? difficultyRaw : 'intermediate',
-        skills: (searchParams.get('skills') ?? '')
-          .split(',')
-          .map((item) => item.trim())
-          .filter(Boolean)
-          .slice(0, 6),
+        targetRole: roleFromUrl || next.setup.targetRole,
+        interviewType: typeFromUrl || next.setup.interviewType || 'Technical',
+        difficulty: isPracticeDifficulty(difficultyRaw) ? difficultyRaw : next.setup.difficulty,
+        skills: skillsFromUrl.length > 0 ? skillsFromUrl : next.setup.skills,
       }
     }
     if (isUuid(jobTargetId)) {
@@ -162,7 +165,7 @@ export function AiPracticePage() {
     setSession(next)
     setError(null)
     setPersistError(null)
-    setPrefilled(again)
+    setPrefilled(again || skillsFromUrl.length > 0 || Boolean(roleFromUrl))
     setResumePrompt(false)
     setSearchParams({}, { replace: true })
   }, [searchParams, setSearchParams])
