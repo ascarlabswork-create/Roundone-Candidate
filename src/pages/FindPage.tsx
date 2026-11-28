@@ -261,10 +261,6 @@ export function FindPage() {
                   />
                 </div>
               </div>
-              <p className="mt-1 text-xs text-slate-500">
-                Optional — pick a range (for example 01-10-2026 to 15-10-2026), or leave empty for any day. Open times
-                outside this range stay on the interviewer&apos;s calendar and are hidden here.
-              </p>
               {dateError ? <p className="mt-1 text-sm text-red-700">{dateError}</p> : null}
             </div>
             <div className="sm:col-span-2 sm:max-w-xs">
